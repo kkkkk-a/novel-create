@@ -110,7 +110,7 @@ function handleJsonLoad(btn) {
 export function initAssetHandlers() {
     setupAssetManager('characters', 'character-file-input', 'webp');
     setupAssetManager('backgrounds', 'background-file-input', 'webp');
-    setupAssetManager('sounds', 'sound-file-input', 'mp3,ogg,opus');
+    setupAssetManager('sounds', 'sound-file-input', 'mp3,ogg,opus,webm');
 
     const mainContent = document.getElementById('main-content');
     
