@@ -71,12 +71,10 @@
                                     <option value="conditional">❓ 条件分岐 (IF)</option>
                                 </select>
                             </div>
-                            <!-- ▼▼▼ ヘルプボタンを追加 ▼▼▼ -->
                             <button id="open-help-btn" class="secondary-button" style="margin-bottom: 2px;">❓ 使い方のヒント</button>
                         </div>
                         
-<div id="text-node-settings" class="node-type-settings">
-                            <!-- ▼▼▼ 修正: キャラクターと立ち位置を横並びに ▼▼▼ -->
+                        <div id="text-node-settings" class="node-type-settings">
                             <div class="form-group-row">
                                 <div style="flex:2">
                                     <label>キャラクター</label>
@@ -94,7 +92,6 @@
                             
                             <div class="form-group"><label>セリフ本文</label><div id="rich-text-editor"></div></div>
                             
-                            <!-- ▼▼▼ 修正: 背景・BGM・効果音を並べる ▼▼▼ -->
                             <div class="form-group"><label>背景画像</label><select id="node-background"></select></div>
                             
                             <div class="form-group-row">
@@ -108,15 +105,21 @@
                                 </div>
                             </div>
                             
-                            <div class="form-group"><label>次のノードへ進む</label><select id="node-next-text"></select></div>
+                            <!-- ★修正: スマート選択用に div コンテナに変更 -->
+                            <div class="form-group">
+                                <label>次のノードへ進む</label>
+                                <div id="container-next-text" class="smart-select-container"></div>
+                            </div>
                         </div>
 
 
                         <div id="choice-node-settings" class="node-type-settings hidden">
-                            <h4>選択肢</h4><div id="choices-editor"></div><button id="add-choice-btn" class="secondary-button">+ 選択肢を追加</button>
+                            <h4>選択肢</h4>
+                            <div id="choices-editor"></div>
+                            <button id="add-choice-btn" class="secondary-button">+ 選択肢を追加</button>
                         </div>
                         
-                      <div id="variable-node-settings" class="node-type-settings hidden">
+                        <div id="variable-node-settings" class="node-type-settings hidden">
                             <h4>変数操作</h4>
                             <div class="form-group"><label for="var-target">対象変数</label><select id="var-target"></select></div>
                             <div class="form-group"><label for="var-operator">操作</label>
@@ -133,7 +136,12 @@
                                 <input type="text" id="var-value" placeholder="例: 10, 1d6, enemy_hp">
                                 <small style="color:#666;">※ 変数名を入力すると、その変数の値を使って計算します</small>
                             </div>
-                            <div class="form-group"><label for="node-next-variable">次のノード</label><select id="node-next-variable"></select></div>
+                            
+                            <!-- ★修正: スマート選択用に div コンテナに変更 -->
+                            <div class="form-group">
+                                <label for="node-next-variable">次のノード</label>
+                                <div id="container-next-variable" class="smart-select-container"></div>
+                            </div>
                         </div>
                         
                         <div id="conditional-node-settings" class="node-type-settings hidden">
@@ -141,7 +149,12 @@
                             <div id="conditions-editor"></div>
                             <button id="add-condition-btn" class="secondary-button">+ 条件(IF)を追加</button>
                             <hr>
-                            <div class="form-group"><label for="node-next-conditional-else">どの条件にも当てはまらない場合 (ELSE)</label><select id="node-next-conditional-else"></select></div>
+                            
+                            <!-- ★修正: スマート選択用に div コンテナに変更 -->
+                            <div class="form-group">
+                                <label for="node-next-conditional-else">どの条件にも当てはまらない場合 (ELSE)</label>
+                                <div id="container-next-conditional-else" class="smart-select-container"></div>
+                            </div>
                         </div>
                     </div>
                     <div id="editor-placeholder">
@@ -180,8 +193,9 @@
             <h2>キャラクター管理</h2>
             <div class="asset-manager">
                 <div class="asset-uploader">
-                    <p>WebP形式のキャラクター画像を追加してください。</p>
-                    <input type="file" id="character-file-input" accept=".webp" multiple>
+                    <!-- ★修正: JSON対応の文言に変更 -->
+                    <p>WebP画像、またはスプライト設定JSONファイルを追加してください。</p>
+                    <input type="file" id="character-file-input" accept=".webp,.json" multiple>
                     <div id="character-list" class="asset-list"></div>
                 </div>
             </div>
@@ -192,15 +206,16 @@
             <h2>背景管理</h2>
             <div class="asset-manager">
                 <div class="asset-uploader">
-                    <p>WebP形式の背景画像を追加してください。</p>
-                    <input type="file" id="background-file-input" accept=".webp" multiple>
+                    <!-- ★修正: JSON対応の文言に変更 -->
+                    <p>WebP画像、またはスプライト設定JSONファイルを追加してください。</p>
+                    <input type="file" id="background-file-input" accept=".webp,.json" multiple>
                     <div id="background-list" class="asset-list"></div>
                 </div>
             </div>
         </div>
         
         <!-- 効果音管理モード -->
-      <div id="mode-sounds" class="mode-content">
+        <div id="mode-sounds" class="mode-content">
             <h2>効果音管理</h2>
             <div class="asset-manager">
                 <div class="asset-uploader">
@@ -213,8 +228,8 @@
 
     </main>
 
-    <!-- ▼▼▼ ヘルプ用モーダルウィンドウ ▼▼▼ -->
-   <div id="help-modal" class="modal hidden">
+    <!-- ヘルプ用モーダルウィンドウ -->
+    <div id="help-modal" class="modal hidden">
         <div class="modal-content">
             <span class="close-modal">&times;</span>
             <h2>📖 使い方のヒント</h2>
@@ -237,7 +252,7 @@
                     <li><code>2d100+5</code> → 1〜100の乱数に5を足す</li>
                 </ul>
             </div>
-        <div class="help-section">
+            <div class="help-section">
                 <h3>💬 セリフ内での変数表示</h3>
                 <p>セリフ本文（リッチテキストエディタ）内で変数やフラグを表示するには、<strong>ダブル波括弧 {{ }}</strong> で変数を囲みます。</p>
                 <ul>
@@ -255,7 +270,6 @@
                     <li>条件分岐: <code>my_speed > enemy_speed</code><br>
                     → 自分の素早さが、敵の素早さより高いかチェックします。</li>
                 </ul>
-                <p>これを使えば、RPGのようなバトル計算も可能です！</p>
             </div>
         </div>
     </div>
