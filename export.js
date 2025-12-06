@@ -80,7 +80,6 @@ export function generateGameHtml(data, startNodeOverride = null) {
     </div>
 
     <script>
-        console.log('--- EXPORTED GAME JS START ---');
         const gameData = ${dataString};
         let gameState = { ...gameData.variables };
         let currentNodeId = "${initialNodeId}";
@@ -225,7 +224,6 @@ export function generateGameHtml(data, startNodeOverride = null) {
             
             isWaitingForInput = false;
             textBox.style.cursor = 'pointer';
-            console.log('Processing Node ID:', nodeId, 'Type:', node.type);
 
             switch(node.type) {
                 case 'text':
@@ -328,8 +326,6 @@ export function generateGameHtml(data, startNodeOverride = null) {
 
     textBox.addEventListener('click', () => { userInteraction(); if (isWaitingForInput) processNode(currentNodeId); });
     window.onload = () => { if(currentNodeId && currentNodeId !== "null") processNode(currentNodeId); };
-    console.log('--- EXPORTED GAME JS END ---');
-    // ★★★ 修正点: テンプレートリテラル内でJS終了タグをエスケープ ★★★
     <\/script></body></html>`;
 }
 
@@ -347,7 +343,6 @@ export function exportGame() {
         document.body.removeChild(link); 
         URL.revokeObjectURL(link.href);
     } catch (error) { 
-        console.error("Export Error:", error); 
         alert("書き出しエラーが発生しました。コンソールを確認してください。"); 
     }
 }
