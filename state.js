@@ -3,10 +3,28 @@
 
 // Quill Rich Text Editorのインスタンスを先に初期化
 // (HTMLに #rich-text-editor が存在することが前提)
+const Font = Quill.import('formats/font');
+// フォントの内部名と表示名の定義
+Font.whitelist = [
+    'sans-serif', // 標準ゴシック
+    'serif',      // 標準明朝
+    'monospace',  // 等幅
+    'dotgothic',  // ドット文字
+    'rounded',    // 丸ゴシック
+    'klee',       // 手書き風
+    'mincho-b'    // 特太明朝
+];
+Quill.register(Font, true);
+
+
+// Quill Rich Text Editorのインスタンスを先に初期化
 export const quill = new Quill('#rich-text-editor', {
     theme: 'snow',
     modules: { 
         toolbar: [
+            // ★修正: フォント選択を追加
+            [{ 'font': Font.whitelist }], 
+            
             ['bold', 'italic', 'underline'],
             [{ 'color': [] }, { 'background': [] }],
             [{ 'size': ['small', false, 'large', 'huge'] }],
@@ -29,7 +47,8 @@ let projectData = {
     scenario: {
         startNodeId: null,
         sections: {}
-    }
+    },
+    maps: {} // ★追加: マップデータ格納場所
 };
 
 // 2. UI状態: 現在の編集状況など、一時的なデータ
