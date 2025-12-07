@@ -11,176 +11,174 @@ export function generateGameHtml(data, startNodeOverride = null) {
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Novel Game</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Klee+One&family=M+PLUS+Rounded+1c:wght@400;700&family=Shippori+Mincho&display=swap" rel="stylesheet">
+
     <style>
-        body { margin: 0; font-family: sans-serif; background-color: #000; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
-        p{
-        margin:0;}
+        body { margin: 0; font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Biz UDPGothic", sans-serif; background-color: #000; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; touch-action: none; }
+        p{ margin:0; }
         #game-container { position: relative; width: 800px; height: 600px; max-width: 100%; max-height: 100vh; overflow: hidden; background-color: #000; box-shadow: 0 0 20px rgba(255, 255, 255, 0.2); }
         
-        /* アニメーション用レイヤー設定 */
-        .layer { 
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
-            transition: opacity 0.5s ease-in-out; 
-            background-size: cover; /* 静止画用デフォルト */
-            background-position: center; 
-            background-repeat: no-repeat;
-        }
+        /* --- Novel Parts --- */
+        .layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; transition: opacity 0.5s ease-in-out; background-size: cover; background-position: center; background-repeat: no-repeat; pointer-events: none; }
+        #character-layer { display: flex; justify-content: center; align-items: flex-end; padding: 0 5%; box-sizing: border-box; }
         
-        #character-layer {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            display: flex; justify-content: center; align-items: flex-end;
-            transition: opacity 0.5s ease-in-out; pointer-events: none;
-            padding: 0 5%; box-sizing: border-box;
-        }
-        #character-layer.pos-left { justify-content: flex-start; }
-        #character-layer.pos-right { justify-content: flex-end; }
-        #character-layer.pos-center { justify-content: center; }
+        #character-layer.pos-top-left { justify-content: flex-start; align-items: flex-start; }
+        #character-layer.pos-top-center { justify-content: center; align-items: flex-start; }
+        #character-layer.pos-top-right { justify-content: flex-end; align-items: flex-start; }
+        #character-layer.pos-center-left { justify-content: flex-start; align-items: center; }
+        #character-layer.pos-center { justify-content: center; align-items: center; }
+        #character-layer.pos-center-right { justify-content: flex-end; align-items: center; }
+        #character-layer.pos-bottom-left { justify-content: flex-start; align-items: flex-end; }
+        #character-layer.pos-bottom-center { justify-content: center; align-items: flex-end; }
+        #character-layer.pos-bottom-right { justify-content: flex-end; align-items: flex-end; }
 
-        /* キャラクターアニメーション用コンテナ */
-        .sprite-char {
-            width: 100%; height: 95%; /* 親に合わせる */
-            background-repeat: no-repeat;
-            background-position: center bottom;
-            background-size: contain; /* 静止画用デフォルト */
-            image-rendering: pixelated; /* ドット絵用 */
-        }
+        .sprite-char { width: 100%; height: 95%; background-repeat: no-repeat; background-position: center bottom; background-size: contain; image-rendering: pixelated; }
 
-        #text-box { position: absolute; bottom: 4%; left: 5%; width: 90%; height: 30%; background: rgba(0, 0, 0, 0.75); color: #fff; border-radius: 10px; padding: 20px; box-sizing: border-box; cursor: pointer; border: 1px solid #444; backdrop-filter: blur(2px); user-select: none; }
+        #text-box { position: absolute; bottom: 4%; left: 5%; width: 90%; height: 30%; background: rgba(0, 0, 0, 0.75); color: #fff; border-radius: 10px; padding: 20px; box-sizing: border-box; border: 1px solid #444; backdrop-filter: blur(2px); user-select: none; pointer-events: auto; display: block; z-index: 20; }
         #character-name { font-size: 1.4em; font-weight: 700; margin: 0 0 10px; padding-bottom: 5px; border-bottom: 1px solid #777; color: #f1c40f; min-height: 1em; }
         #message { font-size: 1.2em; line-height: 1.6; height: calc(100% - 40px); overflow-y: auto; }
-                #message .ql-size-small { font-size: 0.8em !important; line-height: 1.5; }
-        #message .ql-size-large { font-size: 1.4em !important; line-height: 1.6; }
-        #message .ql-size-huge { font-size: 1.8em !important; line-height: 1.4; }
-        /* Quillのデフォルトサイズ（おそらく span なし、または特定のクラス）への対応も必要かもしれませんが、とりあえず大きいものから対応 */
-                #message strong, #message b { font-weight: bold; }
-        #message em { font-style: italic; }
-        #message u { text-decoration: underline; }
-        #message span[style*="color"] { /* Quillのカラー設定をキャッチ */ }
         
-        #choices-box { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: flex; flex-direction: column; gap: 15px; z-index: 10; width: 80%; max-height: 80%; overflow-y: auto; }
+        .ql-font-dotgothic { font-family: "DotGothic16", sans-serif; }
+        .ql-font-rounded { font-family: "M PLUS Rounded 1c", sans-serif; }
+        .ql-font-klee { font-family: "Klee One", cursive; }
+        .ql-font-mincho-b { font-family: "Shippori Mincho", serif; }
+        .ql-font-serif { font-family: "Meryo", serif; }
+        .ql-font-monospace { font-family: "Courier New", monospace; }
+        
+        #message .ql-size-small { font-size: 0.8em !important; }
+        #message .ql-size-large { font-size: 1.4em !important; }
+        #message .ql-size-huge { font-size: 1.8em !important; }
+        
+        #choices-box { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: flex; flex-direction: column; gap: 15px; z-index: 30; width: 80%; max-height: 80%; overflow-y: auto; pointer-events: auto; }
         .choice-button { padding: 15px 30px; font-size: 1.2em; cursor: pointer; background: rgba(25, 144, 255, 0.8); color: #fff; border: 2px solid #fff; border-radius: 10px; text-align: center; transition: all 0.3s; backdrop-filter: blur(5px); }
         .choice-button:hover { background-color: rgba(60, 170, 255, 1); transform: scale(1.02); }
-        ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: rgba(255,255,255,0.1); border-radius: 4px; }
-        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.3); border-radius: 4px; }
+        
+        #click-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; cursor: pointer; display: none; }
+
+        /* --- Action Game Style --- */
+        #map-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 5; display: none; background: #222; }
+        #map-canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
+        
+        #map-controls { position: absolute; bottom: 20px; left: 20px; z-index: 50; display: none; grid-template-columns: 60px 60px 60px; grid-template-rows: 60px 60px; gap: 10px; }
+        #map-action-btn { position: absolute; bottom: 30px; right: 30px; z-index: 50; width: 80px; height: 80px; border-radius: 50%; background: rgba(255, 255, 255, 0.3); border: 2px solid #fff; color: #fff; font-weight: bold; font-size: 1.2em; display: none; justify-content: center; align-items: center; user-select: none; cursor: pointer; }
+        .pad-btn { width: 60px; height: 60px; background: rgba(255, 255, 255, 0.2); border: 1px solid #fff; border-radius: 10px; display: flex; justify-content: center; align-items: center; color: #fff; font-size: 1.5em; user-select: none; cursor: pointer; }
+        .pad-btn:active, #map-action-btn:active { background: rgba(255, 255, 255, 0.5); }
+        .pad-up { grid-column: 2; grid-row: 1; }
+        .pad-left { grid-column: 1; grid-row: 2; }
+        .pad-down { grid-column: 2; grid-row: 2; }
+        .pad-right { grid-column: 3; grid-row: 2; }
+
+        @media (hover: none) and (pointer: coarse) {
+            #map-controls.active, #map-action-btn.active { display: grid; }
+            #map-action-btn.active { display: flex; }
+        }
     </style>
 </head>
 <body>
     <div id="game-container">
+        <!-- Novel Parts -->
         <div id="background-layer-1" class="layer"></div>
         <div id="background-layer-2" class="layer" style="opacity:0;"></div>
-        <div id="character-layer" class="layer">
-            <!-- キャラクター表示用DIV (imgタグから変更) -->
-            <div id="char-sprite" class="sprite-char"></div>
+        <div id="character-layer" class="layer"><div id="char-sprite" class="sprite-char"></div></div>
+        
+        <!-- Action Game Parts -->
+        <div id="map-layer">
+            <canvas id="map-canvas"></canvas>
+            <div id="map-controls">
+                <div class="pad-btn pad-up" data-key="ArrowUp">↑</div>
+                <div class="pad-btn pad-left" data-key="ArrowLeft">←</div>
+                <div class="pad-btn pad-down" data-key="ArrowDown">↓</div>
+                <div class="pad-btn pad-right" data-key="ArrowRight">→</div>
+            </div>
+            <div id="map-action-btn" data-key="Space">ACT</div>
         </div>
+
+        <!-- UI -->
+        <div id="click-overlay"></div>
         <div id="text-box"><div id="character-name"></div><div id="message"></div></div>
         <div id="choices-box"></div>
     </div>
 
     <script>
+        console.log('--- EXPORTED GAME ENGINE START ---');
         const gameData = ${dataString};
         let gameState = { ...gameData.variables };
+        
+        // --- Core State ---
         let currentNodeId = "${initialNodeId}";
         let isWaitingForInput = true;
+        let isMapMode = false;
+        
+        // --- Audio State ---
         let currentBgmAudio = null;
         let currentBgmId = null;
         let queuedSound = null;
         let hasInteracted = false;
         
-        // ★★★ 修正点: lastTimeの初期化 ★★★
+        // --- Map Engine State ---
+        const mapEngine = {
+            canvas: document.getElementById('map-canvas'),
+            ctx: document.getElementById('map-canvas').getContext('2d'),
+            data: null,
+            bgImage: null,
+            bgScrollY: 0,
+            player: { 
+                x: 0, y: 0, w: 32, h: 32, 
+                speed: 4, vx: 0, vy: 0, 
+                onGround: false,
+                isClimbing: false,
+                gravity: 0.6,
+                jumpPower: -12
+            },
+            camera: { x: 0, y: 0 },
+            keys: {},
+            GRID: 32,
+            activeObjects: [] 
+        };
+
+        // --- Animation State ---
         let lastTime = performance.now(); 
-        
-        // アニメーション管理用オブジェクト
         const animState = {
             bg: { id: null, frame: 0, timer: 0, element: null },
             chara: { id: null, frame: 0, timer: 0, element: null }
         };
 
-        const bg1 = document.getElementById('background-layer-1');
-        const bg2 = document.getElementById('background-layer-2');
+        // --- DOM Elements ---
+        const layers = {
+            bg1: document.getElementById('background-layer-1'),
+            bg2: document.getElementById('background-layer-2'),
+            chara: document.getElementById('character-layer'),
+            map: document.getElementById('map-layer')
+        };
+        const ui = {
+            textBox: document.getElementById('text-box'),
+            name: document.getElementById('character-name'),
+            msg: document.getElementById('message'),
+            choices: document.getElementById('choices-box'),
+            overlay: document.getElementById('click-overlay'),
+            charSprite: document.getElementById('char-sprite'),
+            mapControls: document.getElementById('map-controls'),
+            mapActionBtn: document.getElementById('map-action-btn')
+        };
         let activeBg = 1;
-        const charaLayer = document.getElementById('character-layer');
-        const charSprite = document.getElementById('char-sprite');
-        const nameEl = document.getElementById('character-name');
-        const msgEl = document.getElementById('message');
-        const choicesBox = document.getElementById('choices-box');
-        const textBox = document.getElementById('text-box');
 
-        // ★★★ 変数置換ロジック ★★★
+        // ==========================================
+        //  Common Utils
+        // ==========================================
         function replaceVariablesInText(content) {
             let result = content;
-            
             for (const key in gameState) {
-                // マーカー {{key}} を検索する正規表現
-                const regex = new RegExp('\\{\\{' + key + '\\}\\}', 'g'); 
+                const regex = new RegExp('\\\\{\\\\{' + key + '\\\\}\\\\}', 'g'); 
                 const replacement = gameState[key];
                 result = result.replace(regex, replacement);
             }
             return result;
-        }
-
-        // ★★★ アニメーション処理関連 (簡略化) ★★★
-        function updateSpriteAnimation(target, dt) {
-            if (!target.id || !target.element) return;
-            const assetType = (target.element === charSprite) ? 'characters' : 'backgrounds';
-            const asset = gameData.assets[assetType][target.id];
-            if (!asset) return;
-
-            if ((asset.cols || 1) <= 1 && (asset.rows || 1) <= 1) return;
-
-            const fps = asset.fps || 12;
-            const interval = 1000 / fps;
-            
-            target.timer += dt;
-            if (target.timer >= interval) {
-                target.timer = 0;
-                target.frame++;
-                
-                const totalFrames = (asset.cols || 1) * (asset.rows || 1);
-                
-                if (target.frame >= totalFrames) {
-                    target.frame = (asset.loop !== false) ? 0 : totalFrames - 1;
-                }
-                
-                // applySpriteFrameのロジックをインライン化
-                const cols = asset.cols || 1;
-                const rows = asset.rows || 1;
-                target.element.style.backgroundSize = \`\${cols * 100}% \${rows * 100}%\`;
-                const col = target.frame % cols;
-                const row = Math.floor(target.frame / cols);
-                // 以前のコードのNaNチェックは不要なため削除または簡略化
-                const x = col * (100 / (cols - 1 || 1));
-                const y = row * (100 / (rows - 1 || 1));
-                target.element.style.backgroundPosition = \`\${x}% \${y}%\`;
-            }
-        }
-        
-        function gameLoop(timestamp) {
-            const deltaTime = timestamp - lastTime;
-            lastTime = timestamp;
-
-            updateSpriteAnimation(animState.bg, deltaTime);
-            updateSpriteAnimation(animState.chara, deltaTime);
-
-            requestAnimationFrame(gameLoop);
-        }
-        // lastTimeの初期化をしたので、ここでアニメーションループを開始
-        requestAnimationFrame(gameLoop);
-        
-        function userInteraction() {
-            if (hasInteracted) return;
-            hasInteracted = true;
-            if (queuedSound) { queuedSound.play().catch(e => console.error(e)); queuedSound = null; }
-            if (currentBgmAudio && currentBgmAudio.paused) { currentBgmAudio.play().catch(e => console.error(e)); }
-        }
-        
-        function findNode(nodeId) {
-            for (const secId in gameData.scenario.sections) {
-                if (gameData.scenario.sections[secId].nodes[nodeId]) return gameData.scenario.sections[secId].nodes[nodeId];
-            }
-            return null;
         }
 
         function resolveValue(value) {
@@ -194,10 +192,7 @@ export function generateGameHtml(data, startNodeOverride = null) {
                 return total + bonus;
             }
             if (!isNaN(value) && value.trim() !== '') return Number(value);
-            if (gameState.hasOwnProperty(value)) {
-                const val = gameState[value];
-                return !isNaN(val) ? Number(val) : val;
-            }
+            if (gameState.hasOwnProperty(value)) return !isNaN(gameState[value]) ? Number(gameState[value]) : gameState[value];
             return value;
         }
 
@@ -205,6 +200,8 @@ export function generateGameHtml(data, startNodeOverride = null) {
             let left = gameState[cond.variable];
             if (left === undefined) left = 0;
             let right = resolveValue(cond.compareValue);
+            if (cond.value) right = resolveValue(cond.value); 
+
             if (!isNaN(left) && !isNaN(right)) { left = Number(left); right = Number(right); }
             switch(cond.operator) {
                 case '==': return left == right;
@@ -217,115 +214,584 @@ export function generateGameHtml(data, startNodeOverride = null) {
             }
         }
 
+        function userInteraction() {
+            if (hasInteracted) return;
+            hasInteracted = true;
+            if (queuedSound) { queuedSound.play().catch(e=>{}); queuedSound = null; }
+            if (currentBgmAudio && currentBgmAudio.paused) { currentBgmAudio.play().catch(e=>{}); }
+        }
+
+        // ==========================================
+        //  Main Loop
+        // ==========================================
+        function mainLoop(timestamp) {
+            const dt = timestamp - lastTime;
+            lastTime = timestamp;
+
+            if (isMapMode) {
+                updateMapGame(dt);
+                renderMapGame();
+            } else {
+                updateSpriteAnimation(animState.bg, dt);
+                updateSpriteAnimation(animState.chara, dt);
+            }
+            requestAnimationFrame(mainLoop);
+        }
+        requestAnimationFrame(mainLoop);
+
         function processNode(nodeId) {
-            if (!nodeId) { isWaitingForInput = false; textBox.style.cursor = 'default'; return; }
+            if (!nodeId) return; 
             const node = findNode(nodeId);
-            if (!node) { console.error('Node not found:', nodeId); return; }
-            
+            if (!node) return;
+
+            if (isMapMode && node.type !== 'map') endMapMode();
+
+            console.log('Node:', nodeId, node.type);
             isWaitingForInput = false;
-            textBox.style.cursor = 'pointer';
 
             switch(node.type) {
-                case 'text':
-                    // 背景/キャラ/音響処理（簡略化・省略）
-                    if (node.backgroundId && gameData.assets.backgrounds[node.backgroundId]) {
-                        const asset = gameData.assets.backgrounds[node.backgroundId];
-                        const targetBg = (activeBg === 1) ? bg2 : bg1;
-                        // 背景の切り替えロジックを修正
-                        if (!targetBg.style.backgroundImage.includes(asset.data)) {
-                            targetBg.style.backgroundImage = \`url(\${asset.data})\`;
-                            document.getElementById((activeBg === 1) ? 'background-layer-1' : 'background-layer-2').style.opacity = 0;
-                            targetBg.style.opacity = 1;
-                            activeBg = (activeBg === 1) ? 2 : 1;
-                            animState.bg.id = node.backgroundId; animState.bg.frame = 0; animState.bg.timer = 0; animState.bg.element = targetBg;
-                            if((asset.cols||1)===1 && (asset.rows||1)===1) targetBg.style.backgroundSize = 'cover';
-                        }
-                    }
-                    if (node.characterId && gameData.assets.characters[node.characterId]) {
-                        const asset = gameData.assets.characters[node.characterId];
-                        charSprite.style.backgroundImage = \`url(\${asset.data})\`;
-                        if(animState.chara.id !== node.characterId) {
-                            animState.chara.id = node.characterId; animState.chara.frame = 0; animState.chara.timer = 0; animState.chara.element = charSprite;
-                        }
-                        if((asset.cols||1)===1 && (asset.rows||1)===1) charSprite.style.backgroundSize = 'contain';
-                        nameEl.textContent = asset.name; nameEl.style.display = 'block'; charaLayer.style.opacity = 1;
-                        charaLayer.className = 'layer pos-' + (node.characterPosition || 'center');
-                    } else {
-                        nameEl.style.display = 'none'; charaLayer.style.opacity = 0; animState.chara.id = null;
-                    }
-                    if (node.bgmId) {
-                        if (node.bgmId === 'stop') { if (currentBgmAudio) currentBgmAudio.pause(); currentBgmAudio = null; currentBgmId = null; }
-                        else if (node.bgmId !== currentBgmId && gameData.assets.sounds[node.bgmId]) {
-                            if (currentBgmAudio) currentBgmAudio.pause();
-                            const bgm = gameData.assets.sounds[node.bgmId];
-                            currentBgmAudio = new Audio(bgm.data); currentBgmAudio.loop = true; currentBgmId = node.bgmId;
-                            if (hasInteracted) currentBgmAudio.play().catch(e => console.error(e));
-                        }
-                    }
-                    if (node.soundId && gameData.assets.sounds[node.soundId]) {
-                        const audio = new Audio(gameData.assets.sounds[node.soundId].data);
-                        if(hasInteracted) audio.play().catch(e=>{}); else queuedSound = audio;
-                    }
-                    
-                    choicesBox.innerHTML = '';
-                    currentNodeId = node.nextNodeId;
-                    isWaitingForInput = true;
-                    break;
-
-                case 'choice':
-                    msgEl.innerHTML = ''; choicesBox.innerHTML = ''; nameEl.style.display = 'none';
-                    node.choices.forEach(choice => {
-                        const btn = document.createElement('div');
-                        btn.className = 'choice-button';
-                        // 選択肢テキストの変数置換を実行
-                        btn.textContent = replaceVariablesInText(choice.text);
-                        btn.onclick = (e) => { e.stopPropagation(); userInteraction(); currentNodeId = choice.nextNodeId; processNode(currentNodeId); };
-                        choicesBox.appendChild(btn);
-                    });
-                    break;
-
-                case 'variable':
-                    const targetVar = node.targetVariable;
-                    const val = resolveValue(node.value);
-                    if (gameState[targetVar] === undefined) gameState[targetVar] = 0;
-                    const currentVal = !isNaN(gameState[targetVar]) ? Number(gameState[targetVar]) : gameState[targetVar];
-                    const operateVal = !isNaN(val) ? Number(val) : val;
-                    switch(node.operator) {
-                        case '=': gameState[targetVar] = operateVal; break;
-                        case '+=': gameState[targetVar] = currentVal + operateVal; break;
-                        case '-=': gameState[targetVar] = currentVal - operateVal; break;
-                        case '*=': gameState[targetVar] = currentVal * operateVal; break;
-                        case '/=': gameState[targetVar] = currentVal / operateVal; break;
-                    }
-                    currentNodeId = node.nextNodeId;
-                    setTimeout(() => processNode(currentNodeId), 0);
-                    break;
-
-                case 'conditional':
-                    let jumped = false;
-                    for(const cond of node.conditions) {
-                        if (evaluateCondition(cond)) {
-                            currentNodeId = cond.nextNodeId;
-                            jumped = true;
-                            break;
-                        }
-                    }
-                    if (!jumped) currentNodeId = node.elseNextNodeId;
-                    setTimeout(() => processNode(currentNodeId), 0);
-                    break;
+                case 'text': processTextNode(node); break;
+                case 'choice': processChoiceNode(node); break;
+                case 'variable': processVariableNode(node); break;
+                case 'conditional': processConditionalNode(node); break;
+                case 'map': startMapMode(node); break;
             }
+        }
+
+        function findNode(id) {
+            for (const s in gameData.scenario.sections) {
+                if (gameData.scenario.sections[s].nodes[id]) return gameData.scenario.sections[s].nodes[id];
+            }
+            return null;
+        }
+
+        // ==========================================
+        //  Novel Engine Logic
+        // ==========================================
+        function processTextNode(node) {
+            if (node.backgroundId && gameData.assets.backgrounds[node.backgroundId]) {
+                const asset = gameData.assets.backgrounds[node.backgroundId];
+                const targetBg = (activeBg === 1) ? layers.bg2 : layers.bg1;
+                if (!targetBg.style.backgroundImage.includes(asset.data)) {
+                    targetBg.style.backgroundImage = \`url(\${asset.data})\`;
+                    (activeBg===1 ? layers.bg1 : layers.bg2).style.opacity = 0;
+                    targetBg.style.opacity = 1;
+                    activeBg = (activeBg === 1) ? 2 : 1;
+                    animState.bg.id = node.backgroundId; animState.bg.frame = 0; animState.bg.timer = 0; animState.bg.element = targetBg;
+                    if((asset.cols||1)===1 && (asset.rows||1)===1) targetBg.style.backgroundSize = 'cover';
+                }
+            }
+
+            let charName = '';
+            if (node.characterId && gameData.assets.characters[node.characterId]) {
+                const asset = gameData.assets.characters[node.characterId];
+                ui.charSprite.style.backgroundImage = \`url(\${asset.data})\`;
+                if(animState.chara.id !== node.characterId) {
+                    animState.chara.id = node.characterId; animState.chara.frame = 0; animState.chara.timer = 0; animState.chara.element = ui.charSprite;
+                }
+                if((asset.cols||1)===1 && (asset.rows||1)===1) ui.charSprite.style.backgroundSize = 'contain';
+                
+                layers.chara.style.opacity = 1;
+                layers.chara.className = 'layer pos-' + (node.characterPosition || 'bottom-center');
+                charName = node.customName || asset.name;
+            } else {
+                layers.chara.style.opacity = 0; animState.chara.id = null;
+                charName = node.customName || '';
+            }
+
+            ui.name.style.display = charName ? 'block' : 'none';
+            if (charName) ui.name.textContent = replaceVariablesInText(charName);
+
+            if (node.bgmId) {
+                if (node.bgmId === 'stop') { if(currentBgmAudio) currentBgmAudio.pause(); currentBgmAudio=null; currentBgmId=null; }
+                else if (node.bgmId !== currentBgmId && gameData.assets.sounds[node.bgmId]) {
+                    if(currentBgmAudio) currentBgmAudio.pause();
+                    const bgm = gameData.assets.sounds[node.bgmId];
+                    currentBgmAudio = new Audio(bgm.data); currentBgmAudio.loop = true; currentBgmId = node.bgmId;
+                    if(hasInteracted) currentBgmAudio.play().catch(e=>{});
+                }
+            }
+            if (node.soundId && gameData.assets.sounds[node.soundId]) {
+                const se = new Audio(gameData.assets.sounds[node.soundId].data);
+                if(hasInteracted) se.play().catch(e=>{}); else queuedSound = se;
+            }
+
+            ui.choices.innerHTML = '';
+            const tempDiv = document.createElement("div"); tempDiv.innerHTML = node.message || "";
+            const hasText = tempDiv.textContent.trim().length > 0 || node.message.includes("<img");
+
+            if (hasText) {
+                ui.msg.innerHTML = replaceVariablesInText(node.message);
+                ui.textBox.style.display = 'block';
+            } else {
+                ui.textBox.style.display = 'none';
+            }
+
+            ui.overlay.style.display = 'block';
+            currentNodeId = node.nextNodeId;
+            isWaitingForInput = true;
+        }
+
+        function processChoiceNode(node) {
+            ui.overlay.style.display = 'none'; ui.textBox.style.display = 'none'; ui.msg.innerHTML = ''; ui.choices.innerHTML = '';
+            node.choices.forEach(c => {
+                const btn = document.createElement('div');
+                btn.className = 'choice-button';
+                btn.textContent = replaceVariablesInText(c.text);
+                btn.onclick = (e) => { e.stopPropagation(); userInteraction(); currentNodeId = c.nextNodeId; processNode(currentNodeId); };
+                ui.choices.appendChild(btn);
+            });
+        }
+
+        function processVariableNode(node) {
+            const target = node.targetVariable;
+            const val = resolveValue(node.value);
+            if (gameState[target] === undefined) gameState[target] = 0;
+            let cur = gameState[target];
+            if(!isNaN(cur)) cur = Number(cur);
+            const opVal = !isNaN(val) ? Number(val) : val;
             
-            // ★★★ メッセージの変数置換処理 ★★★
-            if (node.type === 'text' && isWaitingForInput) {
-                // node.messageはHTMLを含む（scenarioHandlers.jsによる）
-                msgEl.innerHTML = replaceVariablesInText(node.message);
+            if(node.operator === '=') gameState[target] = opVal;
+            else if(node.operator === '+=') gameState[target] = cur + opVal;
+            else if(node.operator === '-=') gameState[target] = cur - opVal;
+            else if(node.operator === '*=') gameState[target] = cur * opVal;
+            else if(node.operator === '/=') gameState[target] = cur / opVal;
+            
+            currentNodeId = node.nextNodeId;
+            setTimeout(() => processNode(currentNodeId), 0);
+        }
+
+        function processConditionalNode(node) {
+            let jumped = false;
+            for(const cond of node.conditions) {
+                if(evaluateCondition(cond)) { currentNodeId = cond.nextNodeId; jumped = true; break; }
+            }
+            if(!jumped) currentNodeId = node.elseNextNodeId;
+            setTimeout(() => processNode(currentNodeId), 0);
+        }
+
+        function updateSpriteAnimation(state, dt) {
+            if(!state.id || !state.element) return;
+            const type = (state.element === ui.charSprite) ? 'characters' : 'backgrounds';
+            const asset = gameData.assets[type][state.id];
+            if(!asset || (asset.cols||1)<=1) return;
+            state.timer += dt;
+            if(state.timer >= 1000/(asset.fps||12)) {
+                state.timer = 0; state.frame++;
+                const total = (asset.cols||1)*(asset.rows||1);
+                if(state.frame >= total) state.frame = (asset.loop!==false) ? 0 : total-1;
+                const col = state.frame % (asset.cols||1);
+                const row = Math.floor(state.frame / (asset.cols||1));
+                state.element.style.backgroundPosition = \`\${col * 100 / ((asset.cols||1)-1)}% \${row * 100 / ((asset.rows||1)-1)}%\`;
+            }
+        }
+
+        // ==========================================
+        //  Action/RPG Map Engine Logic
+        // ==========================================
+
+        function checkCondition(obj) {
+            if (!obj.condition || !obj.condition.variable) return true; 
+            return evaluateCondition(obj.condition);
+        }
+
+        function startMapMode(node) {
+            isMapMode = true;
+            const mapId = node.mapId;
+            const mapData = gameData.maps[mapId];
+            if (!mapData) { console.error('Map data not found'); return; }
+
+            layers.map.style.display = 'block';
+            ui.textBox.style.display = 'none';
+            ui.overlay.style.display = 'none';
+            ui.mapControls.classList.add('active');
+            ui.mapActionBtn.classList.add('active');
+
+            mapEngine.data = mapData;
+            mapEngine.camera = { x: 0, y: 0 };
+            mapEngine.bgScrollY = 0;
+            
+            mapEngine.bgImage = null;
+            if (mapData.bgImageId && gameData.assets.backgrounds[mapData.bgImageId]) {
+                const img = new Image();
+                img.src = gameData.assets.backgrounds[mapData.bgImageId].data;
+                mapEngine.bgImage = img;
             }
 
-        } // processNode の終了
+            let startX = 1, startY = 1;
+            const spawnObj = mapData.objects.find(o => o.isSpawn && o.spawnId === node.spawnId);
+            if (spawnObj) { startX = spawnObj.x; startY = spawnObj.y; }
+            
+            mapEngine.player.x = startX * mapEngine.GRID;
+            mapEngine.player.y = startY * mapEngine.GRID;
+            mapEngine.player.vx = 0; mapEngine.player.vy = 0;
+            mapEngine.player.onGround = false;
+            mapEngine.player.isClimbing = false;
+            
+            // ★オブジェクトの初期化（移動用ステート設定）
+            // JSONデータは参照渡しになるため、実行用プロパティを追加する場合は注意が必要
+            // ここでは簡易的に元のオブジェクトにプロパティを追加（リセット時に再初期化推奨）
+            mapEngine.activeObjects = mapData.objects.filter(obj => checkCondition(obj));
+            mapEngine.activeObjects.forEach(obj => {
+                obj.currentX = obj.x * mapEngine.GRID;
+                obj.currentY = obj.y * mapEngine.GRID;
+                obj.moveTimer = 0;
+                // 初期方向（ランダムや往復用）
+                obj.dirX = Math.random() > 0.5 ? 1 : -1;
+                obj.dirY = Math.random() > 0.5 ? 1 : -1;
+                obj.originX = obj.x; // グリッド単位の初期位置
+                obj.originY = obj.y;
+            });
+            
+            mapEngine.canvas.width = 800; mapEngine.canvas.height = 600;
+        }
 
+        function endMapMode() {
+            isMapMode = false;
+            layers.map.style.display = 'none';
+            ui.mapControls.classList.remove('active');
+            ui.mapActionBtn.classList.remove('active');
+        }
 
-    textBox.addEventListener('click', () => { userInteraction(); if (isWaitingForInput) processNode(currentNodeId); });
-    window.onload = () => { if(currentNodeId && currentNodeId !== "null") processNode(currentNodeId); };
+        function updateMapGame(dt) {
+            const p = mapEngine.player;
+            const map = mapEngine.data;
+            const grid = mapEngine.GRID;
+            
+            // オブジェクトの再評価（変数が変わった場合など）
+            // ※ 毎フレームfilterは重いかもしれないが、イベント実行で変数が変わる可能性があるため
+            mapEngine.activeObjects = map.objects.filter(obj => checkCondition(obj));
+
+            // ★オブジェクトの移動処理
+            mapEngine.activeObjects.forEach(obj => updateObjectMovement(obj, dt));
+
+            let dx = 0, dy = 0;
+            if (mapEngine.keys['ArrowLeft']) dx = -1;
+            if (mapEngine.keys['ArrowRight']) dx = 1;
+            
+            // --- Player Movement ---
+            if (map.type === 'side') {
+                const cx = Math.floor((p.x + p.w/2) / grid);
+                const cy = Math.floor((p.y + p.h/2) / grid);
+                const ladder = mapEngine.activeObjects.find(o => o.x === cx && o.y === cy && o.effectType === 'ladder');
+                
+                if (ladder) {
+                    if (mapEngine.keys['ArrowUp'] || mapEngine.keys['ArrowDown']) {
+                        p.isClimbing = true;
+                        p.vx = 0; p.vy = 0; 
+                    }
+                } else {
+                    p.isClimbing = false;
+                }
+
+                if (p.isClimbing) {
+                    if (mapEngine.keys['ArrowUp']) p.y -= 2;
+                    if (mapEngine.keys['ArrowDown']) p.y += 2;
+                    p.vx = dx * 2; 
+                    p.vy = 0; 
+                    if (mapEngine.keys['Space']) {
+                        p.isClimbing = false;
+                        p.vy = -5;
+                        mapEngine.keys['Space'] = false;
+                    }
+                } else {
+                    p.vx = dx * p.speed;
+                    p.vy += p.gravity; 
+                    
+                    if ((mapEngine.keys['ArrowUp'] || mapEngine.keys['Space']) && p.onGround) {
+                        p.vy = p.jumpPower;
+                        p.onGround = false;
+                    }
+                }
+
+            } else if (map.type === 'shooter') {
+                if (mapEngine.keys['ArrowUp']) dy = -1;
+                if (mapEngine.keys['ArrowDown']) dy = 1;
+                p.vx = dx * p.speed;
+                p.vy = dy * p.speed;
+                mapEngine.bgScrollY += map.scrollSpeed || 2;
+                
+            } else {
+                if (mapEngine.keys['ArrowUp']) dy = -1;
+                if (mapEngine.keys['ArrowDown']) dy = 1;
+                p.vx = dx * p.speed;
+                p.vy = dy * p.speed;
+            }
+
+            if (map.scrollDir === 'right') p.x += map.scrollSpeed;
+            
+            // --- Physics & Collision ---
+            p.x += p.vx;
+            checkWallCollision(p, map, 'x');
+
+            p.y += p.vy;
+            p.onGround = false;
+            checkWallCollision(p, map, 'y');
+
+            // --- Camera & Bounds ---
+            if (map.type === 'shooter') {
+                p.x = Math.max(0, Math.min(p.x, mapEngine.canvas.width - p.w));
+                p.y = Math.max(0, Math.min(p.y, mapEngine.canvas.height - p.h));
+            } else {
+                mapEngine.camera.x = p.x + p.w/2 - mapEngine.canvas.width/2;
+                mapEngine.camera.y = p.y + p.h/2 - mapEngine.canvas.height/2;
+                
+                const maxX = map.width * grid - mapEngine.canvas.width;
+                const maxY = map.height * grid - mapEngine.canvas.height;
+                mapEngine.camera.x = Math.max(0, Math.min(mapEngine.camera.x, maxX));
+                mapEngine.camera.y = Math.max(0, Math.min(mapEngine.camera.y, maxY));
+                
+                if (map.type === 'side' && p.y > map.height * grid) {
+                    p.y = 0; p.vy = 0; 
+                }
+            }
+
+            checkMapEvents(p);
+        }
+
+        // ★オブジェクト移動ロジック
+        function updateObjectMovement(obj, dt) {
+            if (!obj.moveType || obj.moveType === 'fixed') return;
+            
+            // 初期化（初回のみ）
+            if (obj.currentX === undefined) {
+                obj.currentX = obj.x * mapEngine.GRID;
+                obj.currentY = obj.y * mapEngine.GRID;
+                obj.moveTimer = 0;
+                obj.dirX = 1;
+                obj.dirY = 0;
+            }
+
+            const speed = (obj.moveSpeed || 2) * (dt / 16); // 簡易デルタタイム補正
+            const range = (obj.moveRange || 3) * mapEngine.GRID;
+            const startX = obj.x * mapEngine.GRID;
+            const startY = obj.y * mapEngine.GRID;
+
+            if (obj.moveType === 'horizontal') {
+                obj.currentX += speed * obj.dirX;
+                if (obj.currentX > startX + range) obj.dirX = -1;
+                if (obj.currentX < startX - range) obj.dirX = 1;
+            } 
+            else if (obj.moveType === 'vertical') {
+                obj.currentY += speed * obj.dirY;
+                if (obj.dirY === 0) obj.dirY = 1; // 初期化漏れ対策
+                if (obj.currentY > startY + range) obj.dirY = -1;
+                if (obj.currentY < startY - range) obj.dirY = 1;
+            }
+            else if (obj.moveType === 'random') {
+                obj.moveTimer += dt;
+                if (obj.moveTimer > 1000) { // 1秒ごとに方向転換
+                    obj.moveTimer = 0;
+                    const r = Math.random();
+                    if(r < 0.25) { obj.dirX = 1; obj.dirY = 0; }
+                    else if(r < 0.5) { obj.dirX = -1; obj.dirY = 0; }
+                    else if(r < 0.75) { obj.dirX = 0; obj.dirY = 1; }
+                    else { obj.dirX = 0; obj.dirY = -1; }
+                }
+                // 簡易移動（壁判定は省略、範囲内のみ）
+                let nextX = obj.currentX + speed * obj.dirX;
+                let nextY = obj.currentY + speed * obj.dirY;
+                
+                // 初期位置からの範囲制限
+                if (Math.abs(nextX - startX) < range && Math.abs(nextY - startY) < range) {
+                    obj.currentX = nextX;
+                    obj.currentY = nextY;
+                }
+            }
+            else if (obj.moveType === 'chase') {
+                const p = mapEngine.player;
+                const dx = p.x - obj.currentX;
+                const dy = p.y - obj.currentY;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+                
+                if (dist < range * 2) { // 範囲内に入ったら追尾
+                    if (Math.abs(dx) > 2) obj.currentX += Math.sign(dx) * speed;
+                    if (Math.abs(dy) > 2) obj.currentY += Math.sign(dy) * speed;
+                }
+            }
+        }
+
+        function checkWallCollision(p, map, axis) {
+            if (map.type === 'shooter') return; 
+
+            const grid = mapEngine.GRID;
+            const left = Math.floor(p.x / grid);
+            const right = Math.floor((p.x + p.w - 0.1) / grid);
+            const top = Math.floor(p.y / grid);
+            const bottom = Math.floor((p.y + p.h - 0.1) / grid);
+
+            const isWall = (gx, gy) => {
+                if (gx < 0 || gx >= map.width || gy < 0 || gy >= map.height) return true;
+                const obj = mapEngine.activeObjects.find(o => o.x === gx && o.y === gy);
+                if (obj && obj.isWall) return true;
+                return false;
+            };
+
+            // ★オブジェクトとの動的な衝突（簡易）
+            // activeObjectsの中でisWallかつ、グリッド座標ではない動的座標を持つものをチェックすべきだが
+            // 今回はグリッドベースの壁判定のみとする（複雑化防止）
+
+            const checkSpecial = (gx, gy) => {
+                const obj = mapEngine.activeObjects.find(o => o.x === gx && o.y === gy);
+                if (obj && obj.effectType === 'jump' && map.type === 'side') {
+                    p.vy = -18; 
+                    p.onGround = false;
+                }
+            };
+
+            if (axis === 'x') {
+                if (p.vx > 0) { 
+                    if (isWall(right, top) || isWall(right, bottom)) {
+                        p.x = right * grid - p.w; p.vx = 0;
+                    }
+                } else if (p.vx < 0) { 
+                    if (isWall(left, top) || isWall(left, bottom)) {
+                        p.x = (left + 1) * grid; p.vx = 0;
+                    }
+                }
+                checkSpecial(Math.floor((p.x+p.w/2)/grid), Math.floor((p.y+p.h)/grid));
+            } else { 
+                if (p.vy > 0) { 
+                    if (isWall(left, bottom) || isWall(right, bottom)) {
+                        p.y = bottom * grid - p.h; p.vy = 0; p.onGround = true;
+                    }
+                    const centerBottomX = Math.floor((p.x + p.w/2) / grid);
+                    const centerBottomY = bottom;
+                    checkSpecial(centerBottomX, centerBottomY);
+
+                } else if (p.vy < 0) { 
+                    if (isWall(left, top) || isWall(right, top)) {
+                        p.y = (top + 1) * grid; p.vy = 0;
+                    }
+                }
+            }
+        }
+
+        function checkMapEvents(p) {
+            const grid = mapEngine.GRID;
+            // プレイヤー矩形とオブジェクト矩形の衝突判定（より精密に）
+            const pRect = { l: p.x, r: p.x+p.w, t: p.y, b: p.y+p.h };
+
+            // 重なり判定
+            const hitObj = mapEngine.activeObjects.find(o => {
+                if (!o.hasEvent) return false;
+                
+                // 動いている場合は currentX/Y を使う
+                const ox = (o.currentX !== undefined) ? o.currentX : o.x * grid;
+                const oy = (o.currentY !== undefined) ? o.currentY : o.y * grid;
+                
+                // 矩形衝突
+                return (pRect.l < ox + grid && pRect.r > ox &&
+                        pRect.t < oy + grid && pRect.b > oy);
+            });
+            
+            if (hitObj) {
+                if (hitObj.eventTrigger === 'action' && !mapEngine.keys['Space']) return;
+                if (hitObj.eventTrigger === 'action') mapEngine.keys['Space'] = false; 
+
+                const counterKey = '_sys_evt_' + hitObj.id;
+                if (gameState[counterKey] === undefined) gameState[counterKey] = 0;
+                
+                let count = gameState[counterKey];
+                let eventList = hitObj.eventList || [{nodeId: hitObj.eventNodeId}]; 
+                let targetNodeId = null;
+
+                if (hitObj.eventRepeat === 'once') {
+                    if (count === 0) targetNodeId = eventList[0].nodeId;
+                } else if (hitObj.eventRepeat === 'loop') {
+                    targetNodeId = eventList[count % eventList.length].nodeId;
+                } else { 
+                    const idx = Math.min(count, eventList.length - 1);
+                    targetNodeId = eventList[idx].nodeId;
+                }
+
+                if (targetNodeId) {
+                    gameState[counterKey]++;
+                    processNode(targetNodeId);
+                }
+            }
+        }
+
+        function renderMapGame() {
+            const ctx = mapEngine.ctx;
+            const map = mapEngine.data;
+            const grid = mapEngine.GRID;
+            const cam = mapEngine.camera;
+            const w = mapEngine.canvas.width;
+            const h = mapEngine.canvas.height;
+
+            ctx.clearRect(0, 0, w, h);
+
+            if (map.type === 'shooter' && mapEngine.bgImage) {
+                const bg = mapEngine.bgImage;
+                const yPos = mapEngine.bgScrollY % h;
+                ctx.drawImage(bg, 0, yPos, w, h);
+                ctx.drawImage(bg, 0, yPos - h, w, h);
+            } else if (mapEngine.bgImage) {
+                ctx.save();
+                ctx.translate(-cam.x, -cam.y);
+                ctx.drawImage(mapEngine.bgImage, 0, 0, map.width*grid, map.height*grid);
+                ctx.restore();
+            } else {
+                ctx.fillStyle = '#333';
+                ctx.fillRect(0, 0, w, h);
+            }
+
+            ctx.save();
+            if (map.type !== 'shooter') ctx.translate(-cam.x, -cam.y);
+
+            mapEngine.activeObjects.forEach(obj => {
+                // 動的座標を使用
+                const gx = (obj.currentX !== undefined) ? obj.currentX : obj.x * grid;
+                const gy = (obj.currentY !== undefined) ? obj.currentY : obj.y * grid;
+
+                if (map.type !== 'shooter') {
+                    if (gx + grid < cam.x || gx > cam.x + w || gy + grid < cam.y || gy > cam.y + h) return;
+                }
+
+                ctx.save();
+                ctx.globalAlpha = obj.opacity !== undefined ? obj.opacity : 1.0;
+
+                if (obj.visualType === 'image' && obj.charId && gameData.assets.characters[obj.charId]) {
+                    // スプライト表示（簡易）
+                    ctx.fillStyle = obj.color || 'orange'; 
+                    // ctx.drawImage(...) 画像オブジェクトがあれば描画
+                    ctx.fillRect(gx, gy, grid, grid);
+                } else {
+                    ctx.fillStyle = obj.color || '#888';
+                    ctx.fillRect(gx, gy, grid, grid);
+                }
+                ctx.restore();
+            });
+
+            ctx.fillStyle = 'red';
+            ctx.fillRect(mapEngine.player.x, mapEngine.player.y, mapEngine.player.w, mapEngine.player.h);
+
+            ctx.restore();
+        }
+
+        window.addEventListener('keydown', e => {
+            mapEngine.keys[e.code] = true;
+            if(isMapMode && ["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].includes(e.code)) e.preventDefault();
+        });
+        window.addEventListener('keyup', e => {
+            mapEngine.keys[e.code] = false;
+        });
+
+        document.querySelectorAll('.pad-btn').forEach(btn => {
+            btn.addEventListener('touchstart', (e) => { e.preventDefault(); mapEngine.keys[btn.dataset.key] = true; });
+            btn.addEventListener('touchend', (e) => { e.preventDefault(); mapEngine.keys[btn.dataset.key] = false; });
+        });
+        const actBtn = document.getElementById('map-action-btn');
+        actBtn.addEventListener('touchstart', (e) => { e.preventDefault(); mapEngine.keys['Space'] = true; });
+        actBtn.addEventListener('touchend', (e) => { e.preventDefault(); mapEngine.keys['Space'] = false; });
+
+        const advGame = () => { userInteraction(); if (isWaitingForInput && !isMapMode) processNode(currentNodeId); };
+        ui.textBox.addEventListener('click', advGame);
+        ui.overlay.addEventListener('click', advGame);
+
+        window.onload = () => { if(currentNodeId && currentNodeId !== "null") processNode(currentNodeId); };
+        console.log('--- EXPORTED GAME JS END ---');
     <\/script></body></html>`;
 }
 
@@ -343,6 +809,7 @@ export function exportGame() {
         document.body.removeChild(link); 
         URL.revokeObjectURL(link.href);
     } catch (error) { 
+        console.error("Export Error:", error); 
         alert("書き出しエラーが発生しました。コンソールを確認してください。"); 
     }
 }
