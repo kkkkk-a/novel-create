@@ -87,7 +87,11 @@ function updateNodeData(target) {
         // node.message = state.quill.root.innerHTML; 
         
         const charEl = document.getElementById('node-character');
-        if(charEl) node.characterId = charEl.value;
+     if(charEl) node.characterId = charEl.value;
+
+        // ★追加: 表示名の保存
+        const customNameEl = document.getElementById('node-custom-name');
+        if(customNameEl) node.customName = customNameEl.value;
 
         const posEl = document.getElementById('node-position');
         if(posEl) node.characterPosition = posEl.value;
@@ -135,6 +139,13 @@ function updateNodeData(target) {
                 node.conditions[index][field] = target.value;
             }
         }
+    }
+        else if (node.type === 'map') {
+        const destEl = document.getElementById('node-map-dest');
+        if(destEl) node.mapId = destEl.value;
+        
+        const spawnEl = document.getElementById('node-map-spawn');
+        if(spawnEl) node.spawnId = spawnEl.value;
     }
 }
 
