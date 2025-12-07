@@ -8,7 +8,6 @@ const elements = {
     navButtons: document.querySelectorAll('.nav-button'),
     modeContents: document.querySelectorAll('.mode-content'),
     
-    // シナリオ編集
     sectionList: document.getElementById('section-list'),
     scenarioTree: document.getElementById('scenario-tree'),
     nodeEditor: document.getElementById('node-editor'),
@@ -23,7 +22,6 @@ const elements = {
         background: document.getElementById('node-background'),
         bgm: document.getElementById('node-bgm'),
         sound: document.getElementById('node-sound'),
-        // next はコンテナ化されたため動的に取得
         nextContainer: document.getElementById('container-next-text')
     },
     choiceNode: { editor: document.getElementById('choices-editor') },
@@ -37,7 +35,13 @@ const elements = {
         editor: document.getElementById('conditions-editor'),
         elseNextContainer: document.getElementById('container-next-conditional-else')
     },
+    mapNode: {
+        dest: document.getElementById('node-map-dest'),
+        spawn: document.getElementById('node-map-spawn')
+    },
     
+    mapBgSelect: document.getElementById('map-bg-select'),
+
     variablesList: document.getElementById('variables-list'),
     editorPlaceholder: document.getElementById('editor-placeholder'),
     previewWindow: document.querySelector('.preview-window'),
@@ -47,55 +51,41 @@ const elements = {
     closeHelpBtn: document.querySelector('.close-modal')
 };
 
-// --- ヘルパー関数: スマート選択（章絞り込み機能付き）の生成 ---
+// --- ヘルパー関数 ---
 
-/**
- * 章選択とノード選択の2段階プルダウンを作成する
- * @param {HTMLElement} container - プルダウンを配置する親要素
- * @param {string} selectId - ノード選択プルダウンに付与するID (ハンドラからの参照用)
- * @param {string} currentValue - 現在設定されているノードID
- * @param {Object} dataset - ノード選択プルダウンに付与するdata属性 {index: 1, field: 'nextNodeId'} 等
- */
-function createLinkedSelects(container, selectId, currentValue, dataset = {}) {
+export function createLinkedSelects(container, selectId, currentValue, dataset = {}) {
     if (!container) return;
-    container.innerHTML = ''; // クリア
+    container.innerHTML = ''; 
 
     const projectData = state.getProjectData();
     const activeSectionId = state.getActiveSectionId();
 
-    // 1. 章選択プルダウン
     const sectionSelect = document.createElement('select');
     sectionSelect.className = 'section-filter-select';
-    sectionSelect.style.marginBottom = '5px'; // 少し隙間を空ける
-    sectionSelect.style.backgroundColor = '#f0f8ff'; // 色を変えて区別しやすく
+    sectionSelect.style.marginBottom = '5px';
+    sectionSelect.style.backgroundColor = '#f0f8ff';
 
-    // 2. ノード選択プルダウン
     const nodeSelect = document.createElement('select');
     if (selectId) nodeSelect.id = selectId;
     
-    // データ属性の付与 (条件分岐や選択肢用)
     Object.keys(dataset).forEach(key => {
         nodeSelect.dataset[key] = dataset[key];
     });
 
-    // --- ロジック: 現在のノードIDから、所属する章を特定する ---
-    let targetSectionId = activeSectionId; // デフォルトは現在の章
-    let nodeExists = false;
-
-    // currentValue (繋がっているノードID) がある場合、それがどの章のものか探す
+    let targetSectionId = activeSectionId; 
+    
     if (currentValue) {
         for (const secId in projectData.scenario.sections) {
             if (projectData.scenario.sections[secId].nodes[currentValue]) {
                 targetSectionId = secId;
-                nodeExists = true;
                 break;
             }
         }
     }
+    if (!targetSectionId && Object.keys(projectData.scenario.sections).length > 0) {
+        targetSectionId = Object.keys(projectData.scenario.sections)[0];
+    }
 
-    // --- 章プルダウンの構築 ---
-    // 「(未接続)」などの選択肢のために空文字オプションを用意してもいいが、
-    // 基本はどこかの章を選ぶ形にする。
     Object.keys(projectData.scenario.sections).forEach(secId => {
         const option = document.createElement('option');
         option.value = secId;
@@ -104,16 +94,14 @@ function createLinkedSelects(container, selectId, currentValue, dataset = {}) {
         sectionSelect.appendChild(option);
     });
 
-    // --- ノードプルダウンを更新する関数 ---
     const updateNodeOptions = (secId) => {
-        nodeSelect.innerHTML = '<option value="">(終了または未接続)</option>';
+        nodeSelect.innerHTML = '<option value="">(なし / 終了)</option>';
         
         const section = projectData.scenario.sections[secId];
         if (section && section.nodes) {
             Object.keys(section.nodes).forEach(nodeId => {
                 const node = section.nodes[nodeId];
                 
-                // アイコンと要約の生成
                 let icon = '📄';
                 let summary = node.type;
                 
@@ -138,6 +126,10 @@ function createLinkedSelects(container, selectId, currentValue, dataset = {}) {
                         icon = '❓';
                         summary = `IF分岐`;
                         break;
+                    case 'map':
+                        icon = '🗺️';
+                        summary = 'マップ移動';
+                        break;
                 }
 
                 const option = document.createElement('option');
@@ -150,32 +142,48 @@ function createLinkedSelects(container, selectId, currentValue, dataset = {}) {
         }
     };
 
-    // 初期表示
     updateNodeOptions(targetSectionId);
 
-    // イベントリスナー: 章が変わったらノードリストを更新
     sectionSelect.addEventListener('change', (e) => {
         updateNodeOptions(e.target.value);
-        // 章を変えた瞬間はノードが「未選択」になるので、イベントを発火させてデータを更新しても良いが、
-        // ユーザーがノードを選ぶまで待つ方が親切。ここではノードリストの更新のみ。
+        nodeSelect.value = "";
+        nodeSelect.dispatchEvent(new Event('change', { bubbles: true }));
     });
 
-    // コンテナに追加
     container.appendChild(sectionSelect);
     container.appendChild(nodeSelect);
+}
+
+export function populateAssetSelect(selectElement, type, defaultText = "なし") {
+    if (!selectElement) return;
+    const projectData = state.getProjectData();
+    const currentVal = selectElement.value;
+    
+    selectElement.innerHTML = '';
+    selectElement.add(new Option(defaultText, ''));
+
+    const assets = projectData.assets[type];
+    if (assets) {
+        for (const id in assets) {
+            const asset = assets[id];
+            const displayName = asset.isSpriteSheet ? `${asset.name} (Sprite)` : asset.name;
+            selectElement.add(new Option(displayName, id));
+        }
+    }
+    if (currentVal && assets && assets[currentVal]) {
+        selectElement.value = currentVal;
+    }
 }
 
 // --- メイン UI レンダリング関数 ---
 
 export function renderAll() {
     renderScenarioTree();
-    renderNodeEditor(); // これが内部でスマート選択を生成する
+    renderNodeEditor();
     renderVariablesList();
-    
     renderAssetList('characters');
     renderAssetList('backgrounds');
     renderAssetList('sounds');
-    
     updateAssetDropdowns();
 }
 
@@ -245,7 +253,7 @@ export function renderScenarioTree() {
             nodeDiv.dataset.id = nodeId;
             nodeDiv.dataset.type = node.type;
             
-            nodeDiv.draggable = true; // ドラッグ可能に
+            nodeDiv.draggable = true; 
 
             if (nodeId === projectData.scenario.startNodeId) nodeDiv.classList.add('start-node');
             if (nodeId === activeNodeId) nodeDiv.classList.add('active');
@@ -271,6 +279,10 @@ export function renderScenarioTree() {
                 case 'conditional':
                     icon = '❓';
                     summary = `IF分岐`;
+                    break;
+                case 'map':
+                    icon = '🗺️';
+                    summary = 'マップ移動';
                     break;
                 default:
                     icon = '📄';
@@ -319,12 +331,12 @@ export function renderNodeEditor() {
         case 'text':
             state.quill.root.innerHTML = node.message || '';
             elements.textNode.character.value = node.characterId || '';
-            elements.textNode.position.value = node.characterPosition || 'center';
+            const customNameInput = document.getElementById('node-custom-name');
+            if (customNameInput) customNameInput.value = node.customName || '';
+            elements.textNode.position.value = node.characterPosition || 'bottom-center';
             elements.textNode.background.value = node.backgroundId || '';
             elements.textNode.bgm.value = node.bgmId || '';
             elements.textNode.sound.value = node.soundId || '';
-            
-            // ★スマート選択の生成★
             createLinkedSelects(elements.textNode.nextContainer, 'node-next-text', node.nextNodeId);
             break;
 
@@ -336,18 +348,50 @@ export function renderNodeEditor() {
             elements.variableNode.target.value = node.targetVariable || '';
             elements.variableNode.operator.value = node.operator || '=';
             elements.variableNode.value.value = node.value || '';
-            
-            // ★スマート選択の生成★
             createLinkedSelects(elements.variableNode.nextContainer, 'node-next-variable', node.nextNodeId);
             break;
 
         case 'conditional':
             renderConditionsEditor(node.conditions || []);
-            
-            // ★スマート選択の生成 (ELSE)★
             createLinkedSelects(elements.conditionalNode.elseNextContainer, 'node-next-conditional-else', node.elseNextNodeId);
             break;
+            
+        case 'map':
+            updateMapSelect(elements.mapNode.dest);
+            elements.mapNode.dest.value = node.mapId || '';
+            elements.mapNode.dest.onchange = () => {
+                updateSpawnSelect(elements.mapNode.spawn, elements.mapNode.dest.value);
+            };
+            updateSpawnSelect(elements.mapNode.spawn, node.mapId);
+            elements.mapNode.spawn.value = node.spawnId || '';
+            break;
     }
+}
+
+function updateMapSelect(selectElement) {
+    const maps = state.getProjectData().maps;
+    selectElement.innerHTML = '<option value="">(マップを選択)</option>';
+    if(maps) {
+        for (const id in maps) {
+            selectElement.add(new Option(maps[id].name, id));
+        }
+    }
+}
+
+function updateSpawnSelect(selectElement, mapId) {
+    selectElement.innerHTML = '<option value="">(前回位置または初期位置)</option>';
+    if (!mapId) return;
+    const projectData = state.getProjectData();
+    const map = projectData.maps[mapId];
+    if (!map || !map.objects) return;
+
+    map.objects.forEach(obj => {
+        if (obj.isSpawn) {
+            const label = obj.spawnId ? `🚩 ${obj.spawnId}` : `🚩 (IDなし) [${obj.x},${obj.y}]`;
+            const value = obj.spawnId || '';
+            selectElement.add(new Option(label, value));
+        }
+    });
 }
 
 export function renderChoicesEditor(choices) {
@@ -356,7 +400,6 @@ export function renderChoicesEditor(choices) {
         const item = document.createElement('div');
         item.className = 'choice-editor-item';
         
-        // 選択肢テキスト入力
         const input = document.createElement('input');
         input.type = 'text';
         input.placeholder = '選択肢テキスト';
@@ -364,16 +407,13 @@ export function renderChoicesEditor(choices) {
         input.dataset.index = index;
         input.dataset.field = 'text';
 
-        // 矢印
         const arrow = document.createElement('span');
         arrow.textContent = '→';
 
-        // 次のノード（スマート選択コンテナ）
         const selectContainer = document.createElement('div');
         selectContainer.className = 'smart-select-mini';
         createLinkedSelects(selectContainer, null, choice.nextNodeId, { index: index, field: 'nextNodeId' });
 
-        // 削除ボタン
         const delBtn = document.createElement('button');
         delBtn.className = 'danger-button';
         delBtn.textContent = '×';
@@ -394,19 +434,16 @@ export function renderConditionsEditor(conditions) {
         const item = document.createElement('div');
         item.className = 'condition-editor-item';
 
-        // IFラベル
         const label = document.createElement('span');
         label.textContent = 'IF';
         item.appendChild(label);
 
-        // 変数選択 (これは updateVariableSelects で後で埋められる)
         const varSelect = document.createElement('select');
         varSelect.dataset.index = index;
         varSelect.dataset.field = 'variable';
-        varSelect.value = cond.variable; // 一旦セット
+        varSelect.value = cond.variable; 
         item.appendChild(varSelect);
 
-        // 演算子
         const opSelect = document.createElement('select');
         opSelect.dataset.index = index;
         opSelect.dataset.field = 'operator';
@@ -417,7 +454,6 @@ export function renderConditionsEditor(conditions) {
         });
         item.appendChild(opSelect);
 
-        // 値
         const valInput = document.createElement('input');
         valInput.type = 'text';
         valInput.placeholder = '値';
@@ -426,18 +462,15 @@ export function renderConditionsEditor(conditions) {
         valInput.dataset.field = 'compareValue';
         item.appendChild(valInput);
 
-        // THEN矢印
         const arrow = document.createElement('span');
         arrow.textContent = 'THEN →';
         item.appendChild(arrow);
 
-        // 次のノード（スマート選択コンテナ）
         const selectContainer = document.createElement('div');
         selectContainer.className = 'smart-select-mini';
         createLinkedSelects(selectContainer, null, cond.nextNodeId, { index: index, field: 'nextNodeId' });
         item.appendChild(selectContainer);
 
-        // 削除ボタン
         const delBtn = document.createElement('button');
         delBtn.className = 'danger-button';
         delBtn.textContent = '×';
@@ -447,7 +480,6 @@ export function renderConditionsEditor(conditions) {
         elements.conditionalNode.editor.appendChild(item);
     });
     
-    // 変数セレクトの中身を更新
     updateVariableSelects();
 }
 
@@ -499,7 +531,6 @@ export function renderAssetList(type) {
         if (!asset.data && !asset.isSpriteSheet) {
             contentHtml += `<div style="color:red; font-weight:bold;">エラー: データ破損 (${id})</div>`;
         } else if (!asset.data && asset.isSpriteSheet) {
-            // スプライトシート表示
             contentHtml = `
                 <div style="width:100%; height:120px; background-color:#eee; border-radius:4px; display:flex; justify-content:center; align-items:center; color:#555; font-size:0.9em; text-align:center;">
                     スプライトシート<br>(${asset.width}x${asset.height}px)
@@ -520,7 +551,6 @@ export function renderAssetList(type) {
                 <button class="danger-button" data-id="${id}" data-type="${type}">削除</button>
             `;
         } else {
-            // 通常画像表示
             contentHtml = `
                 <img src="${asset.data}" alt="${asset.name}">
                 <div class="asset-key">${id}</div>
@@ -545,37 +575,17 @@ export function renderAssetList(type) {
     }
 }
 
-// updateAllNodeSelects は廃止 (createLinkedSelects に統合)
 export function updateAllNodeSelects() {
-    // 互換性のために空関数として残すか、再描画を呼ぶ
-    // 基本的に renderNodeEditor が呼ばれれば再生成されるので不要だが、
-    // 外部から呼ばれたときのために念のため現在のエディタを再描画する
     renderNodeEditor();
 }
 
 export function updateAssetDropdowns() {
-    const projectData = state.getProjectData();
-    const populate = (select, type, defaultOptionText) => {
-        if(!select) return;
-        const currentVal = select.value;
-        select.innerHTML = '';
-        select.add(new Option(defaultOptionText, ''));
-
-        const assets = projectData.assets[type];
-        if (!assets) return;
-
-        for (const id in assets) {
-            const asset = assets[id];
-            const displayName = asset.isSpriteSheet ? `${asset.name} (SpriteSheet)` : asset.name;
-            select.add(new Option(displayName, id));
-        }
-        select.value = currentVal;
-    };
-
-    populate(elements.textNode.character, 'characters', 'なし');
-    populate(elements.textNode.background, 'backgrounds', '変更なし');
+    populateAssetSelect(elements.textNode.character, 'characters', 'なし');
+    populateAssetSelect(elements.textNode.background, 'backgrounds', '変更なし');
+    populateAssetSelect(elements.mapBgSelect, 'backgrounds', 'なし');
     
     const soundSelects = [elements.textNode.bgm, elements.textNode.sound];
+    const projectData = state.getProjectData();
     soundSelects.forEach(select => {
         if(!select) return;
         const currentVal = select.value;
@@ -593,14 +603,28 @@ export function updateAssetDropdowns() {
     });
 }
 
+// ★修正: マップエディタの条件変数セレクトにも対応
 export function updateVariableSelects() {
-    const selects = document.querySelectorAll('#var-target, select[data-field="variable"]');
+    // 既存のセレクト群
+    const selects = Array.from(document.querySelectorAll('#var-target, select[data-field="variable"]'));
+    // マップエディタ用のセレクトも追加
+    const mapCondVar = document.getElementById('obj-cond-var');
+    if (mapCondVar) selects.push(mapCondVar);
+
     const projectData = state.getProjectData();
     const options = Object.keys(projectData.variables).map(name => `<option value="${name}">${name}</option>`).join('');
+    
     selects.forEach(select => {
         let currentValue = select.value;
-        select.innerHTML = options;
-        select.value = currentValue || Object.keys(projectData.variables)[0] || '';
+        select.innerHTML = '<option value="">(条件なし)</option>' + options;
+        
+        // 既存の値があれば復元、なければデフォルト
+        if (currentValue && projectData.variables.hasOwnProperty(currentValue)) {
+            select.value = currentValue;
+        } else if (select !== mapCondVar && Object.keys(projectData.variables).length > 0) {
+            // 変数ノードの場合はデフォルト値を入れるが、条件設定の場合は空欄(なし)で良い
+            if (select.id === 'var-target') select.value = Object.keys(projectData.variables)[0];
+        }
     });
 }
 
