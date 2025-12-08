@@ -695,4 +695,28 @@ input[type="text"]:focus, select:focus, textarea:focus { border-color: var(--pri
 .ql-snow .ql-picker.ql-font .ql-picker-label[data-value="monospace"]::before,
 .ql-snow .ql-picker.ql-font .ql-picker-item[data-value="monospace"]::before {
     content: '等幅フォント';
+}/* --- サイトに戻るボタンのスタイル --- */
+.nav-return-btn {
+    margin-left: auto; /* 右端に寄せる */
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: bold;
+    color: #666;
+    background-color: #fff;
+    border: 1px solid #ccc;
+    padding: 8px 16px;
+    border-radius: 20px; /* 丸みをつけて区別する */
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    white-space: nowrap; /* 折り返し防止 */
+    flex-shrink: 0;
+}
+
+.nav-return-btn:hover {
+    background-color: #f0f0f0;
+    color: #333;
+    border-color: #999;
+    transform: translateX(-2px); /* 左にちょこっと動くアニメーション */
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
 }
