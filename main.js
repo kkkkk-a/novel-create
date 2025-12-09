@@ -3,7 +3,7 @@
 // 各モジュールをインポートし、初期化処理を実行する責務を持つ。
 
 // --- 各モジュールの初期化関数をインポート ---
-import { initUi } from './ui.js';
+import { initUi, initUISettings } from './ui.js';
 import { initAssetHandlers } from './assets.js';
 import { initProjectHandlers } from './project.js';
 import { initMainHandlers } from './mainHandlers.js'; 
@@ -17,6 +17,7 @@ function main() {
     // 各モジュールの初期化を実行
     // この順番は重要。UIが最初に存在し、次にデータ操作、最後に入力処理。
     initUi();
+    initUISettings();
     initAssetHandlers();
     initProjectHandlers();
     initMainHandlers(); 
