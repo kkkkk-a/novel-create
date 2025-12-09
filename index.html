@@ -29,6 +29,7 @@
         <button class="nav-button" data-mode="backgrounds">背景管理</button>
         <button class="nav-button" data-mode="sounds">効果音管理</button>
         <button class="nav-button" data-mode="map">マップ作成</button>
+        <button class="nav-button" data-mode="ui-config">⚙️ システム設定</button>
 
         <div class="nav-separator"></div>
 
@@ -465,6 +466,102 @@
                 </div>
             </div>
         </div>
+
+
+
+        
+        <div id="mode-ui-config" class="mode-content">
+    <h2>⚙️ システム・UIデザイン設定</h2>
+    <div class="ui-config-layout">
+        
+        <!-- メッセージウィンドウ設定 -->
+        <div class="ui-config-card">
+            <h3>💬 メッセージウィンドウ</h3>
+            
+            <div class="form-group">
+                <label for="ui-window-bg-transparent" class="checkbox-label">
+                    <input type="checkbox" id="ui-window-bg-transparent">
+                    <span>背景色なし (完全透過)</span>
+                </label>
+            </div>
+            
+            <div class="form-group">
+                <label for="ui-window-color">背景色</label>
+                <div class="color-picker-group">
+                    <input type="color" id="ui-window-color" value="#000000">
+                    <input type="range" id="ui-window-opacity" min="0" max="100" value="75">
+                    <span id="ui-window-opacity-label">75%</span>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>ウィンドウ画像</label>
+                <div class="ui-image-selector">
+                    <div id="ui-window-image-preview" class="ui-image-preview">なし</div>
+                    <div>
+                        <button id="ui-window-image-btn" class="secondary-button">画像を選択</button>
+                        <button id="ui-window-image-clear" class="danger-button ui-clear-btn">削除</button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- 選択肢ボタン設定 -->
+        <div class="ui-config-card">
+            <h3>🔀 選択肢ボタン</h3>
+            
+            <div class="form-group">
+                <label for="ui-button-bg-transparent" class="checkbox-label">
+                    <input type="checkbox" id="ui-button-bg-transparent">
+                    <span>背景色なし (完全透過)</span>
+                </label>
+            </div>
+
+            <div class="form-group">
+                <label for="ui-button-color">背景色</label>
+                <div class="color-picker-group">
+                    <input type="color" id="ui-button-color" value="#1990ff">
+                    <input type="range" id="ui-button-opacity" min="0" max="100" value="80">
+                    <span id="ui-button-opacity-label">80%</span>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>ボタン画像</label>
+                <div class="ui-image-selector">
+                    <div id="ui-button-image-preview" class="ui-image-preview">なし</div>
+                    <div>
+                        <button id="ui-button-image-btn" class="secondary-button">画像を選択</button>
+                        <button id="ui-button-image-clear" class="danger-button ui-clear-btn">削除</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- ★追加: 共通の枠線設定 -->
+        <div class="ui-config-card">
+            <h3>🎨 枠線 (ボーダー) 設定</h3>
+            <p style="font-size:0.9em; color:#666; margin-top:-10px; margin-bottom:15px;">※ウィンドウ・ボタン共通</p>
+
+            <div class="form-group">
+                <label for="ui-border-width">枠線の太さ (px)</label>
+                <input type="number" id="ui-border-width" value="2" min="0">
+            </div>
+            
+            <div class="form-group">
+                <label for="ui-border-color">枠線の色</label>
+                <input type="color" id="ui-border-color" value="#FFFFFF" style="height:40px; width:100%;">
+            </div>
+
+            <div class="form-group">
+                <label for="ui-border-radius">角の丸み (px)</label>
+                <input type="number" id="ui-border-radius" value="10" min="0">
+            </div>
+        </div>
+
+    </div>
+</div>
 
     </main>
 
