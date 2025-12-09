@@ -36,7 +36,7 @@
         <button id="load-project-btn">読込</button>
         <button id="save-project-btn">保存</button>
         <button id="export-game-btn" class="export-button">ゲーム書き出し</button>
-        <button class="nav-return-btn"><a href="https://kkkkk-a.github.io/hud/" class="nav-home-link" title="ポートフォリオに戻る">他サイト</a></button>
+        <button class="nav-return-btn"><a href="#" class="nav-home-link" title="戻る" onclick="return false;">戻る</a></button>
     </nav>
 
     <main id="main-content">
@@ -85,38 +85,29 @@
                         
                         <!-- テキストノード設定 -->
                         <div id="text-node-settings" class="node-type-settings">
-                            <div class="form-group-row">
-                                <div style="flex:2">
-                                    <label>キャラクター画像</label>
-                                    <select id="node-character"></select>
+                            <div class="form-group">
+                                <label>キャラクター配置</label>
+                                <div id="node-char-list-container" style="margin-bottom: 5px;">
+                                    <!-- JSで動的に追加されるリスト -->
                                 </div>
-                                <div style="flex:2">
-                                    <label>表示名 (上書き用・空欄で画像名)</label>
-                                    <input type="text" id="node-custom-name" placeholder="例: 謎の男 / ???">
-                                </div>
+                                <button id="add-char-btn" class="secondary-button" style="width:100%;">＋ キャラクターを追加</button>
                             </div>
                             
-                            <div class="form-group">
-                                <label>立ち位置</label>
-                                <select id="node-position">
-                                    <option value="top-left">↖ 左上</option>
-                                    <option value="top-center">⬆ 中央上</option>
-                                    <option value="top-right">↗ 右上</option>
-                                    <option value="center-left">⬅ 左中</option>
-                                    <option value="center">⏺ 中央 (ど真ん中)</option>
-                                    <option value="center-right">➡ 右中</option>
-                                    <option value="bottom-left">↙ 左下</option>
-                                    <option value="bottom-center" selected>⬇ 中央下 (デフォルト)</option>
-                                    <option value="bottom-right">↘ 右下</option>
-                                </select>
-                            </div>
+<div class="form-group">
+    <!-- labelのfor属性と、inputのid属性を同じにする -->
+    <label for="node-custom-name">発言者名 (空欄で名前ウィンドウ非表示)</label>
+    <input type="text" id="node-custom-name" placeholder="例: 謎の男 / ???">
+</div>
                             
                             <div class="form-group">
                                 <label>セリフ本文 (空欄だとウィンドウが消えます)</label>
                                 <div id="rich-text-editor"></div>
                             </div>
                             
-                            <div class="form-group"><label>背景画像</label><select id="node-background"></select></div>
+                            <div class="form-group">
+                                <label for="node-background">背景画像</label>
+<select id="node-background"></select>
+                            </div>
                             
                             <div class="form-group-row">
                                 <div style="flex:1">
@@ -396,7 +387,7 @@
 
                                 <hr style="margin: 10px 0;">
 
-                                <!-- ★追加: 自動移動設定 -->
+                                <!-- 自動移動設定 -->
                                 <div class="form-group">
                                     <label>自律移動 (NPC/敵)</label>
                                     <select id="obj-move-type">
@@ -520,6 +511,26 @@
                     → 自分の素早さが、敵の素早さより高いかチェックします。</li>
                 </ul>
             </div>
+
+            <!-- ★追加したセクション -->
+            <div class="help-section">
+                <h3>🖼️ キャラクター配置と演出</h3>
+                <p>テキストノードでは、複数のキャラクターを同時に表示し、細かく調整できます。</p>
+                <ul>
+                    <li><strong>基本配置:</strong> プルダウンから「左下」「中央」「右上」など9方向を選べます。</li>
+                    <li><strong>🔍 拡大率:</strong> キャラクターの大きさを変えます（基準100%）。</li>
+                    <li><strong>↔ 横(X) / ↕ 縦(Y):</strong> 指定したピクセル数だけ位置をズラします。</li>
+                    <li><strong>🎭 Mask (マスク):</strong> 別の画像を使ってキャラを切り抜けます。<br>
+                    例: 「破れた服の形の画像」をマスクに設定 → 服が破れたように見える。</li>
+                </ul>
+                <p style="background:#f9f9f9; padding:5px; border-radius:4px; font-size:0.9em;">
+                    <strong>💡 顔アップ（トリミング）のやり方</strong><br>
+                    画像を物理的に切る必要はありません。<br>
+                    1. 拡大率を <code>150</code>% 〜 <code>200</code>% に設定。<br>
+                    2. 縦(Y)をプラスの値（例: <code>300</code>）に設定して、体を画面の下に押し出せば完成です！
+                </p>
+            </div>
+
         </div>
     </div>
     
