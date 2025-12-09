@@ -17,8 +17,12 @@ const elements = {
     allNodeTypeSettings: document.querySelectorAll('.node-type-settings'),
     
     textNode: {
-        character: document.getElementById('node-character'),
-        position: document.getElementById('node-position'),
+        // ★変更: 単一のselectではなく、リストコンテナを使用
+        charListContainer: document.getElementById('node-char-list-container'), 
+        addCharBtn: document.getElementById('add-char-btn'),
+        
+        customName: document.getElementById('node-custom-name'), // 名前入力は維持（発言者名）
+        
         background: document.getElementById('node-background'),
         bgm: document.getElementById('node-bgm'),
         sound: document.getElementById('node-sound'),
@@ -170,10 +174,192 @@ export function populateAssetSelect(selectElement, type, defaultText = "なし")
             selectElement.add(new Option(displayName, id));
         }
     }
-    if (currentVal && assets && assets[currentVal]) {
-        selectElement.value = currentVal;
-    }
+    // 値の復元は呼び出し側で行うか、ここで行うなら注意が必要
+    if (currentVal) selectElement.value = currentVal;
 }
+
+// --- ★新機能: キャラクターリストのレンダリング ---
+function renderCharacterListEditor(characters) {
+    const container = elements.textNode.charListContainer;
+    if (!container) return;
+    container.innerHTML = '';
+
+    if (!characters || characters.length === 0) {
+        container.innerHTML = '<div style="color:#999; font-size:0.9em; padding:5px;">表示するキャラクターがいません</div>';
+        return;
+    }
+
+    characters.forEach((charData, index) => {
+        const wrapper = document.createElement('div');
+        wrapper.style.marginBottom = '8px';
+        wrapper.style.background = '#f9f9f9';
+        wrapper.style.padding = '8px';
+        wrapper.style.borderRadius = '4px';
+        wrapper.style.border = '1px solid #ddd';
+
+        // --- 1行目: キャラ選択・削除 ---
+        const row1 = document.createElement('div');
+        row1.className = 'form-group-row';
+        row1.style.marginBottom = '5px';
+
+        // ★修正: labelで囲むことで、文字クリックでも反応させる
+        const charLabel = document.createElement('label');
+        charLabel.style.flex = '1';
+        charLabel.style.display = 'flex'; // レイアウト崩れ防止
+        charLabel.style.alignItems = 'center';
+        charLabel.style.gap = '5px';
+        charLabel.style.cursor = 'pointer';
+
+        const charSelect = document.createElement('select');
+        charSelect.style.flex = '1'; // 幅いっぱい
+        populateAssetSelect(charSelect, 'characters', '(画像選択)');
+        charSelect.value = charData.characterId || '';
+        charSelect.onchange = (e) => { charData.characterId = e.target.value; };
+
+        // ラベルの中にテキストなどは入れず、select自体を大きく使うレイアウトなので
+        // ここでは単にSelectをappendChildするだけでも良いが、将来的にラベル文字を入れるならこうする
+        charLabel.appendChild(charSelect);
+
+        const delBtn = document.createElement('button');
+        delBtn.className = 'danger-button';
+        delBtn.textContent = '削除';
+        delBtn.style.padding = '2px 8px';
+        delBtn.style.fontSize = '0.8em';
+        delBtn.onclick = () => {
+            characters.splice(index, 1);
+            renderCharacterListEditor(characters);
+        };
+
+        row1.appendChild(charLabel); // labelを追加
+        row1.appendChild(delBtn);
+
+        // --- 2行目: 9方向位置選択 ---
+        const row2 = document.createElement('div');
+        row2.style.marginBottom = '5px';
+        
+        // ★修正: labelで囲む
+        const posLabel = document.createElement('label');
+        posLabel.style.width = '100%';
+        posLabel.style.cursor = 'pointer';
+        
+        const posSelect = document.createElement('select');
+        posSelect.style.width = '100%';
+        const positions = {
+            'bottom-left': '↙ 左下 (標準)',
+            'bottom-center': '⬇ 中央下 (標準)',
+            'bottom-right': '↘ 右下 (標準)',
+            'center-left': '⬅ 左中',
+            'center': '⏺ 中央',
+            'center-right': '➡ 右中',
+            'top-left': '↖ 左上',
+            'top-center': '⬆ 中央上',
+            'top-right': '↗ 右上'
+        };
+        for (const [key, label] of Object.entries(positions)) {
+            posSelect.add(new Option(label, key));
+        }
+        posSelect.value = charData.position || 'bottom-center';
+        posSelect.onchange = (e) => { charData.position = e.target.value; };
+        
+        posLabel.appendChild(posSelect);
+        row2.appendChild(posLabel);
+
+        // --- 3行目: 詳細調整 (拡大率, X, Y) ---
+        const row3 = document.createElement('div');
+        row3.style.display = 'flex';
+        row3.style.gap = '10px'; // 間隔を少し広げる
+        row3.style.alignItems = 'center';
+        row3.style.fontSize = '0.9em';
+        row3.style.marginBottom = '5px';
+
+        // ★ヘルパー関数: ラベル付き入力欄を作る
+        const createLabeledInput = (iconText, value, onChange, title) => {
+            const label = document.createElement('label');
+            label.style.display = 'flex';
+            label.style.alignItems = 'center';
+            label.style.gap = '2px';
+            label.style.cursor = 'pointer';
+            label.title = title; // ホバー時に説明を表示
+
+            const span = document.createElement('span');
+            span.textContent = iconText;
+            
+            const input = document.createElement('input');
+            input.type = 'number';
+            input.value = value;
+            input.style.width = '50px';
+            input.style.padding = '2px';
+            input.onchange = onChange;
+
+            label.appendChild(span);
+            label.appendChild(input);
+            return label;
+        };
+
+        // 拡大率
+        const scaleLabel = createLabeledInput(
+            '🔍', 
+            charData.scale !== undefined ? charData.scale : 100, 
+            (e) => { charData.scale = parseInt(e.target.value) || 100; },
+            "拡大率 (%)"
+        );
+
+        // 横(X)
+        const xLabel = createLabeledInput(
+            '↔', 
+            charData.x || 0, 
+            (e) => { charData.x = parseInt(e.target.value) || 0; },
+            "横位置調整 (px)"
+        );
+
+        // 縦(Y)
+        const yLabel = createLabeledInput(
+            '↕', 
+            charData.y || 0, 
+            (e) => { charData.y = parseInt(e.target.value) || 0; },
+            "縦位置調整 (px)"
+        );
+
+        row3.appendChild(scaleLabel);
+        row3.appendChild(xLabel);
+        row3.appendChild(yLabel);
+
+        // --- 4行目: マスク設定 ---
+        const row4 = document.createElement('div');
+        row4.style.marginTop = '5px';
+        row4.style.borderTop = '1px dashed #ccc';
+        row4.style.paddingTop = '5px';
+
+        // ★修正: labelで囲む
+        const maskLabel = document.createElement('label');
+        maskLabel.style.display = 'flex';
+        maskLabel.style.alignItems = 'center';
+        maskLabel.style.gap = '5px';
+        maskLabel.style.cursor = 'pointer';
+        maskLabel.style.width = '100%';
+
+        const maskIcon = document.createElement('span');
+        maskIcon.textContent = '🎭 Mask:';
+        maskIcon.style.fontSize = '0.8em';
+        
+        const maskSelect = document.createElement('select');
+        maskSelect.style.flex = '1';
+        populateAssetSelect(maskSelect, 'characters', '(マスクなし)');
+        maskSelect.value = charData.maskId || '';
+        maskSelect.onchange = (e) => { charData.maskId = e.target.value; };
+
+        maskLabel.appendChild(maskIcon);
+        maskLabel.appendChild(maskSelect);
+        row4.appendChild(maskLabel);
+
+        wrapper.appendChild(row1);
+        wrapper.appendChild(row2);
+        wrapper.appendChild(row3);
+        wrapper.appendChild(row4);
+        container.appendChild(wrapper);
+    });
+}
+
 
 // --- メイン UI レンダリング関数 ---
 
@@ -330,15 +516,90 @@ export function renderNodeEditor() {
     switch(node.type) {
         case 'text':
             state.quill.root.innerHTML = node.message || '';
-            elements.textNode.character.value = node.characterId || '';
-            const customNameInput = document.getElementById('node-custom-name');
-            if (customNameInput) customNameInput.value = node.customName || '';
-            elements.textNode.position.value = node.characterPosition || 'bottom-center';
+            
+            // ★変更: 複数キャラ対応
+            // 古いデータ構造(characterId)がある場合は、新しい構造(characters配列)に変換してあげる
+            if (!node.characters) {
+                node.characters = [];
+                if (node.characterId) {
+                    node.characters.push({
+                        characterId: node.characterId,
+                        position: node.characterPosition || 'center'
+                    });
+                    // 古いデータは消してもいいが、念のため残すか、上書き時に消える
+                }
+            }
+            renderCharacterListEditor(node.characters);
+            
+            // キャラ追加ボタンのイベント
+            if(elements.textNode.addCharBtn) {
+                // イベントリスナーが重複しないように一旦クローンでリセットするか、onclickで上書き
+                elements.textNode.addCharBtn.onclick = () => {
+                    node.characters.push({ characterId: '', position: 'center' });
+                    renderCharacterListEditor(node.characters);
+                };
+            }
+
+            if(elements.textNode.customName) elements.textNode.customName.value = node.customName || '';
+            
             elements.textNode.background.value = node.backgroundId || '';
             elements.textNode.bgm.value = node.bgmId || '';
             elements.textNode.sound.value = node.soundId || '';
-            createLinkedSelects(elements.textNode.nextContainer, 'node-next-text', node.nextNodeId);
-            break;
+    let effectSelect = document.getElementById('node-effect');
+        if (!effectSelect) {
+            const container = elements.textNode.bgm.closest('.node-type-settings'); // 親コンテナ取得
+            
+            const group = document.createElement('div');
+            group.className = 'form-group';
+            group.style.marginTop = '10px';
+            group.style.padding = '10px';
+            group.style.background = '#fff0f6'; // 目立つように薄いピンク
+            group.style.borderRadius = '4px';
+            group.style.border = '1px dashed #ffadd2';
+
+            const label = document.createElement('label');
+            label.textContent = '⚡ 画面演出 (このノードの開始時)';
+            label.htmlFor = 'node-effect';
+            label.style.color = '#c41d7f';
+            label.style.fontWeight = 'bold';
+
+            effectSelect = document.createElement('select');
+            effectSelect.id = 'node-effect';
+            
+            // 演出のリスト
+            const effects = {
+                '': 'なし',
+                'flash-white': '⚪ 白フラッシュ (発光/雷)',
+                'flash-red': '🔴 赤フラッシュ (被弾/危険)',
+                'shake-small': '🫨 揺れ (小) - ガタッ',
+                'shake-medium': '🫨 揺れ (中) - ドスン',
+                'shake-hard': '🫨 揺れ (大) - 激震',
+                'fade-black': '⚫ 暗転 (フェードアウト→イン)'
+            };
+            for (const [val, text] of Object.entries(effects)) {
+                effectSelect.add(new Option(text, val));
+            }
+
+            // 挿入位置: BGM/SE設定(form-group-row)の後ろ
+            const soundRow = elements.textNode.sound.closest('.form-group-row');
+            if (soundRow && soundRow.nextSibling) {
+                container.insertBefore(group, soundRow.nextSibling);
+            } else {
+                container.appendChild(group);
+            }
+            group.appendChild(label);
+            group.appendChild(effectSelect);
+        }
+
+        // 値の反映と保存イベント
+        effectSelect.value = node.effect || '';
+        effectSelect.onchange = (e) => { 
+            node.effect = e.target.value; 
+        };
+        // ------------------------------------------
+
+        createLinkedSelects(elements.textNode.nextContainer, 'node-next-text', node.nextNodeId);
+        break;
 
         case 'choice':
             renderChoicesEditor(node.choices || []);
@@ -580,10 +841,11 @@ export function updateAllNodeSelects() {
 }
 
 export function updateAssetDropdowns() {
-    populateAssetSelect(elements.textNode.character, 'characters', 'なし');
+    // 既存の固定プルダウン（背景、マップ背景）の更新
     populateAssetSelect(elements.textNode.background, 'backgrounds', '変更なし');
     populateAssetSelect(elements.mapBgSelect, 'backgrounds', 'なし');
     
+    // BGM/SEの更新
     const soundSelects = [elements.textNode.bgm, elements.textNode.sound];
     const projectData = state.getProjectData();
     soundSelects.forEach(select => {
@@ -601,13 +863,12 @@ export function updateAssetDropdowns() {
         }
         select.value = currentVal;
     });
+
+    renderNodeEditor();
 }
 
-// ★修正: マップエディタの条件変数セレクトにも対応
 export function updateVariableSelects() {
-    // 既存のセレクト群
     const selects = Array.from(document.querySelectorAll('#var-target, select[data-field="variable"]'));
-    // マップエディタ用のセレクトも追加
     const mapCondVar = document.getElementById('obj-cond-var');
     if (mapCondVar) selects.push(mapCondVar);
 
@@ -618,11 +879,9 @@ export function updateVariableSelects() {
         let currentValue = select.value;
         select.innerHTML = '<option value="">(条件なし)</option>' + options;
         
-        // 既存の値があれば復元、なければデフォルト
         if (currentValue && projectData.variables.hasOwnProperty(currentValue)) {
             select.value = currentValue;
         } else if (select !== mapCondVar && Object.keys(projectData.variables).length > 0) {
-            // 変数ノードの場合はデフォルト値を入れるが、条件設定の場合は空欄(なし)で良い
             if (select.id === 'var-target') select.value = Object.keys(projectData.variables)[0];
         }
     });
