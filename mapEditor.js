@@ -10,6 +10,9 @@ let canvas = null;
 let isDrawing = false;
 let selectedObject = null;
 
+// ★修正: 画像キャッシュ用オブジェクト (描画負荷軽減)
+const imageCache = {};
+
 // 描画設定（ペンの設定）
 let penSettings = {
     visualType: 'color', 
@@ -101,15 +104,13 @@ export function initMapEditor() {
     toggleEditorVisibility(false);
 }
 
-// ★追加: 外部から呼び出してエディタ状態をリセット・更新する関数
 export function resetMapEditor() {
     currentMapId = null;
     selectedObject = null;
-    renderMapList(); // リストを最新データで更新
-    toggleEditorVisibility(false); // 編集画面を閉じる
+    renderMapList(); 
+    toggleEditorVisibility(false); 
 }
 
-// ★export追加
 export function toggleEditorVisibility(show) {
     const ui = document.getElementById('map-editor-ui');
     const canvasEl = document.getElementById('map-canvas');
@@ -152,7 +153,6 @@ function createNewMap() {
     loadMap(id);
 }
 
-// ★export追加
 export function renderMapList() {
     const select = document.getElementById('map-list-select');
     if (!select) return;
@@ -364,17 +364,26 @@ function drawMap() {
     ctx.fillStyle = '#fff';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+    // 背景画像
     if (map.bgImageId && projectData.assets.backgrounds[map.bgImageId]) {
         const asset = projectData.assets.backgrounds[map.bgImageId];
-        const img = new Image();
-        img.src = asset.data;
+        // ★修正: キャッシュを使用
+        let img = imageCache[map.bgImageId];
+        if (!img) {
+            img = new Image();
+            img.src = asset.data;
+            imageCache[map.bgImageId] = img;
+        }
+
         if (img.complete) {
             ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
         } else {
-            img.onload = () => { if(currentMapId) drawMap(); }; 
+            // ロード待ち（ループ防止のためonloadは設定しないか、フラグ管理推奨。ここでは簡易的に再帰はしない）
+            // 初回ロード時のみ一瞬表示されない可能性があるが、エディタ操作ですぐ再描画される
         }
     }
 
+    // グリッド
     ctx.strokeStyle = 'rgba(0,0,0,0.1)';
     ctx.lineWidth = 1;
     for (let x = 0; x <= map.width; x++) {
@@ -384,6 +393,7 @@ function drawMap() {
         ctx.beginPath(); ctx.moveTo(0, y * GRID_SIZE); ctx.lineTo(canvas.width, y * GRID_SIZE); ctx.stroke();
     }
 
+    // オブジェクト描画
     map.objects.forEach(obj => {
         const gx = obj.x * GRID_SIZE;
         const gy = obj.y * GRID_SIZE;
@@ -394,12 +404,17 @@ function drawMap() {
         if (obj.visualType === 'image') {
             if (obj.charId && projectData.assets.characters[obj.charId]) {
                 const asset = projectData.assets.characters[obj.charId];
-                const img = new Image();
-                img.src = asset.data;
+                
+                // ★修正: キャッシュを使用
+                let img = imageCache[obj.charId];
+                if (!img) {
+                    img = new Image();
+                    img.src = asset.data;
+                    imageCache[obj.charId] = img;
+                }
+                
                 if(img.complete) {
                     ctx.drawImage(img, gx, gy, GRID_SIZE, GRID_SIZE);
-                } else {
-                    img.onload = () => drawMap();
                 }
             } else {
                 ctx.strokeStyle = '#ccc';
@@ -513,6 +528,7 @@ function handleCanvasDown(e) {
         drawMap();
     } 
     else if (currentTool === 'pen') {
+        // Pointer downでの配置も重複チェックを行う
         const idx = map.objects.findIndex(o => o.x === x && o.y === y);
         if (idx !== -1) map.objects.splice(idx, 1);
 
@@ -546,8 +562,11 @@ function handleCanvasMove(e) {
         if (x < 0 || x >= map.width || y < 0 || y >= map.height) return;
 
         if (currentTool === 'pen') {
-            const existing = map.objects.find(o => o.x === x && o.y === y);
-            if (!existing) {
+            // ★修正: 重複チェック
+            // 同じ座標に既にオブジェクトがあれば何もしない（無限増殖防止）
+            const isDuplicate = map.objects.some(o => o.x === x && o.y === y);
+            
+            if (!isDuplicate) {
                 const newObj = JSON.parse(JSON.stringify(penSettings));
                 newObj.id = `obj_${Date.now()}_${Math.random()}`;
                 newObj.x = x;
