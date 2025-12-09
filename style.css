@@ -728,3 +728,77 @@ input[type="text"]:focus, select:focus, textarea:focus { border-color: var(--pri
     transform: scale(1.02);
     transition: all 0.2s;
 }
+
+/* style.css の末尾に追加 */
+
+/* --- UI設定画面専用スタイル --- */
+.ui-config-layout {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.ui-config-card {
+    flex: 1;
+    min-width: 320px;
+    padding: 20px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--panel-bg-color);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+.ui-config-card h3 {
+    margin-top: 0;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #eee;
+}
+
+/* 画像セレクター */
+.ui-image-selector {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+}
+.ui-image-preview {
+    width: 120px;
+    height: 70px;
+    border: 2px dashed #ccc;
+    background-size: cover;
+    background-position: center;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 0.9em;
+    color: #999;
+    border-radius: 4px;
+    flex-shrink: 0;
+}
+.ui-clear-btn {
+    display: none; /* JSで制御 */
+    font-size: 0.8em !important;
+    padding: 4px 8px !important;
+    margin-top: 5px;
+}
+
+/* カラーピッカーとスライダーのレイアウト */
+.color-picker-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.color-picker-group input[type="color"] {
+    width: 50px;
+    height: 40px;
+    padding: 2px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+.color-picker-group input[type="range"] {
+    flex: 1;
+}
+.color-picker-group span {
+    width: 40px; /* "100%" が改行しないように幅確保 */
+    text-align: right;
+    font-family: monospace;
+    font-size: 0.9em;
+}
