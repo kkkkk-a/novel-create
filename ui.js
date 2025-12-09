@@ -891,3 +891,129 @@ export function initUi() {
     renderAll();
     initHelpSystem();
 }
+
+export function initUISettings() {
+    const projectData = state.getProjectData();
+    // データがない場合の初期化
+    if (!projectData.settings) {
+        projectData.settings = {
+            windowColor: '#000000', windowOpacity: 75, windowBgTransparent: false, windowImage: null,
+            textColor: '#ffffff',
+            buttonColor: '#1990ff', buttonOpacity: 80, buttonBgTransparent: false, buttonImage: null,
+            borderRadius: 10
+        };
+    }
+    const s = projectData.settings;
+
+    // 各入力欄の要素取得
+    const inputs = {
+        // Window
+        windowBgTransparent: document.getElementById('ui-window-bg-transparent'),
+        windowColor: document.getElementById('ui-window-color'),
+        windowOpacity: document.getElementById('ui-window-opacity'),
+        windowOpacityLabel: document.getElementById('ui-window-opacity-label'),
+        windowImageBtn: document.getElementById('ui-window-image-btn'),
+        windowImagePreview: document.getElementById('ui-window-image-preview'),
+        windowImageClear: document.getElementById('ui-window-image-clear'),
+        // Button
+        buttonBgTransparent: document.getElementById('ui-button-bg-transparent'),
+        buttonColor: document.getElementById('ui-button-color'),
+        buttonOpacity: document.getElementById('ui-button-opacity'),
+        buttonOpacityLabel: document.getElementById('ui-button-opacity-label'),
+        buttonImageBtn: document.getElementById('ui-button-image-btn'),
+        buttonImagePreview: document.getElementById('ui-button-image-preview'),
+        buttonImageClear: document.getElementById('ui-button-image-clear'),
+        borderRadius: document.getElementById('ui-border-radius'),
+                borderRadius: document.getElementById('ui-border-radius'),
+        borderWidth: document.getElementById('ui-border-width'),
+        borderColor: document.getElementById('ui-border-color')
+
+    };
+
+    // 要素が存在しない場合は何もしない
+    if(!inputs.windowColor) return;
+
+    // --- 値の初期化とイベントリスナー設定 ---
+
+    // ヘルパー関数: スライダーとラベルを同期
+    const setupSlider = (slider, label, key) => {
+        slider.value = s[key];
+        label.textContent = `${s[key]}%`;
+        slider.oninput = (e) => {
+            const value = e.target.value;
+            s[key] = parseInt(value);
+            label.textContent = `${value}%`;
+        };
+    };
+
+    // ヘルパー関数: チェックボックスを同期
+    const setupCheckbox = (checkbox, key) => {
+        checkbox.checked = s[key];
+        checkbox.onchange = (e) => {
+            s[key] = e.target.checked;
+        };
+    };
+
+    // ヘルパー関数: カラーピッカーを同期
+    const setupColorPicker = (picker, key) => {
+        picker.value = s[key];
+        picker.onchange = (e) => {
+            s[key] = e.target.value;
+        };
+        // リアルタイム反映させたいなら oninput を使う
+        picker.oninput = (e) => {
+             s[key] = e.target.value;
+        };
+    };
+    
+    // ヘルパー関数: 画像アップロードをセットアップ
+    const setupImageUpload = (btn, preview, clearBtn, key) => {
+        const updatePreview = () => {
+            if (s[key]) {
+                preview.style.backgroundImage = `url(${s[key]})`;
+                preview.textContent = '';
+                clearBtn.style.display = 'inline-block';
+            } else {
+                preview.style.backgroundImage = 'none';
+                preview.textContent = 'なし';
+                clearBtn.style.display = 'none';
+            }
+        };
+        updatePreview();
+
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file'; fileInput.accept = 'image/*'; fileInput.style.display = 'none';
+        document.body.appendChild(fileInput);
+
+        btn.onclick = () => fileInput.click();
+
+        fileInput.onchange = (e) => {
+            const file = e.target.files[0]; if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (evt) => { s[key] = evt.target.result; updatePreview(); };
+            reader.readAsDataURL(file);
+            fileInput.value = '';
+        };
+
+        clearBtn.onclick = () => { s[key] = null; updatePreview(); };
+    };
+
+    // 各UI要素に設定を適用
+    setupCheckbox(inputs.windowBgTransparent, 'windowBgTransparent');
+    setupColorPicker(inputs.windowColor, 'windowColor');
+    setupSlider(inputs.windowOpacity, inputs.windowOpacityLabel, 'windowOpacity');
+    setupImageUpload(inputs.windowImageBtn, inputs.windowImagePreview, inputs.windowImageClear, 'windowImage');
+
+    setupCheckbox(inputs.buttonBgTransparent, 'buttonBgTransparent');
+    setupColorPicker(inputs.buttonColor, 'buttonColor');
+    setupSlider(inputs.buttonOpacity, inputs.buttonOpacityLabel, 'buttonOpacity');
+    setupImageUpload(inputs.buttonImageBtn, inputs.buttonImagePreview, inputs.buttonImageClear, 'buttonImage');
+
+   inputs.borderRadius.value = s.borderRadius;
+    inputs.borderRadius.onchange = (e) => { s.borderRadius = parseInt(e.target.value) || 0; };
+    
+    inputs.borderWidth.value = s.borderWidth;
+    inputs.borderWidth.onchange = (e) => { s.borderWidth = parseInt(e.target.value) || 0; };
+
+    setupColorPicker(inputs.borderColor, 'borderColor');
+}
