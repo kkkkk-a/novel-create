@@ -622,19 +622,6 @@ function renderRaycastGame() {
                     }
                 }
             });
-
-            // Minimap (Top-Left)
-            const mw=100; const mh=100; const scale=mw/(map.width*grid);
-            const mx = 10; const my = 10; 
-            ctx.fillStyle='rgba(0,0,0,0.5)'; ctx.fillRect(mx, my, mw, mh);
-            mapEngine.activeObjects.forEach(o=>{ 
-                if(o.isWall) { ctx.fillStyle=o.color||'#fff'; ctx.fillRect(mx + o.x*grid*scale, my+o.y*grid*scale, grid*scale, grid*scale); }
-            });
-            ctx.fillStyle='red'; ctx.beginPath(); ctx.arc(mx+p.x*scale, my+p.y*scale, 2, 0, Math.PI*2); ctx.fill();
-            ctx.strokeStyle='yellow'; ctx.lineWidth = 2; ctx.beginPath(); 
-            ctx.moveTo(mx+p.x*scale, my+p.y*scale);
-            ctx.lineTo(mx+p.x*scale + Math.cos(p.dir)*15, my+p.y*scale + Math.sin(p.dir)*15);
-            ctx.stroke();
         }
 
         // --- Map Update Functions ---
