@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="ja">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -9,17 +10,20 @@
 
     <!-- Quill.js Rich Text Editor CSS -->
     <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
-    
+
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Klee+One&family=M+PLUS+Rounded+1c:wght@400;700&family=Shippori+Mincho&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Klee+One&family=M+PLUS+Rounded+1c:wght@400;700&family=Shippori+Mincho&display=swap"
+        rel="stylesheet">
 
     <!-- Styles -->
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="map_style.css">
 
-    <!-- ★修正: 3Dライブラリ読み込み (esm.sh を使用) -->
+    <!-- 3D Libraries -->
+    <!-- 3D Libraries -->
     <script async src="https://unpkg.com/es-module-shims@1.8.0/dist/es-module-shims.js"></script>
     <script type="importmap">
     {
@@ -27,26 +31,41 @@
             "three": "https://esm.sh/three@0.169.0",
             "three/addons/": "https://esm.sh/three@0.169.0/examples/jsm/",
             "@pixiv/three-vrm": "https://esm.sh/@pixiv/three-vrm@3.0.0?external=three",
-            "@pixiv/three-vrm-animation": "https://esm.sh/@pixiv/three-vrm-animation@3.0.0?external=three"
+            "@pixiv/three-vrm-animation": "https://esm.sh/@pixiv/three-vrm-animation@3.0.0?external=three",
+            
+            "mmdparser": "https://esm.sh/three@0.169.0/examples/jsm/libs/mmdparser.module.js",
+            
+            "three/addons/loaders/MMDLoader.js": "https://esm.sh/three@0.169.0/examples/jsm/loaders/MMDLoader.js?external=three,mmdparser",
+            "three/addons/animation/MMDAnimationHelper.js": "https://esm.sh/three@0.169.0/examples/jsm/animation/MMDAnimationHelper.js?external=three,mmdparser",
+            "three/addons/animation/CCDIKSolver.js": "https://esm.sh/three@0.169.0/examples/jsm/animation/CCDIKSolver.js?external=three",
+            "three/addons/animation/MMDPhysics.js": "https://esm.sh/three@0.169.0/examples/jsm/animation/MMDPhysics.js?external=three"
         }
     }
     </script>
-    
+
     <!-- Quill.js Library -->
     <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
 </head>
+
 <body>
+    <!-- 変数入力補完用のリスト -->
+    <datalist id="variable-list-options"></datalist>
+    <!-- UI管理ID補完用のリスト -->
+    <datalist id="ui-id-list-options"></datalist>
 
     <nav id="main-nav">
         <button class="nav-button active" data-mode="scenario">シナリオ編集</button>
         <button class="nav-button" data-mode="preview">プレビュー</button>
-        <button class="nav-button" data-mode="variables">変数・フラグ管理</button>
-        <button class="nav-button" data-mode="characters">キャラクター管理(2D)</button>
-        <button class="nav-button" data-mode="models">3Dモデル管理</button>
+        <button class="nav-button" data-mode="variables">変数・フラグ</button>
+        <button class="nav-button" data-mode="characters">2Dキャラクター</button>
+        <button class="nav-button" data-mode="models">3Dモデル</button>
         <button class="nav-button" data-mode="animations">3Dアニメーション</button>
-        <button class="nav-button" data-mode="backgrounds">背景管理</button>
-        <button class="nav-button" data-mode="sounds">効果音管理</button>
-        <button class="nav-button" data-mode="map">マップ作成</button>
+        <button class="nav-button" data-mode="backgrounds">背景</button>
+        <button class="nav-button" data-mode="sounds">効果音</button>
+        <button class="nav-button" data-mode="map">マップ</button>
+        <button class="nav-button" data-mode="items">アイテム</button>
+        <button class="nav-button" data-mode="enemies">エネミー</button>
+        <button class="nav-button" data-mode="particles">エフェクト</button>
         <button class="nav-button" data-mode="ui-config">⚙️ システム設定</button>
 
         <div class="nav-separator"></div>
@@ -54,12 +73,40 @@
         <input type="file" id="load-project-input" style="display: none;" accept=".json">
         <button id="load-project-btn">読込</button>
         <button id="save-project-btn">保存</button>
+        <div
+            style="display:flex; align-items:center; margin-left:8px; padding-left:8px; border-left:1px solid #ddd; gap:5px;">
+            <div style="display:flex; flex-direction:column; align-items:flex-end;">
+                <label style="font-size:10px; color:#555; display:flex; align-items:center; cursor:pointer;"
+                    title="自動保存の間隔を指定します">
+                    <span style="margin-right:2px;">毎</span>
+                    <input type="number" id="autosave-interval-input" value="5" min="1" max="60"
+                        style="width:30px; padding:1px; font-size:11px; text-align:center; border:1px solid #ccc; border-radius:3px;">
+                    <span style="margin-left:2px;">分</span>
+                </label>
+                <span id="autosave-status-text"
+                    style="font-size:9px; color:#1890ff; height:12px; line-height:12px; margin-top:1px; white-space:nowrap;"></span>
+            </div>
+            <button id="toggle-autosave-btn"
+                style="font-size:11px; padding:2px 8px; height:32px; line-height:1.2;">自動保存<br>OFF</button>
+        </div>
+        <div class="nav-separator"></div>
+        <div id="system-status-bar" style="display:flex; gap:10px; margin-right:10px; align-items:center;">
+    <div id="status-network" class="status-badge" title="ネットワーク接続状況">
+        <span class="icon">📡</span> <span class="label">Net</span>
+    </div>
+    <div id="status-3d-lib" class="status-badge" title="3Dライブラリ読み込み状況">
+        <span class="icon">🧊</span> <span class="label">3D</span>
+    </div>
+</div>
+
+        <div class="nav-separator"></div>
         <button id="export-game-btn" class="export-button">ゲーム書き出し</button>
-        <button class="nav-return-btn"><a href="#" class="nav-home-link" title="戻る" onclick="return false;">戻る</a></button>
+        <button class="nav-return-btn"><a href="#" class="nav-home-link" title="戻る"
+                onclick="return false;">戻る</a></button>
     </nav>
 
     <main id="main-content">
-        
+
         <!-- シナリオ編集モード -->
         <div id="mode-scenario" class="mode-content active">
             <div class="scenario-layout">
@@ -68,9 +115,10 @@
                         <h3>シナリオ構成図</h3>
                         <div class="toolbar">
                             <button id="add-section-btn" title="新しい章(セクション)を追加">＋ 章を追加</button>
-                            <button id="rename-section-btn" style="background:#fff; color:#333;" title="選択中の章名を変更">✏️ 名前変更</button>
+                            <button id="rename-section-btn" style="background:#fff; color:#333;" title="選択中の章名を変更">✏️
+                                名前変更</button>
                             <button id="add-node-btn" title="選択中の章にノードを追加">＋ ノード追加</button>
-                            </div>
+                        </div>
                         <div class="auto-link-option">
                             <label>
                                 <input type="checkbox" id="auto-link-next-node" checked>
@@ -86,9 +134,13 @@
                     <div id="node-editor" class="hidden">
                         <div class="editor-header">
                             <div class="node-id-badge">ID: <span id="node-id-display"></span></div>
+                            <div style="flex:1; margin:0 10px;">
+                                <input type="text" id="node-label" placeholder="管理名 (例: オープニング)"
+                                    style="width:100%; padding:5px; font-size:0.9em;">
+                            </div>
                             <div class="editor-actions">
                                 <label class="checkbox-label">
-                                    <input type="checkbox" id="is-start-node"> 
+                                    <input type="checkbox" id="is-start-node">
                                     <span>START地点にする</span>
                                 </label>
                                 <button id="delete-node-btn" class="danger-button">削除</button>
@@ -103,39 +155,46 @@
                                     <option value="choice">🔀 分岐 / 選択肢</option>
                                     <option value="variable">🔢 変数操作</option>
                                     <option value="conditional">❓ 条件分岐 (IF)</option>
+                                    <option value="ui_control">🖥️ UI / HUD操作</option>
                                     <option value="map">🗺️ マップ移動</option>
+                                    <option value="shop">🛒 ショップ (買い物)</option>
+                                    <option value="battle">⚔️ ターン制バトル</option>
                                 </select>
                             </div>
-                            <button id="open-help-btn" class="secondary-button" style="margin-bottom: 2px;">❓ 使い方のヒント</button>
+                            <button id="open-help-btn" class="secondary-button" style="margin-bottom: 2px;">❓
+                                使い方のヒント</button>
                         </div>
-                        
+
                         <!-- テキストノード設定 -->
                         <div id="text-node-settings" class="node-type-settings">
                             <div class="form-group">
                                 <label>2Dキャラクター配置</label>
                                 <div id="node-char-list-container" style="margin-bottom: 5px;"></div>
-                                <button id="add-char-btn" class="secondary-button" style="width:100%;">＋ 2Dキャラを追加</button>
+                                <button id="add-char-btn" class="secondary-button" style="width:100%;">＋
+                                    2Dキャラを追加</button>
                             </div>
-                            
-                            <!-- 3Dキャラクター設定 -->
-                            <div class="form-group" style="background:#f0f5ff; padding:10px; border-radius:4px; border:1px solid #adc6ff;">
+
+                            <div class="form-group"
+                                style="background:#f0f5ff; padding:10px; border-radius:4px; border:1px solid #adc6ff;">
                                 <label style="font-weight:bold; color:#1890ff;">🎭 3Dキャラクター表示</label>
                                 <div id="node-3d-char-list"></div>
-                                <button id="add-3d-char-btn" class="secondary-button" style="width:100%; margin-top:5px;">＋ 3Dキャラを追加</button>
+                                <button id="add-3d-char-btn" class="secondary-button"
+                                    style="width:100%; margin-top:5px;">＋ 3Dキャラを追加</button>
                             </div>
 
                             <div class="form-group">
                                 <label for="node-custom-name">発言者名 (空欄で名前ウィンドウ非表示)</label>
                                 <input type="text" id="node-custom-name" placeholder="例: ヒロインA / (空欄でナレーション)">
                             </div>
-                            
+
                             <div class="form-group">
                                 <label>セリフ本文 (空欄だとウィンドウが消えます)</label>
                                 <div id="rich-text-editor"></div>
                             </div>
-                            
-                            <div class="form-group"><label for="node-background">背景画像</label><select id="node-background"></select></div>
-                            
+
+                            <div class="form-group"><label for="node-background">背景画像</label><select
+                                    id="node-background"></select></div>
+
                             <div class="form-group-row">
                                 <div style="flex:1">
                                     <label for="node-bgm">BGM (ループ再生)</label>
@@ -145,44 +204,111 @@
                                     <label for="node-sound">効果音 (単発)</label>
                                     <select id="node-sound"></select>
                                 </div>
+                                <div style="flex:1">
+                                    <label>✨ エフェクト再生</label>
+                                    <select id="node-particle"></select>
+                                </div>
                             </div>
-                            
+
+                            <!-- ▼ 個別ウィンドウ設定 (修正: div内に移動) -->
+                            <details class="node-extra-settings" style="margin-top:10px; border:1px solid #ddd; border-radius:4px; padding:5px; background:#f9f9f9;">
+                                <summary style="cursor:pointer; font-weight:bold; color:#555;">🎨 ウィンドウの個別設定 (Overrides)</summary>
+                                <div style="padding:10px;">
+                                    <label class="checkbox-label" style="margin-bottom:10px; border-bottom:1px solid #eee; padding-bottom:5px;">
+                                        <input type="checkbox" id="node-win-override">
+                                        <span style="font-weight:bold; color:#1890ff;">このノードで設定を上書きする</span>
+                                    </label>
+                                    
+                                    <div id="node-win-settings-group" style="display:none;">
+                                        <div class="form-group">
+                                            <label class="checkbox-label"><input type="checkbox" id="node-win-transparent"> 背景色なし(透明)</label>
+                                        </div>
+                                        <div class="form-group-row">
+                                            <div style="flex:1"><label>背景色</label><input type="color" id="node-win-color" style="width:100%;"></div>
+                                            <div style="flex:1"><label>不透明度(%)</label><input type="number" id="node-win-opacity" min="0" max="100"></div>
+                                        </div>
+                                        <div class="form-group">
+                                            <label>画像 (空欄でシステム設定)</label>
+                                            <select id="node-win-image"></select>
+                                        </div>
+                                        <div class="form-group">
+                                            <label>表示位置</label>
+                                            <select id="node-win-pos">
+                                                <option value="">(システム設定に従う)</option>
+                                                <option value="bottom">下部</option>
+                                                <option value="middle">中央</option>
+                                                <option value="top">上部</option>
+                                                <option value="full">全画面</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            </details>
+
                             <div class="form-group">
                                 <label>次のノードへ進む</label>
                                 <div id="container-next-text" class="smart-select-container"></div>
                             </div>
                         </div>
 
+
+
                         <!-- 選択肢ノード設定 -->
-                        <div id="choice-node-settings" class="node-type-settings hidden">
+                    <div id="choice-node-settings" class="node-type-settings hidden">
                             <h4>選択肢</h4>
                             <div id="choices-editor"></div>
                             <button id="add-choice-btn" class="secondary-button">+ 選択肢を追加</button>
+                            
+                            <!-- 個別ボタン設定 -->
+                            <details class="node-extra-settings" style="margin-top:15px; border:1px solid #ddd; border-radius:4px; padding:5px; background:#f9f9f9;">
+                                <summary style="cursor:pointer; font-weight:bold; color:#555;">🎨 ボタンの個別設定 (Overrides)</summary>
+                                <div style="padding:10px;">
+                                    <label class="checkbox-label" style="margin-bottom:10px; border-bottom:1px solid #eee; padding-bottom:5px;">
+                                        <input type="checkbox" id="node-btn-override">
+                                        <span style="font-weight:bold; color:#1890ff;">このノードで設定を上書きする</span>
+                                    </label>
+                                    
+                                    <div id="node-btn-settings-group" style="display:none;">
+                                        <div class="form-group">
+                                            <label class="checkbox-label"><input type="checkbox" id="node-btn-transparent"> 背景色なし</label>
+                                        </div>
+                                        <div class="form-group-row">
+                                            <div style="flex:1"><label>背景色</label><input type="color" id="node-btn-color" style="width:100%;"></div>
+                                            <div style="flex:1"><label>不透明度(%)</label><input type="number" id="node-btn-opacity" min="0" max="100"></div>
+                                        </div>
+                                        <div class="form-group-row">
+                                            <div style="flex:1"><label>文字色</label><input type="color" id="node-btn-text-color" style="width:100%;"></div>
+                                        </div>
+                                        <div class="form-group">
+                                            <label>画像 (空欄でシステム設定)</label>
+                                            <select id="node-btn-image"></select>
+                                        </div>
+                                        <div class="form-group">
+                                            <label>並び方</label>
+                                            <select id="node-btn-dir">
+                                                <option value="">(システム設定に従う)</option>
+                                                <option value="vertical">縦並び</option>
+                                                <option value="horizontal">横並び</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            </details>
                         </div>
                         
+
                         <!-- 変数ノード設定 -->
                         <div id="variable-node-settings" class="node-type-settings hidden">
                             <h4>変数操作</h4>
-                            <div class="form-group"><label for="var-target">対象変数</label><select id="var-target"></select></div>
-                            <div class="form-group"><label for="var-operator">操作</label>
-                                <select id="var-operator">
-                                    <option value="=">代入 (=)</option>
-                                    <option value="+=">加算 (+=)</option>
-                                    <option value="-=">減算 (-=)</option>
-                                    <option value="*=">乗算 (*=)</option>
-                                    <option value="/=">除算 (/=)</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label for="var-value">値 (数字、ダイス、変数名)</label>
-                                <input type="text" id="var-value" placeholder="例: 10, 1d6, enemy_hp">
-                            </div>
+                            <div id="variable-operations-editor"></div>
+                            <button id="add-variable-op-btn" class="secondary-button">+ 操作を追加</button>
+                            <hr>
                             <div class="form-group">
                                 <label>次のノード</label>
                                 <div id="container-next-variable" class="smart-select-container"></div>
                             </div>
                         </div>
-                        
+
                         <!-- 条件分岐ノード設定 -->
                         <div id="conditional-node-settings" class="node-type-settings hidden">
                             <h4>条件分岐</h4>
@@ -195,12 +321,161 @@
                             </div>
                         </div>
 
+                        <!-- UI操作ノード設定 -->
+                        <div id="ui_control-node-settings" class="node-type-settings hidden">
+                            <h4>🖥️ UI / HUD操作 (複数実行可)</h4>
+                            <p style="font-size:0.8em; color:#666;">上から順番に実行されます。</p>
+                            <div id="ui-operations-list"></div>
+                            <button id="add-ui-op-btn" class="secondary-button"
+                                style="width:100%; margin-bottom:15px;">＋ UI操作を追加</button>
+                            <div class="form-group">
+                                <label>次のノードへ進む</label>
+                                <div id="container-next-ui" class="smart-select-container"></div>
+                            </div>
+                        </div>
+
                         <!-- マップノード設定 -->
                         <div id="map-node-settings" class="node-type-settings hidden">
                             <h4>マップ移動設定</h4>
-                            <div class="form-group"><label for="node-map-dest">移動先マップ</label><select id="node-map-dest"></select></div>
-                            <div class="form-group"><label for="node-map-spawn">出現位置</label><select id="node-map-spawn"></select></div>
+                            <div class="form-group"><label for="node-map-dest">移動先マップ</label><select
+                                    id="node-map-dest"></select></div>
+                            <div class="form-group"><label for="node-map-spawn">出現位置</label><select
+                                    id="node-map-spawn"></select></div>
                         </div>
+
+
+                        <!-- ★追加: ショップノード設定 -->
+                        <div id="shop-node-settings" class="node-type-settings hidden">
+                            <h4>🛒 ショップ設定</h4>
+
+                            <div class="form-group">
+                                <label>所持金として使う変数</label>
+                                <input type="text" id="shop-currency-var" list="variable-list-options"
+                                    placeholder="money (デフォルト)" value="money">
+                                <p style="font-size:0.8em; color:#666;">※この変数の値が増減します。</p>
+                            </div>
+
+                            <div class="form-group"
+                                style="background:#fff7e6; padding:10px; border:1px solid #ffd591; border-radius:4px;">
+                                <label style="font-weight:bold; color:#d46b08;">商品リスト</label>
+                                <div id="shop-item-list-container" style="margin-bottom:10px;"></div>
+
+                                <div style="display:flex; gap:5px;">
+                                    <button id="shop-add-item-btn" class="secondary-button">＋ 商品追加</button>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label>背景画像</label>
+                                <select id="shop-background"></select>
+                            </div>
+
+                            <div class="form-group">
+                                <label>BGM</label>
+                                <select id="shop-bgm"></select>
+                            </div>
+
+                            <div class="form-group">
+                                <label>買い物が終わった後の移動先ノード</label>
+                                <div id="container-next-shop" class="smart-select-container"></div>
+                            </div>
+                        </div>
+
+
+                        <!-- バトルノード設定 -->
+<div id="battle-node-settings" class="node-type-settings hidden">
+    <h4>⚔️ ターン制バトル設定</h4>
+    
+    <div class="form-group" style="background:#fff0f6; padding:15px; border:1px solid #ffadd2; border-radius:4px;">
+        <label style="color:#c41d7f; font-weight:bold; display:block; margin-bottom:10px;">👹 出現するエネミー構成</label>
+        
+        <!-- ★ここをリストコンテナに変更 -->
+        <div id="battle-enemy-list-container" style="margin-bottom:10px;"></div>
+        
+        <button id="battle-add-enemy-btn" class="secondary-button" style="width:100%; border-style:dashed;">
+            ＋ 敵を追加 (最大5体)
+        </button>
+        <p style="font-size:0.75em; color:#666; margin-top:5px;">※同じ敵を複数追加することも可能です。</p>
+    </div>
+
+    <div class="form-group">
+        <label>🎨 UIテーマ (見た目)</label>
+        <select id="battle-theme">
+            <option value="dq">黒ウィンドウ (DQ風)</option>
+            <option value="ff">青グラデーション (FF風)</option>
+            <option value="paper">ポップ・手書き (ペーパー風)</option>
+            <option value="cyber">サイバーパンク (女神転生風)</option>
+        </select>
+    </div>
+
+   <div class="form-group">
+        <label>使用可能なコマンド</label>
+        <div style="display:flex; flex-wrap:wrap; gap:10px; padding:8px; background:#f9f9f9; border:1px solid #eee; border-radius:4px;">
+            <label class="checkbox-label" style="cursor:pointer;">
+                <input type="checkbox" id="battle-can-attack" checked>
+                <span>⚔️ 攻撃</span>
+            </label>
+            <label class="checkbox-label" style="cursor:pointer;">
+                <input type="checkbox" id="battle-can-guard" checked>
+                <span>🛡️ 防御</span>
+            </label>
+            <label class="checkbox-label" style="cursor:pointer;">
+                <input type="checkbox" id="battle-can-dash">
+                <span>💨 ダッシュ</span>
+            </label>
+            <label class="checkbox-label" style="cursor:pointer;">
+                <input type="checkbox" id="battle-can-jump">
+                <span>🦘 ジャンプ</span>
+            </label>
+            <label class="checkbox-label" style="cursor:pointer;">
+                <input type="checkbox" id="battle-can-item" checked>
+                <span>💊 アイテム</span>
+            </label>
+                        <label class="checkbox-label" style="cursor:pointer;">
+                <input type="checkbox" id="battle-can-lockon" checked>
+                <span>🎯 ロックオン</span>
+            </label>
+            <label class="checkbox-label" style="cursor:pointer;">
+                <input type="checkbox" id="battle-can-wait" checked>
+                <span>👀 様子を見る</span>
+            </label>
+            <label class="checkbox-label" style="cursor:pointer;">
+                <input type="checkbox" id="battle-can-run" checked>
+                <span>🏳️ 逃げる</span>
+            </label>
+            
+        </div>
+
+    </div>
+
+    <div class="form-group">
+        <label>プレイヤー表示名 (空欄ならデフォルト名)</label>
+        <input type="text" id="battle-player-name-override" placeholder="例: 勇者 (この戦闘だけ名前を変える場合)">
+    </div>
+
+    <div class="form-group-row">
+        <div style="flex:1"><label>背景画像</label><select id="battle-background"></select></div>
+        <div style="flex:1"><label>戦闘BGM</label><select id="battle-bgm"></select></div>
+    </div>
+
+    <hr>
+
+    <div class="form-group">
+        <label>🏆 勝利した時の移動先</label>
+        <div id="container-next-battle-win" class="smart-select-container"></div>
+    </div>
+    
+    <div class="form-group">
+        <label>🏳️ 逃走した時の移動先 (空欄なら逃走不可)</label>
+        <div id="container-next-battle-run" class="smart-select-container"></div>
+    </div>
+
+    <div class="form-group">
+        <label>💀 敗北した時の移動先 (空欄ならゲームオーバー)</label>
+        <div id="container-next-battle-lose" class="smart-select-container"></div>
+    </div>
+</div>
+
                     </div>
                     <div id="editor-placeholder">
                         <p>左のツリーから編集したいノードを選択してください。</p>
@@ -211,20 +486,42 @@
 
         <!-- プレビューモード -->
         <div id="mode-preview" class="mode-content">
-            <div class="preview-area"><div class="preview-window"></div></div>
+            <div class="preview-area">
+                <div class="preview-window"></div>
+                <div style="text-align: center; margin-top: 15px;">
+                    <button id="preview-restart-btn" class="secondary-button"
+                        style="padding: 10px 30px; font-weight:bold;">
+                        🏁 スタート地点から再生
+                    </button>
+                    <p style="font-size:0.8em; color:#666; margin-top:5px;">
+                        ※編集中ノードに関わらず、設定された「START地点」からゲームを開始します。
+                    </p>
+                </div>
+            </div>
         </div>
 
         <!-- 変数管理 -->
         <div id="mode-variables" class="mode-content">
             <h2>変数・フラグ管理</h2>
+
+            <div style="text-align:right; margin-bottom:10px;">
+                <button id="add-group-btn" class="secondary-button">＋ 新しいグループ(章)を作成</button>
+            </div>
+
             <div id="variables-list"></div>
+
             <div class="add-variable-form">
-                <input type="text" id="new-variable-name" placeholder="変数名 (例: love_point)">
+                <div style="grid-column: 1 / -1; font-weight:bold; margin-bottom:5px;">新規変数の追加</div>
+
+                <input type="text" id="new-variable-name" placeholder="変数名 (例: flag_event1)">
                 <input type="text" id="new-variable-value" placeholder="初期値 (例: 0)">
-                <button id="add-variable-btn" class="export-button">+ 変数を追加</button>
+                <select id="new-variable-group" style="padding:8px;">
+                    <option value="基本 (Default)">基本 (Default)</option>
+                </select>
+                <button id="add-variable-btn" class="export-button">+ 追加</button>
             </div>
         </div>
-        
+
         <!-- 2Dキャラクター管理 -->
         <div id="mode-characters" class="mode-content">
             <h2>キャラクター管理 (2D)</h2>
@@ -242,8 +539,12 @@
             <h2>3Dモデル管理</h2>
             <div class="asset-manager">
                 <div class="asset-uploader">
-                    <p>VRM または GLB/glTF 形式の3Dモデルファイルを追加してください。</p>
-                    <input type="file" id="model-file-input" accept=".vrm,.glb,.gltf" multiple>
+                    <p>VRM, GLB, または MMDモデル(.pmx/.pmd) を追加してください。<br>
+                        <span style="font-size:0.8em; color:red;">※MMDの場合、.pmxファイルと使用するテクスチャ画像(.png,
+                            .spa等)を<strong>全て同時に選択</strong>してアップロードしてください。</span>
+                    </p>
+                    <input type="file" id="model-file-input"
+                        accept=".vrm,.glb,.gltf,.pmx,.pmd,.png,.jpg,.bmp,.tga,.spa,.sph" multiple>
                     <div id="model-list" class="asset-list"></div>
                 </div>
             </div>
@@ -254,8 +555,8 @@
             <h2>3Dアニメーション管理 (VRMA)</h2>
             <div class="asset-manager">
                 <div class="asset-uploader">
-                    <p>.vrma 形式のアニメーションファイルを追加してください。</p>
-                    <input type="file" id="animation-file-input" accept=".vrma" multiple>
+                    <p>.vrma (VRM用) または .vmd (MMD用) 形式のアニメーションファイルを追加してください。</p>
+                    <input type="file" id="animation-file-input" accept=".vrma,.vmd" multiple>
                     <div id="animation-list" class="asset-list"></div>
                 </div>
             </div>
@@ -272,7 +573,7 @@
                 </div>
             </div>
         </div>
-        
+
         <!-- 効果音管理 -->
         <div id="mode-sounds" class="mode-content">
             <h2>効果音管理</h2>
@@ -284,7 +585,7 @@
                 </div>
             </div>
         </div>
-        
+
         <!-- マップ作成モード -->
         <div id="mode-map" class="mode-content">
             <div class="map-editor-layout">
@@ -292,9 +593,13 @@
                     <h3>マップ管理</h3>
                     <button id="create-map-btn" class="secondary-button">+ 新規マップ作成</button>
                     <select id="map-list-select"></select>
+                    <button id="open-player-settings-btn" class="secondary-button" style="margin-top:5px;">👤
+                        プレイヤー初期設定</button>
                     <hr>
                     <div id="map-editor-ui" class="hidden">
-                        <div class="accordion-header" onclick="document.getElementById('map-basic-settings').classList.toggle('hidden')">▼ マップ基本設定</div>
+                        <div class="accordion-header"
+                            onclick="document.getElementById('map-basic-settings').classList.toggle('hidden')">▼ マップ基本設定
+                        </div>
                         <div id="map-basic-settings">
                             <form id="map-settings-form">
                                 <div class="form-group"><label>名前</label><input type="text" id="map-name"></div>
@@ -304,6 +609,12 @@
                                         <option value="side">アクション風 (横)</option>
                                         <option value="shooter">シューティング風 (縦)</option>
                                         <option value="dungeon">3Dダンジョン (FPS視点)</option>
+                                        <option value="quarter">クォータービュー (2.5D)</option>
+                                        <option value="mode7">Mode7 (擬似3D平面)</option>
+                                        <option value="belt">ベルトスクロール (奥移動あり)</option>
+                                        <option value="trapezoid">2.5D (台形/奥行き)</option>
+                                        <option value="adventure">🔎 探索・調査 (クリック/タップ)</option>
+                                        <option value="panorama">🔄 パノラマ (360度ビュー)</option>
                                     </select>
                                 </div>
                                 <div class="form-group-row">
@@ -311,171 +622,2079 @@
                                     <div><label>高</label><input type="number" id="map-height" style="width:60px"></div>
                                 </div>
                                 <div class="form-group">
-                                    <label>背景画像</label>
+                                    <label>初期カメラズーム (0.1 ~ 5.0)</label>
+                                    <input type="number" id="map-init-zoom" value="1.0" step="0.1" min="0.1" max="5.0">
+                                </div>
+<div class="form-group">
+    <label>重力倍率 (1.0=標準, 0=無重力)</label>
+    <!-- typeを"text"に変更し、入力補完を追加 -->
+    <input type="text" id="map-gravity" value="1.0" list="variable-list-options" placeholder="例: 1.0 や $worldGravity" style="width: 100%;">
+    <p style="font-size:0.8em; color:#666; margin-top:2px;">
+        高いとドッスンと落ち、低いとフワッと飛びます。
+    </p>
+</div>
+
+                                <div class="form-group">
+                                    <label>背景画像 (メイン/床)</label>
                                     <select id="map-bg-select"></select>
+                                </div>
+
+                                <!-- ★追加: 外側/空の背景 -->
+                                <div class="form-group">
+                                    <label>外側・空の画像 (Outer/Sky)</label>
+                                    <p style="font-size:0.8em; color:#666; margin:0 0 5px 0;">
+                                        2Dでは「マップ外側の背景」、3D/台形では「空」として表示されます。
+                                    </p>
+                                    <select id="map-bg-outside-select"></select>
+                                </div>
+                                <div class="form-group">
+                                    <label>マップBGM</label>
+                                    <select id="map-bgm-select"></select>
+                                </div>
+                                <div class="form-group">
+                                    <label>3Dステージモデル (GLB/VRM)</label>
+                                    <p style="font-size:0.8em; color:#666; margin:0 0 5px 0;">設定すると背景画像の代わりに3Dモデルを表示します。
+                                    </p>
+                                    <select id="map-stage-model-select"></select>
                                 </div>
                                 <div class="form-group">
                                     <label>強制スクロール</label>
                                     <div style="display:flex; gap:5px;">
                                         <select id="map-scroll-dir" style="flex:2;">
                                             <option value="none">なし</option>
-                                            <option value="right">右へ (→)</option>
-                                            <option value="left">左へ (←)</option>
-                                            <option value="down">下へ (↓)</option>
-                                            <option value="up">上へ (↑)</option>
+                                            <option value="right">右 / 前進 (X+)</option>
+                                            <option value="left">左 / 後退 (X-)</option>
+                                            <option value="down">下 / 右移動 (Y+)</option>
+                                            <option value="up">上 / 左移動 (Y-)</option>
+                                            <option value="rise">上昇 (Z+)</option>
+                                            <option value="fall">下降 (Z-)</option>
                                         </select>
                                         <input type="number" id="map-scroll-speed" placeholder="速" style="flex:1;">
                                     </div>
                                 </div>
-                                                                <div class="form-group" style="margin-top:10px; padding:10px; background:#fff0f6; border:1px dashed #ffadd2; border-radius:4px;">
+                                <div class="form-group">
+                                    <label>マップの端 (Edge Behavior)</label>
+                                    <select id="map-edge-type">
+                                        <option value="clamp">🚧 行き止まり (Clamp)</option>
+                                        <option value="loop">🔄 無限ループ (World Map)</option>
+                                    </select>
+                                </div>
+
+                                <div class="form-group"
+                                    style="background:#f0fff4; padding:10px; border:1px solid #b7eb8f; border-radius:4px; margin-top:10px;">
+                                    <label style="color:#389e0d; font-weight:bold;">🎲 ランダム生成モード (Roguelike)</label>
+                                    <select id="map-random-mode" style="width:100%; margin-bottom:5px;">
+                                        <option value="none">なし (エディタ通り)</option>
+                                        <option value="shuffle">配置シャッフル (数は維持)</option>
+                                        <option value="generate">自動生成 (埋め尽くす)</option>
+                                    </select>
+
+                                    <!-- 自動生成用オプション (JSで表示切り替え) -->
+                                    <div id="map-random-options"
+                                        style="display:none; margin-top:5px; padding-top:5px; border-top:1px dashed #b7eb8f;">
+                                        <div style="display:flex; gap:5px; align-items:center; margin-bottom:5px;">
+                                            <label style="font-size:0.8em; flex:1;">壁の密度(%)</label>
+                                            <input type="number" id="map-random-wall-rate" value="20" min="0" max="100"
+                                                style="width:60px;">
+                                        </div>
+                                        <div style="display:flex; gap:5px; align-items:center;">
+                                            <label style="font-size:0.8em; flex:1;">敵・アイテム数倍率</label>
+                                            <input type="number" id="map-random-entity-rate" value="1.0" step="0.1"
+                                                min="0.1" style="width:60px;">
+                                        </div>
+                                        <p style="font-size:0.7em; color:#666; margin-top:5px;">
+                                            ※エディタに配置されたオブジェクトを「見本」として使用します。<br>
+                                            ※Start地点周辺は安全地帯になります。
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div class="form-group"
+                                    style="margin-top:10px; padding:10px; background:#fff0f6; border:1px dashed #ffadd2; border-radius:4px;">
                                     <label style="color:#c41d7f; font-weight:bold;">⚡️ 挟まれ（クラッシュ）イベント</label>
-                                    <p style="font-size:0.8em; margin:0 0 5px 0;">強制スクロールで壁と画面端に挟まれた場合に実行されます。</p>
                                     <div id="map-crush-event-select" class="smart-select-container"></div>
                                 </div>
-                                
+                                <div class="form-group"
+                                    style="margin-top:10px; padding:10px; background:#fff1f0; border:1px dashed #ffa39e; border-radius:4px;">
+                                    <label style="color:#cf1322; font-weight:bold;">💀 ゲームオーバー / 死亡時イベント</label>
+                                    <div id="map-gameover-event-select" class="smart-select-container"></div>
+                                </div>
                             </form>
                         </div>
                         <hr>
                         <h4>ツール</h4>
                         <div class="map-tools">
-                            <button class="map-tool-btn active" data-tool="pointer">👆 選択</button>
-                            <button class="map-tool-btn" data-tool="pen">✏️ 配置</button>
-                            <button class="map-tool-btn" data-tool="erase">🧹 消去</button>
+                            <button class="map-tool-btn active" data-tool="pointer" title="選択">👆 選択</button>
+                            <button class="map-tool-btn" data-tool="pen" title="配置">✏️ 配置</button>
+                            <button class="map-tool-btn" data-tool="erase" title="削除">🧹 消去</button>
+                            <button class="map-tool-btn" id="map-undo-btn" title="元に戻す">↩️ 戻る</button>
+                            <button class="map-tool-btn" id="map-redo-btn" title="やり直す">↪️ 進む</button>
                         </div>
-                        
-                        <div id="obj-settings-container" class="map-props" style="margin-top:15px; border-top:2px solid #aaa; padding-top:10px;">
+
+                        <div id="obj-settings-container" class="map-props"
+                            style="margin-top:15px; border-top:2px solid #aaa; padding-top:10px;">
                             <h4 style="margin-bottom:10px; background:#eee; padding:5px;">オブジェクト設定</h4>
                             <form id="obj-settings-form">
+                                <!-- 1. 種別を一番上に配置 -->
                                 <div class="form-group">
-                                    <label>見た目タイプ</label>
-                                    <select id="obj-visual-type"><option value="color">単色</option><option value="image">画像</option></select>
+                                    <label>オブジェクトの種別 (Role)</label>
+                                    <select id="obj-role-type">
+                                        <option value="obstacle">🚧 障害物 (壁)</option>
+                                        <option value="enemy">👹 エネミー (戦闘)</option>
+                                        <option value="item">📦 アイテム (取得)</option>
+                                        <option value="ladder">🧗 ハシゴ</option>
+                                        <option value="jump">⏫ ジャンプ台</option>
+                                        <option value="deco">🍀 装飾 (背景)</option>
+                                    </select>
                                 </div>
-                                <div id="obj-visual-color-group" class="form-group">
-                                    <label>色 / 透明度</label>
-                                    <div style="display:flex; gap:5px;">
-                                        <input type="color" id="obj-color" style="flex:1; height:30px;"><input type="number" id="obj-opacity" min="0" max="100" value="100" style="width:60px;"><span>%</span>
+
+                                <div class="form-group-row">
+                                    <div style="flex:1">
+                                        <label style="font-size:0.85em;">幅 (マス数)</label>
+                                        <input type="number" id="obj-size-w" value="1" min="1" step="1">
+                                    </div>
+                                    <div style="flex:1">
+                                        <label style="font-size:0.85em;">高さ (マス数)</label>
+                                        <input type="number" id="obj-size-h" value="1" min="1" step="1">
                                     </div>
                                 </div>
-                                <div id="obj-visual-image-group" class="form-group" style="display:none;">
-                                    <label>画像 / 透明度</label>
-                                    <select id="obj-char-select" style="margin-bottom:5px;"></select>
-                                    <div style="display:flex; gap:5px; align-items:center;"><span>透明度:</span><input type="number" id="obj-img-opacity" min="0" max="100" value="100" style="width:60px;"><span>%</span></div>
+
+
+                                <div id="obj-enemy-preset-group"
+                                    style="display:none; background:#e6f7ff; padding:10px; border-radius:4px; margin-bottom:15px; border:1px solid #1890ff;">
+                                    <label style="font-weight:bold; color:#0050b3;">👹 エネミーデータを選択</label>
+                                    <div style="display:flex; gap:5px;">
+                                        <select id="obj-enemy-id" style="flex:1; font-weight:bold;">
+                                            <option value="">(カスタム / 個別設定)</option>
+                                        </select>
+                                        <button type="button" id="refresh-enemy-list-btn" class="secondary-button"
+                                            style="padding:2px 8px;">🔄</button>
+                                    </div>
+                                    <p style="font-size:0.8em; color:#666; margin-top:5px;">
+                                        選択すると、ステータスや画像は「エネミー管理」の設定が適用されます。<br>
+                                        <span style="color:#d46b08;">※下の設定欄で値を入力すると、その個体だけステータスを上書き(オーバーライド)できます。</span>
+                                    </p>
                                 </div>
+
+                                <!-- 2. アイテム専用設定 -->
+                                <div id="obj-item-settings"
+                                    style="display:none; background:#fffbe6; padding:10px; border:1px solid #ffe58f; border-radius:4px; margin-bottom:15px;">
+                                    <label style="color:#d46b08; font-weight:bold;">🎒 アイテム取得設定</label>
+                                    <div class="form-group">
+                                        <label style="font-size:0.8em;">取得するアイテム</label>
+                                        <select id="obj-item-id"></select>
+                                        <p style="font-size:0.7em; color:#888; margin-top:2px;">※アイテムのアイコンがマップに自動表示されます。
+                                        </p>
+                                    </div>
+                                    <div class="form-group-row">
+                                        <div style="flex:1"><label style="font-size:0.8em;">個数</label><input
+                                                type="number" id="obj-item-amount" value="1" min="1"></div>
+                                        <div style="flex:2"><label style="font-size:0.8em;">取得方法</label><select
+                                                id="obj-item-pickup">
+                                                <option value="touch">接触</option>
+                                                <option value="action">調べる</option>
+                                            </select></div>
+                                    </div>
+                                </div>
+
+                                <!-- 3. 見た目設定グループ (アイテム選択時はここが隠れる) -->
+                                <div id="obj-visual-settings-group">
+                                    <div class="form-group">
+                                        <label>見た目タイプ</label>
+                                        <select id="obj-visual-type">
+                                            <option value="color">単色</option>
+                                            <option value="image">画像</option>
+                                        </select>
+                                    </div>
+                                    <div id="obj-visual-color-group" class="form-group">
+                                        <label>色 / 透明度</label>
+                                        <div style="display:flex; gap:5px;"><input type="color" id="obj-color"><input
+                                                type="number" id="obj-opacity" value="100" style="width:50px;">%</div>
+                                    </div>
+                                    <div id="obj-visual-image-group" class="form-group" style="display:none;">
+                                        <label>画像(待機)</label><select id="obj-char-select"></select>
+                                        <div
+                                            style="border-left:2px solid #ddd; padding-left:5px; font-size:0.8em; margin-bottom:5px;">
+                                            移動<select id="obj-char-move"></select>
+                                            攻撃<select id="obj-char-attack"></select>
+                                            被弾<select id="obj-char-damage"></select>
+                                        </div>
+                                        <div style="display:flex; align-items:center;">透明度:<input type="number"
+                                                id="obj-img-opacity" value="100" style="width:50px;">%</div>
+                                    </div>
+                                </div>
+
+                                <!-- 3D/2.5D専用設定エリア -->
+                                <div id="obj-3d-specific-settings"
+                                    style="display:none; background:#f0f8ff; padding:8px; border:1px dashed #adc6ff; border-radius:4px; margin-bottom:15px;">
+                                    <label
+                                        style="color:#0056b3; font-weight:bold; font-size:0.9em; margin-bottom:5px;">🧊
+                                        3D・高さ設定</label>
+                                    <div class="form-group">
+                                        <label style="font-size:0.8em;">描画タイプ</label>
+                                        <select id="obj-render-type" style="font-size:0.9em;">
+                                            <option value="billboard">👀 ビルボード</option>
+                                            <option value="plane">🚪 プレーン (固定板)</option>
+                                            <option value="box">📦 ボックス (立体)</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label style="font-size:0.8em;">高さ (背の高さ / Z)</label>
+                                        <div style="display:flex; align-items:center; gap:5px;">
+                                            <input type="number" id="obj-elevation" value="0" style="width:80px;"><span
+                                                style="font-size:0.8em; color:#666;">px</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+
                                 <hr>
                                 <div class="form-group">
                                     <label>出現条件</label>
                                     <div style="display:flex; gap:2px; align-items:center;">
-                                        <select id="obj-cond-var" style="flex:2;"></select><select id="obj-cond-op" style="flex:1;"><option value="==">=</option><option value="!=">≠</option><option value=">">&gt;</option><option value="<">&lt;</option><option value=">=">≥</option><option value="<=">≤</option></select><input type="text" id="obj-cond-val" placeholder="値" style="flex:1;">
+                                        <select id="obj-cond-var" style="flex:2;"></select>
+                                        <select id="obj-cond-op" style="flex:1;">
+                                            <option value="==">=</option>
+                                            <option value="!=">≠</option>
+                                            <option value=">">&gt;</option>
+                                            <option value="<">&lt;</option>
+                                            <option value=">=">≥</option>
+                                            <option value="<=">≤</option>
+                                        </select>
+                                        <input type="text" id="obj-cond-val" placeholder="値"
+                                            list="variable-list-options" style="flex:1;">
                                     </div>
-                                </div>
-                                <hr>
-                                <div class="form-group">
-                                    <label class="checkbox-label"><input type="checkbox" id="obj-is-wall" checked><span>🚧 障害物</span></label>
-                                    <label style="margin-top:10px;">特殊効果</label>
-                                    <select id="obj-effect-type"><option value="none">なし</option><option value="ladder">🧗 ハシゴ</option><option value="jump">⏫ ジャンプ台</option></select>
                                 </div>
                                 <hr>
                                 <div class="form-group">
                                     <label>自律移動</label>
-                                    <select id="obj-move-type"><option value="fixed">固定</option><option value="random">ランダム</option><option value="horizontal">左右往復</option><option value="vertical">上下往復</option><option value="chase">追尾</option></select>
-                                    <div id="obj-move-details" style="display:none; margin-top:5px; padding-left:10px; border-left:3px solid #f0ad4e;">
+                                    <select id="obj-move-type">
+                                        <option value="fixed">固定</option>
+                                        <option value="random">ランダム</option>
+                                        <option value="horizontal">左右往復</option>
+                                        <option value="vertical">上下往復</option>
+                                        <option value="chase">追尾</option>
+                                    </select>
+                                    <div id="obj-move-details"
+                                        style="display:none; margin-top:5px; padding-left:10px; border-left:3px solid #f0ad4e;">
                                         <div style="display:flex; gap:5px;">
-                                            <div><label style="font-size:0.8em;">速度</label><input type="number" id="obj-move-speed" value="2" style="width:50px;"></div>
-                                            <div><label style="font-size:0.8em;">範囲</label><input type="number" id="obj-move-range" value="3" style="width:50px;"></div>
+                                            <div><label style="font-size:0.8em;">SPD</label><input type="number" id="obj-spd" value="2" style="width:50px;"></div>
+                                            <div><label style="font-size:0.8em;">範囲</label><input type="number"
+                                                    id="obj-move-range" value="3" style="width:50px;"></div>
                                         </div>
+                                        <div class="form-group"><label style="font-size:0.8em;">追尾ターゲットID
+                                                (空欄でPlayer)</label><input type="text" id="obj-move-chase-id"
+                                                placeholder="例: crystal" style="width:100%;"></div>
                                     </div>
                                 </div>
-                                <hr>
-                                <div class="form-group"><label class="checkbox-label"><input type="checkbox" id="obj-has-event"><span>⚡ イベント</span></label></div>
-                                <div id="obj-event-details" style="display:none; padding-left:10px; border-left:3px solid #007bff; margin-bottom:10px;">
-                                    <div class="form-group"><label>発生条件</label><select id="obj-event-trigger"><option value="touch">接触時</option><option value="action">調べる</option></select></div>
-                                    <div class="form-group"><label>進行タイプ</label><select id="obj-event-repeat"><option value="once">1回のみ</option><option value="loop">ループ</option><option value="stick">最後で固定</option></select></div>
-                                    <div class="form-group"><label>実行ノード</label><div id="obj-event-list-container"></div><button type="button" id="add-event-step-btn" class="secondary-button" style="font-size:0.8em;">+ ステップ追加</button></div>
+
+                                <!-- ★★★ ここに追加: 索敵と活動限界 ★★★ -->
+                                <div class="form-group-row"
+                                    style="margin-top:10px; padding-top:10px; border-top:1px dashed #ccc;">
+                                    <div style="flex:1">
+                                        <label style="font-size:0.85em;" title="プレイヤーがこの範囲(マス)に入ると動き出します。0で無限(常に動く)。">
+                                            👁️ 索敵範囲 (マス)
+                                        </label>
+                                        <input type="number" id="obj-detection-range" value="0" min="0"
+                                            style="width:100%;">
+                                    </div>
+                                    <div style="flex:1">
+                                        <label style="font-size:0.85em;"
+                                            title="初期位置から離れられる最大距離(マス)。これを超えると戻ります。0で制限なし。">
+                                            🏠 活動限界 (マス)
+                                        </label>
+                                        <input type="number" id="obj-territory-range" value="0" min="0"
+                                            style="width:100%;">
+                                    </div>
                                 </div>
-                                <div class="form-group"><label class="checkbox-label"><input type="checkbox" id="obj-is-spawn"><span>🚩 出現点</span></label></div>
-                                <div id="obj-spawn-details" style="display:none; padding-left:10px; border-left:3px solid #28a745;">
-                                    <div class="form-group"><label>出現点ID</label><input type="text" id="obj-spawn-id" placeholder="例: start_point"></div>
+                                <!-- ★★★ 追加ここまで ★★★ -->
+
+                                <hr>
+                                <div class="form-group"><label class="checkbox-label"><input type="checkbox"
+                                            id="obj-has-event"><span>⚡ 通常イベント (会話等)</span></label></div>
+                                <div id="obj-event-details"
+                                    style="display:none; padding-left:10px; border-left:3px solid #007bff; margin-bottom:10px;">
+                                    <div class="form-group"><label>発生条件</label><select id="obj-event-trigger">
+                                            <option value="touch">接触時</option>
+                                            <option value="action">調べる</option>
+                                            <option value="auto">自動実行 (Auto Run)</option>
+                                        </select></div>
+                                    <div class="form-group"><label>進行タイプ</label><select id="obj-event-repeat">
+                                            <option value="once">1回のみ</option>
+                                            <option value="loop">ループ</option>
+                                            <option value="stick">最後で固定</option>
+                                        </select></div>
+                                    <div id="obj-event-list-container"></div><button type="button"
+                                        id="add-event-step-btn" class="secondary-button" style="font-size:0.8em;">+
+                                        ステップ追加</button>
+                                </div>
+
+                                <div class="form-group"><label class="checkbox-label"><input type="checkbox"
+                                            id="obj-is-spawn"><span>🚩 出現点に設定</span></label></div>
+                                <div id="obj-spawn-details"
+                                    style="display:none; padding-left:10px; border-left:3px solid #28a745; margin-bottom:10px;">
+                                    <input type="text" id="obj-spawn-id" placeholder="出現点ID (例: start_point)">
+                                </div>
+
+                                <div class="form-group"><label class="checkbox-label"><input type="checkbox"
+                                            id="obj-has-battle-event"><span>⚡ バトルイベント (HPトリガー)</span></label></div>
+                                <div id="obj-battle-event-details"
+                                    style="display:none; padding-left:10px; border-left:3px solid #dc3545; margin-bottom:10px;">
+                                    <div id="obj-battle-event-list-container"></div><button type="button"
+                                        id="add-battle-event-btn" class="secondary-button" style="font-size:0.8em;">+
+                                        条件を追加</button>
+                                </div>
+
+                                <div class="form-group"
+                                    style="margin-top:10px; padding:5px; background:#f0f5ff; border-radius:4px; border:1px solid #adc6ff;">
+                                    <label class="checkbox-label"
+                                        title="ONにすると、アイテム取得や敵撃破の状態がセーブデータに記録され、マップ移動しても復活しなくなります。">
+                                        <input type="checkbox" id="obj-keep-destroyed">
+                                        <span>💾 取得/破壊状態を永続化 (復活しない)</span>
+                                    </label>
+                                </div>
+
+
+                                <hr>
+                                <!-- ★ バトル設定全体をこのIDで囲む ★ -->
+<div id="obj-battle-settings" style="display:none;">
+    <div class="form-group" style="background:#fff7e6; padding:10px; border:1px solid #ffd591; border-radius:4px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+            <label style="color:#d46b08; font-weight:bold; margin:0;">⚔️ バトル設定</label>
+            <button type="button" id="open-battle-help-btn" class="secondary-button" style="font-size:0.8em; padding:2px 8px; background:#fff; border-color:#ffd591; color:#d46b08;">❓ 計算式</button>
+        </div>
+
+        <!-- 1段目: HP, スタミナ, 接触ダメ -->
+        <div style="display:flex; gap:5px; margin-bottom:5px;">
+            <div style="flex:1;">
+                <label style="font-size:0.8em;">HP (耐久値)</label>
+                <input type="text" id="obj-battle-hp" list="variable-list-options" placeholder="10 or $hp">
+            </div>
+            
+            <!-- ★追加: スタミナ入力欄 (ツールチップ付き) -->
+            <div style="flex:1;">
+                <label style="font-size:0.8em; cursor:help; border-bottom:1px dotted #999;" title="ターン制バトル開始時の初期値です。マップ上のアクション戦闘では消費しません（無限扱い）。">
+                    スタミナ(※)
+                </label>
+                <input type="text" id="obj-battle-stamina" list="variable-list-options" placeholder="空欄=DB値">
+            </div>
+            
+            <div style="flex:1;">
+                <label style="font-size:0.8em;">接触ダメ</label>
+                <input type="text" id="obj-battle-dmg" list="variable-list-options" placeholder="1 or $atk">
+            </div>
+        </div>
+
+        <!-- ★追加: ユーザーへの明示メッセージ -->
+        <p style="font-size:0.75em; color:#d46b08; margin:0 0 10px 0; line-height:1.3;">
+            ※スタミナ値は<strong>「ターン制バトル」</strong>に突入した時のみ使用されます。<br>
+            （マップ上のアクション戦闘では、敵はスタミナを消費しません）
+        </p>
+
+        <!-- 2段目: 防御, 貫通 (以下既存コード) -->
+        <div style="display:flex; gap:5px; margin-bottom:10px;">
+            <div style="flex:1;">
+                <label style="font-size:0.8em;">防御力</label>
+                <input type="text" id="obj-battle-def" placeholder="例: 0, $def" list="variable-list-options">
+            </div>
+            <div style="flex:1;">
+                <label style="font-size:0.8em;">貫通力</label>
+                <input type="text" id="obj-battle-pen" placeholder="例: 1" list="variable-list-options">
+            </div>
+        </div>
+
+                                        <!-- 獲得EXP -->
+                                        <div style="display:flex; gap:5px; margin-bottom:5px;">
+                                            <div style="flex:1;">
+                                                <label style="font-size:0.8em;">獲得EXP</label>
+                                                <!-- 修正: placeholderを追加 -->
+                                                <input type="text" id="obj-battle-exp" value="10" style="width:100%;"
+                                                    list="variable-list-options" placeholder="例: 10 + $level">
+                                            </div>
+                                            <div style="flex:1;"></div>
+                                        </div>
+
+                                        <!-- 爆発設定 -->
+                                        <div
+                                            style="display: flex; gap: 5px; margin-bottom:10px; background:#fff7e6; padding:5px; border-radius:4px; border:1px solid #ffe58f; box-sizing: border-box;">
+                                            <div style="flex:1">
+                                                <label style="font-size:0.8em;">💥 爆発範囲 (px)</label>
+                                                <!-- 修正: placeholderを変更 (0=なし の説明を含める) -->
+                                                <input type="text" id="obj-blast-radius" value="0"
+                                                    placeholder="例: 64 (0=なし)"
+                                                    style="width:100%; box-sizing: border-box;"
+                                                    list="variable-list-options">
+                                            </div>
+                                            <div style="flex:1">
+                                                <label style="font-size:0.8em;">爆風倍率 (%)</label>
+                                                <!-- 修正: placeholderを追加 -->
+                                                <input type="text" id="obj-blast-rate" value="50" placeholder="例: 50"
+                                                    style="width:100%; box-sizing: border-box;"
+                                                    list="variable-list-options">
+                                            </div>
+                                        </div>
+
+                                        <div class="form-group">
+                                            <label class="checkbox-label"><input type="checkbox"
+                                                    id="obj-is-destructible"><span>💥 HP0で消滅</span></label>
+                                            <label class="checkbox-label" style="margin-top:5px;"><input type="checkbox"
+                                                    id="obj-show-hp"><span>📊 HPバーを表示</span></label>
+                                        </div>
+                                        <div class="form-group"
+                                            style="margin-top:10px; border-top:1px dashed #ffd591; padding-top:5px;">
+                                            <label style="font-size:0.8em; color:#d46b08;">🎁 ドロップアイテム (死亡時)</label>
+                                            <select id="obj-drop-item-id" style="width:100%; margin-bottom:5px;">
+                                                <!-- JSでアイテムリストが挿入されます -->
+                                            </select>
+                                            <div style="display:flex; align-items:center; gap:5px;">
+                                                <label style="font-size:0.8em;">確率(%)</label>
+                                                <input type="text" id="obj-drop-rate" value="100" style="width:60px;"
+                                                    list="variable-list-options" placeholder="例: 50">
+                                            </div>
+                                        </div>
+                                        <div style="margin-top:10px; padding-top:10px; border-top: 1px dashed #ffd591;">
+                                            <label style="font-size:0.9em; font-weight:bold;">攻撃アクション設定</label>
+                                            <div style="display:flex; gap:5px; margin-bottom:5px;">
+                                                <div style="flex:1;"><label style="font-size:0.7em;">射程</label>
+                                                    <!-- placeholder を変数例に変更 -->
+                                                    <input type="text" id="obj-atk-range" placeholder="例: 32"
+                                                        list="variable-list-options">
+                                                </div>
+                                                <div style="flex:1;"><label style="font-size:0.7em;">間隔</label>
+                                                    <!-- placeholder を変数例に変更 -->
+                                                    <input type="text" id="obj-atk-cooldown" placeholder="例: 60, $cool"
+                                                        list="variable-list-options">
+                                                </div>
+                                            </div>
+                                            <div style="display:flex; gap:5px;">
+                                                <div style="flex:1;"><label style="font-size:0.7em;">弾速 (1~で射撃)</label>
+                                                    <!-- placeholder を変数例に変更 -->
+                                                    <input type="text" id="obj-atk-speed" placeholder="例: 0 (近接)"
+                                                        list="variable-list-options">
+                                                </div>
+                                                <div style="flex:1;"></div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </form>
                         </div>
                     </div>
                 </div>
                 <div class="map-canvas-area">
+                    <canvas id="map-3d-canvas"></canvas>
                     <canvas id="map-canvas" class="hidden"></canvas>
-                    <div id="map-placeholder"><p>マップを選択してください。</p></div>
+                    <div id="map-placeholder">
+                        <p>マップを選択してください。</p>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <!-- UI設定モード -->
+
+
+        <!-- アイテム管理モード -->
+        <div id="mode-items" class="mode-content">
+
+            <div class="ui-config-layout" id="item-manager-wrapper">
+
+                <!-- 左側パネル: 登録アイテム一覧 -->
+                <div class="ui-config-card" id="item-list-panel"
+                    style="flex:1; max-width:320px; height:calc(100vh - 160px); display:flex; flex-direction:column;">
+                    <h3 style="margin-bottom: 5px;">登録アイテム一覧</h3>
+
+                    <!-- ★追加: 検索とフィルタ -->
+                    <div style="margin-bottom: 10px; display:flex; flex-direction:column; gap:5px;">
+                        <input type="text" id="item-search-input" placeholder="🔍 名前で検索..."
+                            style="width:100%; box-sizing:border-box;">
+                        <div style="display:flex; gap:2px;">
+                            <button class="filter-btn active" data-filter="all"
+                                style="flex:1; font-size:10px; padding:4px;">全て</button>
+                            <button class="filter-btn" data-filter="consumable"
+                                style="flex:1; font-size:10px; padding:4px;">消費</button>
+                            <button class="filter-btn" data-filter="key"
+                                style="flex:1; font-size:10px; padding:4px;">重要</button>
+                            <button class="filter-btn" data-filter="equip"
+                                style="flex:1; font-size:10px; padding:4px;">装備</button>
+                        </div>
+                    </div>
+
+                    <div id="item-list-container"
+                        style="flex:1; overflow-y:auto; border:1px solid #ddd; border-radius:4px; margin-bottom:10px; background:#fff;">
+                        <!-- ここに JavaScript でアイテム行が生成されます -->
+                    </div>
+                    <button id="create-item-btn" class="export-button"
+                        style="width:100%; padding:12px; font-weight:bold;">
+                        ＋ アイテムを新規作成
+                    </button>
+                </div>
+
+                <!-- 右側パネル: アイテム詳細編集 -->
+                <div class="ui-config-card" id="item-editor-panel"
+                    style="flex:2; height:calc(100vh - 160px); overflow-y:auto;">
+
+                    <!-- モバイル専用ヘッダー（戻るボタン） -->
+                    <div id="item-mobile-header"
+                        style="display:none; align-items:center; margin-bottom:15px; border-bottom:1px solid #eee; padding-bottom:10px;">
+                        <button id="item-back-to-list-btn" class="secondary-button" style="padding:8px 15px;">←
+                            戻る</button>
+                        <h3 style="margin:0 0 0 15px; border:none; padding:0;">アイテム詳細編集</h3>
+                    </div>
+
+                    <!-- デスクトップ専用タイトル -->
+                    <h3 id="item-editor-title-desktop" style="margin-bottom: 20px;">アイテム詳細編集</h3>
+
+                    <!-- 編集フォーム本体 (初期状態は非表示) -->
+                    <div id="item-editor-form" style="display:none;">
+
+                        <!-- 基本設定エリア -->
+                        <div
+                            style="background:#f9f9f9; padding:15px; border-radius:8px; border:1px solid #eee; margin-bottom:20px;">
+                            <div class="form-group-row">
+                                <div style="flex:1">
+                                    <label style="font-size:0.85em; color:#666;">アイテムID (自動発行)</label>
+                                    <input type="text" id="item-id" disabled
+                                        style="background:#eee; font-family:monospace; color:#888;">
+                                </div>
+                                <div style="flex:2">
+                                    <label style="font-weight:bold;">アイテム名</label>
+                                    <input type="text" id="item-name" placeholder="例: 薬草、銀のカギ">
+                                </div>
+                            </div>
+
+                            <div class="form-group-row" style="margin-top:15px;">
+                                <div style="flex:1">
+                                    <label>アイコン (絵文字)</label>
+                                    <input type="text" id="item-icon-emoji" placeholder="📦"
+                                        style="font-size:1.5em; text-align:center;">
+                                </div>
+                                <div style="flex:2">
+                                    <label>アイコン (画像素材)</label>
+                                    <select id="item-icon-image">
+                                        <!-- JavaScript でキャラ画像アセットが読み込まれます -->
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="form-group" style="margin-top:15px;">
+                                <label>アイテムの説明文</label>
+                                <textarea id="item-desc" rows="3" placeholder="ゲーム内メニューで表示される説明文を入力してください..."
+                                    style="resize: vertical;"></textarea>
+                            </div>
+                        </div>
+
+                        <!-- アイテム特性設定 -->
+                        <div class="form-group" style="margin-bottom:20px;">
+                            <label style="font-weight:bold;">アイテムの分類</label>
+                            <select id="item-type" style="padding:10px; border:2px solid #ddd;">
+                                <option value="consumable">💊 消費アイテム (使うとなくなる)</option>
+                                <option value="key">🔑 重要アイテム (使ってもなくならない / イベント用)</option>
+                                <option value="ammo">🔫 弾薬・消耗品 (マガジンを補充する)</option>
+                                <option value="equip">🛡️ 装備品・パッシブ (所持しているだけで効果を発揮)</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group-row"
+                            style="background:#fffbe6; padding:10px; border:1px solid #ffe58f; border-radius:4px;">
+                            <div style="flex:1">
+                                <label style="font-size:0.85em;">基本価格 (買値)</label>
+                                <div style="display:flex; align-items:center;">
+                                    <span style="font-size:1.2em; margin-right:5px;">💰</span>
+                                    <input type="number" id="item-price" value="100" min="0" style="width:100%;">
+                                </div>
+                            </div>
+                            <div style="flex:1">
+                                <label style="font-size:0.85em;">売却価格 (0=売れない)</label>
+                                <div style="display:flex; align-items:center;">
+                                    <span style="font-size:1.2em; margin-right:5px;">🤝</span>
+                                    <input type="number" id="item-sell-price" value="50" min="0" style="width:100%;">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group-row"
+                            style="background:#f0f5ff; padding:10px; border:1px solid #adc6ff; border-radius:4px; margin-top:10px;">
+                            <div style="flex:1">
+                                <label style="font-size:0.85em; font-weight:bold;">最大所持数 (Max Stack)</label>
+                                <div style="display:flex; align-items:center;">
+                                    <span style="font-size:1.2em; margin-right:5px;">🔢</span>
+                                    <input type="number" id="item-max-stack" value="99" min="1" style="width:100%;">
+                                </div>
+                                <p style="font-size:0.75em; color:#666; margin:2px 0 0 0;">
+                                    これ以上は拾ったり買ったりできません。<br>
+                                    (例: 消耗品=99, 装備/貴重品=1)
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- 使用時の効果設定エリア -->
+                        <div class="form-group" id="item-effect-group"
+                            style="background:#f0f8ff; padding:20px; border-radius:8px; border:1px solid #adc6ff;">
+                            <label
+                                style="font-weight:bold; color:#0056b3; display:block; margin-bottom:15px; border-bottom:1px solid #adc6ff; padding-bottom:5px;">
+                                ⚡ 効果・ステータス補正設定
+                            </label>
+
+                            <!-- 攻撃力・防御力 -->
+                            <div class="form-group-row">
+                                <!-- type="text" に変更 -->
+                                <div style="flex:1"><label style="font-size:0.85em;">攻撃力 (ATK)</label><input type="text"
+                                        id="item-effect-atk" value="0" placeholder="例: 5, 1d6" style="width:100%;">
+                                </div>
+                                <div style="flex:1"><label style="font-size:0.85em;">防御力 (DEF)</label><input type="text"
+                                        id="item-effect-def" value="0" placeholder="例: 5, {{$level}}"
+                                        style="width:100%;"></div>
+                            </div>
+
+                            <div class="form-group-row"
+                                style="margin-top:10px; display:flex; gap:5px; box-sizing:border-box;">
+                                <div style="flex:1">
+                                    <label style="font-size:0.85em;">💥 爆発範囲 (px)</label>
+                                    <!-- type="number" から text に変更 -->
+                                    <input type="text" id="item-effect-blast-radius" value="0" placeholder="0=なし"
+                                        style="width:100%; box-sizing:border-box;">
+                                </div>
+                                <div style="flex:1">
+                                    <label style="font-size:0.85em;">爆風倍率 (%)</label>
+                                    <!-- type="number" から text に変更 -->
+                                    <input type="text" id="item-effect-blast-rate" value="100"
+                                        style="width:100%; box-sizing:border-box;">
+                                </div>
+                            </div>
+
+<div class="form-group-row" style="margin-top:10px;">
+    <div style="flex:1">
+        <label style="font-size:0.85em;">🦶 移動速度補正 ($spd)</label>
+        <input type="text" id="item-effect-spd" value="0" placeholder="例: 0.5 (倍率)" style="width:100%;">
+    </div>
+    <div style="flex:1">
+        <label style="font-size:0.85em;">🚀 弾速補正 (ProjSpeed)</label>
+        <input type="text" id="item-effect-proj-speed" value="0" placeholder="例: 5 (弾速px)" style="width:100%;">
+    </div>
+</div>
+<div class="form-group-row" style="margin-top:10px;">
+    <div style="flex:1">
+        <label style="font-size:0.85em;">🛡️ 貫通力 (Penetration)</label>
+        <input type="text" id="item-effect-pen" value="0" placeholder="例: 1 (防御無視)" style="width:100%;">
+    </div>
+    <div style="flex:1">
+        <label style="font-size:0.85em;">🎯 会心率補正 (%)</label>
+        <input type="text" id="item-effect-crit-rate" value="0" placeholder="例: 5" style="width:100%;">
+    </div>
+</div>
+
+<div class="form-group-row" style="margin-top:10px;">
+    <div style="flex:1">
+        <label style="font-size:0.85em;">📏 射程補正 (Range)</label>
+        <input type="text" id="item-effect-range" value="0" placeholder="例: 32 (px)" style="width:100%;">
+    </div>
+    <div style="flex:1">
+        <label style="font-size:0.85em;">⏱️ 硬直軽減 (Cooldown)</label>
+        <input type="text" id="item-effect-cooldown-reduce" value="0" placeholder="例: 5 (フレーム)" style="width:100%;">
+    </div>
+</div>
+
+                            <!-- HP・スタミナ -->
+                            <div class="form-group-row" style="margin-top:10px;">
+                                <div style="flex:1">
+                                    <label style="font-size:0.85em;">HP回復量</label>
+                                    <!-- type="text" に変更 -->
+                                    <input type="text" id="item-effect-hp" value="0"
+                                        placeholder="例: 50, 1d100, {{$maxHp}}" style="width:100%;">
+                                </div>
+                                <div style="flex:1">
+                                    <label style="font-size:0.85em;">スタミナ回復量</label>
+                                    <!-- type="text" に変更 -->
+                                    <input type="text" id="item-effect-stamina" value="0" placeholder="例: 20"
+                                        style="width:100%;">
+                                </div>
+                            </div>
+                            <div class="form-group-row" style="margin-top:10px; background:#f6ffed; padding:5px; border-radius:4px; border:1px solid #b7eb8f;">
+                                <div style="flex:1">
+                                    <label style="font-size:0.85em; color:#389e0d;">❤️ 最大HPアップ (永続)</label>
+                                    <input type="text" id="item-effect-hp-max" value="0" placeholder="例: 5" style="width:100%;">
+                                </div>
+                                <div style="flex:1">
+                                    <label style="font-size:0.85em; color:#389e0d;">⚡ 最大スタミナアップ (永続)</label>
+                                    <input type="text" id="item-effect-stamina-max" value="0" placeholder="例: 10" style="width:100%;">
+                                </div>
+                            </div>
+                            <!-- 弾薬・変数操作 -->
+                            <div class="form-group-row" style="margin-top:10px;">
+                                <div style="flex:1">
+                                    <label style="font-size:0.85em;">弾薬補充数</label>
+                                    <!-- type="text" に変更 -->
+                                    <input type="text" id="item-effect-ammo" value="0" placeholder="例: 10, 1d6"
+                                        style="width:100%;">
+                                </div>
+
+                                <!-- ★ここが変更箇所: 変数操作UIを3分割 -->
+                                <div style="flex:2.5">
+                                    <label style="font-size:0.85em;">変数操作</label>
+                                    <div style="display:flex; gap:2px;">
+                                        <!-- 変数名入力 -->
+                                        <select id="item-var-name" style="flex:2.5; min-width:0;"></select>
+                                        <!-- 演算子選択 -->
+                                        <select id="item-var-op" style="flex:1; min-width:0; padding:0 2px;">
+                                            <option value="=">=</option>
+                                            <option value="+=">+=</option>
+                                            <option value="-=">-=</option>
+                                            <option value="*=">*=</option>
+                                            <option value="/=">/=</option>
+                                        </select>
+                                        <!-- 値入力 -->
+                                        <input type="text" id="item-var-val" placeholder="値"
+                                            style="flex:1.5; min-width:0;">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-group-row" style="margin-top:10px;">
+                                <div style="flex:1">
+                                    <label style="font-size:0.85em;" title="再使用できるまでの時間（秒）">クールタイム (秒)</label>
+                                    <input type="number" id="item-effect-cooldown" value="0" min="0" step="0.1"
+                                        style="width:100%;">
+                                </div>
+                                <div style="flex:1">
+                                    <label style="font-size:0.85em;" title="効果が持続する時間（秒）">効果時間 (秒)</label>
+                                    <input type="number" id="item-effect-duration" value="0" min="0" step="0.1"
+                                        style="width:100%;">
+                                </div>
+                            </div>
+
+                            <div style="flex:0.8; display:flex; align-items:flex-end; padding-bottom:5px;">
+                                <label class="checkbox-label" style="font-size:0.85em; cursor:pointer;">
+                                    <input type="checkbox" id="item-effect-invincible">
+                                    <span>🌟 無敵化</span>
+                                </label>
+                            </div>
+
+                            <div class="form-group" style="margin-top:15px;">
+                                <label style="font-size:0.85em;">使用時の効果音 (SE)</label>
+                                <select id="item-effect-sound">
+                                    <!-- JavaScript で効果音アセットが読み込まれます -->
+                                </select>
+                            </div>
+
+
+
+                            <div class="form-group"
+                                style="margin-top:15px; background:#fffbe6; padding:10px; border:1px solid #ffe58f; border-radius:4px;">
+                                <label style="font-weight:bold; color:#d46b08;">🧱 配置(Place)時の設定</label>
+                                <div class="form-group-row">
+                                    <div style="flex:1">
+                                        <label style="font-size:0.85em;" title="壊すのに必要な攻撃回数 (0ならアイテムとして配置)">耐久度
+                                            (HP)</label>
+                                        <input type="number" id="item-place-hp" value="0" min="0" style="width:100%;">
+                                    </div>
+                                    <div style="flex:1; display:flex; align-items:flex-end; padding-bottom:5px;">
+                                        <label class="checkbox-label" style="cursor:pointer;">
+                                            <input type="checkbox" id="item-place-wall">
+                                            <span>🚧 壁判定 (乗れる)</span>
+                                        </label>
+                                    </div>
+                                </div>
+                                <p style="font-size:0.8em; color:#666; margin-top:5px;">
+                                    HPが 1 以上なら「破壊可能なブロック」として配置されます。<br>
+                                    HPが 0 なら「拾えるアイテム」として配置されます。
+                                </p>
+                            </div>
+
+
+                        </div>
+
+                        <!-- 削除ボタンエリア -->
+                        <div style="text-align:right; margin-top:30px; padding-top:20px; border-top:1px dashed #ddd;">
+                            <button id="delete-item-btn" class="danger-button"
+                                style="padding:10px 20px; font-size:0.9em;">
+                                🗑️ このアイテムをデータベースから削除
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 未選択時のプレースホルダー -->
+                    <div id="item-editor-placeholder" style="color:#999; text-align:center; padding:100px 20px;">
+                        <div style="font-size:48px; margin-bottom:20px; opacity:0.3;">🎒</div>
+                        <p>左側のリストから編集するアイテムを選択するか、<br>「新規作成」ボタンを押してください。</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+
+<!-- エネミー管理モード -->
+        <div id="mode-enemies" class="mode-content">
+            <div class="ui-config-layout" id="enemy-manager-wrapper">
+                <!-- 左側: リスト -->
+                <div class="ui-config-card" id="enemy-list-panel"
+                    style="flex:1; max-width:320px; height:calc(100vh - 160px); display:flex; flex-direction:column;">
+                    <h3 style="margin-bottom: 5px;">登録エネミー一覧</h3>
+                    <div style="margin-bottom: 10px;">
+                        <input type="text" id="enemy-search-input" placeholder="🔍 名前で検索..."
+                            style="width:100%; box-sizing:border-box;">
+                    </div>
+                    <div id="enemy-list-container"
+                        style="flex:1; overflow-y:auto; border:1px solid #ddd; border-radius:4px; margin-bottom:10px; background:#fff;">
+                    </div>
+                    <button id="create-enemy-btn" class="export-button"
+                        style="width:100%; padding:12px; font-weight:bold;">＋ エネミーを新規作成</button>
+                </div>
+
+                <!-- 右側: 詳細編集 -->
+                <div class="ui-config-card" id="enemy-editor-panel"
+                    style="flex:2; height:calc(100vh - 160px); overflow-y:auto;">
+                    <!-- スマホ用ヘッダー -->
+                    <div id="enemy-mobile-header"
+                        style="display:none; align-items:center; margin-bottom:15px; border-bottom:1px solid #eee; padding-bottom:10px;">
+                        <button id="enemy-back-to-list-btn" class="secondary-button">← 戻る</button>
+                        <h3 style="margin:0 0 0 15px;">エネミー詳細編集</h3>
+                    </div>
+                    <h3 id="enemy-editor-title-desktop" style="margin-bottom: 20px;">エネミー詳細編集</h3>
+
+                    <div id="enemy-editor-form" style="display:none;">
+                        <!-- 基本情報 -->
+                        <div
+                            style="background:#f9f9f9; padding:15px; border-radius:8px; border:1px solid #eee; margin-bottom:20px;">
+                            <div class="form-group-row">
+                                <div style="flex:1"><label style="font-size:0.85em; color:#666;">ID</label><input
+                                        type="text" id="enemy-id" disabled
+                                        style="background:#eee; font-family:monospace; color:#888;"></div>
+                                <div style="flex:2"><label style="font-weight:bold;">名前</label><input type="text"
+                                        id="enemy-name" placeholder="例: スライム"></div>
+                            </div>
+
+                            <div class="form-group-row" style="margin-top:10px;">
+                                <div style="flex:1">
+                                    <label style="font-size:0.8em;">幅 (マス)</label>
+                                    <input type="number" id="enemy-size-w" value="1" min="1">
+                                </div>
+                                <div style="flex:1">
+                                    <label style="font-size:0.8em;">高さ (マス)</label>
+                                    <input type="number" id="enemy-size-h" value="1" min="1">
+                                </div>
+                            </div>
+
+                            <!-- 画像設定 -->
+                            <div class="form-group" style="margin-top:10px;">
+                                <label>画像アセット選択</label>
+                                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                                    <div><label style="font-size:0.8em;">通常(待機)</label><select id="enemy-img-idle"
+                                            style="width:100%"></select></div>
+                                    <div><label style="font-size:0.8em;">移動時</label><select id="enemy-img-move"
+                                            style="width:100%"></select></div>
+                                    <div><label style="font-size:0.8em;">攻撃時</label><select id="enemy-img-attack"
+                                            style="width:100%"></select></div>
+                                    <div><label style="font-size:0.8em;">ダメージ</label><select id="enemy-img-damage"
+                                            style="width:100%"></select></div>
+                                </div>
+
+                                <div
+                                    style="margin-top:10px; background:#f0f8ff; padding:5px; border-radius:4px; border:1px solid #adc6ff;">
+                                    <label style="font-size:0.8em; font-weight:bold; color:#0056b3;">🧊 3Dモデル
+                                        (3Dモード用)</label>
+                                    <select id="enemy-model-id" style="width:100%"></select>
+                                    <div style="display:flex; gap:5px; margin-top:5px;">
+                                        <div style="flex:1"><label style="font-size:0.7em;">スケール</label><input
+                                                type="number" id="enemy-model-scale" value="1.0" step="0.1"
+                                                style="width:100%;"></div>
+                                        <div style="flex:1"><label style="font-size:0.7em;">Y軸オフセット</label><input
+                                                type="number" id="enemy-model-y" value="0" style="width:100%;"></div>
+                                    </div>
+                                </div>
+
+                                <div style="margin-top:5px; display:flex; align-items:center;">
+                                    <label style="font-size:0.8em;">透明度:</label><input type="number" id="enemy-opacity"
+                                        value="100" style="width:50px;">%
+                                    <label style="font-size:0.8em; margin-left:10px;">色:</label><input type="color"
+                                        id="enemy-color" value="#ffffff">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ステータス設定 -->
+                        <div
+                            style="background:#fff0f6; padding:15px; border-radius:8px; border:1px solid #ffadd2; margin-bottom:20px;">
+                            <label
+                                style="font-weight:bold; color:#c41d7f; display:block; margin-bottom:10px; border-bottom:1px solid #ffadd2;">⚔️
+                                バトルステータス</label>
+                            <div class="form-group-row">
+                                <div style="flex:1"><label style="font-size:0.85em;">HP (耐久力)</label>
+                                    <input type="text" id="enemy-hp" value="10" list="variable-list-options">
+                                </div>
+                                <div style="flex:1"><label style="font-size:0.85em;">攻撃力 (ATK)</label>
+                                    <input type="text" id="enemy-atk" value="1" list="variable-list-options"
+                                        placeholder="例: 5, difficulty">
+                                </div>
+                                <div style="flex:1"><label style="font-size:0.85em;">防御力 (DEF)</label>
+                                    <input type="text" id="enemy-def" value="0" list="variable-list-options"
+                                        placeholder="例: 0">
+                                </div>
+                            </div>
+
+                            <div class="form-group-row" style="margin-top:10px;">
+                                <div style="flex:1"><label style="font-size:0.85em;">獲得EXP</label>
+                                    <input type="text" id="enemy-exp" value="10" list="variable-list-options"
+                                        placeholder="例: 10 + 1d5">
+                                </div>
+                                <div style="flex:1"><label style="font-size:0.85em;">貫通力</label>
+                                    <input type="text" id="enemy-pen" value="1" list="variable-list-options"
+                                        placeholder="例: 1">
+                                </div>
+
+                            </div>
+
+                            <!-- クリティカル設定 -->
+                            <div class="form-group-row"
+                                style="margin-top:10px; background:#fff; padding:5px; border-radius:4px; border:1px solid #ffadd2;">
+                                <div style="flex:1">
+                                    <label style="font-size:0.85em;">クリティカル率 (%)</label>
+                                    <input type="text" id="enemy-crit-rate" value="5" list="variable-list-options"
+                                        placeholder="例: 5">
+                                </div>
+                                <div style="flex:1">
+                                    <label style="font-size:0.85em;">クリティカル倍率</label>
+                                    <input type="text" id="enemy-crit-mult" value="1.5" list="variable-list-options"
+                                        placeholder="例: 1.5">
+                                </div>
+                            </div>
+
+                            <div class="form-group-row" style="margin-top:10px; background:#fff; padding:5px; border-radius:4px; border:1px solid #ffadd2;">
+    <!-- ▼▼▼ 追加ここから ▼▼▼ -->
+    <div style="flex:1; display:flex; align-items:center;">
+        <label class="checkbox-label" style="cursor:pointer;">
+            <input type="checkbox" id="enemy-can-stomp">
+            <span style="font-weight:bold; color:#d46b08;">🦶 踏みつけ可能 (2Dマップ全般で機能)</span>
+        </label>
+    </div>
+    <!-- ▲▲▲ 追加ここまで ▲▲▲ -->
+</div>
+
+                            <!-- ターン制バトル専用設定（アコーディオン） -->
+                            <details class="advanced-settings-group" style="margin-top: 15px; border-color:#ffd591;">
+                                <summary style="color:#d46b08;">⚡ ターン制バトル専用設定 (スタミナ・AI)</summary>
+
+                                <div class="advanced-settings-content" style="background:#fff7e6;">
+                                    <div class="form-group-row">
+                                        <div style="flex:1">
+                                            <label style="font-size:0.85em;">最大スタミナ (ST)</label>
+                                            <input type="text" id="enemy-stamina" value="100"
+                                                list="variable-list-options" placeholder="例: 100">
+                                        </div>
+                                        <div style="flex:1">
+                                            <label style="font-size:0.85em;">ST回復 (毎ターン)</label>
+                                            <input type="text" id="enemy-stamina-regen" value="10"
+                                                list="variable-list-options" placeholder="例: 10">
+                                        </div>
+                                    </div>
+
+                                    <div class="form-group"
+                                        style="margin-top:10px; border-top:1px dashed #ffd591; padding-top:10px;">
+                                        <label style="font-size:0.85em; font-weight:bold;">行動AIパターン</label>
+                                        <select id="enemy-ai-pattern" style="width:100%; padding:5px; margin-top:3px;">
+                                            <option value="tactical">⚖️ バランス (状況判断)</option>
+                                            <option value="aggressive">🔥 好戦的 (攻撃優先)</option>
+                                            <option value="defensive">🛡️ 慎重 (回避優先)</option>
+                                            <option value="power">💪 パワー (強攻撃多め)</option>
+                                            <option value="random">🎲 ランダム (運任せ)</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </details>
+
+                            <!-- 爆発・ドロップなど -->
+                            <div class="form-group-row"
+                                style="margin-top:10px; background:#fff7e6; padding:5px; border-radius:4px; border:1px solid #ffe58f;">
+                                <div style="flex:1">
+                                    <label style="font-size:0.85em;">💥 爆発範囲 (px)</label>
+                                    <input type="text" id="enemy-blast-radius" value="0" placeholder="0=なし">
+                                </div>
+                                <div style="flex:1">
+                                    <label style="font-size:0.85em;">爆風倍率 (%)</label>
+                                    <input type="text" id="enemy-blast-rate" value="50">
+                                </div>
+                            </div>
+
+                            <div style="margin-top:10px; padding-top:10px; border-top:1px dashed #ffadd2;">
+                                <div class="form-group-row" style="align-items:flex-end;">
+                                    <div style="flex:2">
+                                        <label style="font-size:0.85em;">🎁 ドロップアイテム</label>
+                                        <select id="enemy-drop-item" style="width:100%;"></select>
+                                    </div>
+                                    <div style="flex:1">
+                                        <label style="font-size:0.85em;">確率(%)</label>
+                                        <input type="text" id="enemy-drop-rate" value="50" style="width:100%;"
+                                            list="variable-list-options" placeholder="例: 50">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-group"
+                                style="margin-top:10px; border-top:1px dashed #ffadd2; padding-top:5px;">
+                                <label style="font-size:0.85em;">🤕 被弾時エフェクト</label>
+                                <select id="enemy-hit-particle" style="width:100%;">
+                                </select>
+                            </div>
+
+                        </div>
+
+                        <!-- AI・アクション設定 (マップ用) -->
+                        <div
+                            style="background:#f0f8ff; padding:15px; border-radius:8px; border:1px solid #adc6ff; margin-bottom:20px;">
+                            <label
+                                style="font-weight:bold; color:#0056b3; display:block; margin-bottom:10px; border-bottom:1px solid #adc6ff;">
+                                🏃 マップ移動・アクション</label>
+
+                            <div class="form-group-row">
+                                <div style="flex:1">
+                                    <label style="font-size:0.85em;">移動タイプ</label>
+                                    <select id="enemy-move-type" style="width:100%;">
+                                        <option value="fixed">固定 (動かない)</option>
+                                        <option value="random">ランダム</option>
+                                        <option value="horizontal">左右往復</option>
+                                        <option value="vertical">上下往復</option>
+                                        <option value="chase">プレイヤー追尾</option>
+                                    </select>
+                                </div>
+                                <div style="flex:1">
+<label style="font-size:0.85em;">素早さ / 移動速度 (SPD)</label>
+<input type="number" id="enemy-spd" value="2" step="0.1">
+                                </div>
+                            </div>
+
+                                                    <div class="form-group" style="margin-top:10px;">
+                            <label style="font-size:0.85em; font-weight:bold; color:#0056b3;" title="プレイヤーが敵の方を向いている時の特殊な挙動を設定します。">
+                                👁️ 視線検知AI
+                            </label>
+                            <select id="enemy-on-sight" style="width:100%; padding:5px;">
+                                <option value="normal">通常 (プレイヤーの向きを無視)</option>
+                                <option value="freeze">静止 (目が合うと止まる)</option>
+                                <option value="flee">逃走 (目が合うと逃げる)</option>
+                                <option value="aggressive">突撃 (目が合うと襲ってくる)</option>
+                            </select>
+                        </div>
+
+                            <div class="form-group-row" style="margin-top:10px;">
+                                <div style="flex:1">
+                                    <label style="font-size:0.85em;">索敵範囲 (マス)</label>
+                                    <input type="number" id="enemy-detect-range" value="0" placeholder="0=無限">
+                                </div>
+                                <div style="flex:1">
+                                    <label style="font-size:0.85em;">活動限界 (マス)</label>
+                                    <input type="number" id="enemy-territory-range" value="0" placeholder="0=無限">
+                                </div>
+                            </div>
+
+                            <hr style="border:0; border-top:1px dashed #adc6ff; margin:10px 0;">
+
+                            <div class="form-group-row">
+                                <div style="flex:1"><label style="font-size:0.85em;">攻撃射程(Range)</label>
+                                    <input type="text" id="enemy-atk-range" value="32" list="variable-list-options"
+                                        placeholder="例: 32">
+                                </div>
+                                <div style="flex:1"><label style="font-size:0.85em;">攻撃間隔(Cool)</label>
+                                    <input type="text" id="enemy-atk-cool" value="60" list="variable-list-options"
+                                        placeholder="例: 60, $spd*10">
+                                </div>
+                                <div style="flex:1"><label style="font-size:0.85em;">弾速(Speed)</label>
+                                    <input type="text" id="enemy-atk-speed" value="0" list="variable-list-options"
+                                        placeholder="例: 0 (近接)">
+                                </div>
+<div style="flex:1">
+    <label style="font-size:0.85em;" title="弾がプレイヤーを追尾する強さ。0=直進、0.05=緩い誘導、0.2=強い誘導">🎯 誘導性能</label>
+    <!-- type="text" に変更し、list属性を追加、step属性を削除 -->
+    <input type="text" id="enemy-homing-strength" value="0" list="variable-list-options" placeholder="例: 0.1, $homing" style="width:100%;">
+</div>
+                            </div>
+                        </div>
+
+                        <div style="text-align:right; margin-top:20px;">
+                            <button id="delete-enemy-btn" class="danger-button">🗑️ 削除</button>
+                        </div>
+                    </div>
+
+                    <div id="enemy-editor-placeholder" style="color:#999; text-align:center; padding:100px 20px;">
+                        <div style="font-size:48px; margin-bottom:20px; opacity:0.3;">👹</div>
+                        <p>左側のリストから編集するエネミーを選択するか、<br>「新規作成」ボタンを押してください。</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+        <!-- エフェクト管理モード (旧パーティクル管理) -->
+        <div id="mode-particles" class="mode-content">
+            <div class="ui-config-layout" id="particle-manager-wrapper">
+
+                <!-- 左側: リスト -->
+                <div class="ui-config-card" id="particle-list-panel"
+                    style="flex:1; max-width:320px; height:calc(100vh - 160px); display:flex; flex-direction:column;">
+                    <h3 style="margin-bottom: 5px;">登録エフェクト一覧</h3>
+
+                    <div style="margin-bottom: 10px;">
+                        <input type="text" id="particle-search-input" placeholder="🔍 名前で検索..."
+                            style="width:100%; box-sizing:border-box;">
+                    </div>
+
+                    <div id="particle-list-container"
+                        style="flex:1; overflow-y:auto; border:1px solid #ddd; border-radius:4px; margin-bottom:10px; background:#fff;">
+                    </div>
+                    <button id="create-particle-btn" class="export-button"
+                        style="width:100%; padding:12px; font-weight:bold;">＋ 新規作成</button>
+                </div>
+
+                <!-- 右側: 詳細編集 -->
+                <div class="ui-config-card" id="particle-editor-panel"
+                    style="flex:2; height:calc(100vh - 160px); overflow-y:auto;">
+                    <!-- モバイル用ヘッダー -->
+                    <div id="particle-mobile-header"
+                        style="display:none; align-items:center; margin-bottom:15px; border-bottom:1px solid #eee; padding-bottom:10px;">
+                        <button id="particle-back-to-list-btn" class="secondary-button">← 戻る</button>
+                        <h3 style="margin:0 0 0 15px;">編集</h3>
+                    </div>
+
+                    <!-- 未選択時のプレースホルダー -->
+                    <div id="particle-editor-placeholder" style="color:#999; text-align:center; padding:100px 20px;">
+                        <div style="font-size:48px; margin-bottom:20px; opacity:0.3;">✨</div>
+                        <p>左側のリストから選択するか、新規作成してください。</p>
+                    </div>
+
+                    <!-- 編集フォーム本体 -->
+                    <div id="particle-editor-form" style="display:none;">
+
+                        <!-- プレビューエリア -->
+                        <div id="effect-preview-container"
+                            style="background:#333; padding:10px; border-radius:8px; margin-bottom:15px; text-align:center; position:relative; overflow:hidden; min-height:200px; display:flex; align-items:center; justify-content:center;">
+                            <!-- フィルター確認用のダミー画像 -->
+                            <img id="filter-preview-img"
+                                src="data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%22400%22%20height%3D%22200%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Crect%20width%3D%22100%25%22%20height%3D%22100%25%22%20fill%3D%22%234488ff%22%2F%3E%3Ctext%20x%3D%2250%25%22%20y%3D%2250%25%22%20font-family%3D%22sans-serif%22%20font-size%3D%2220%22%20fill%3D%22white%22%20dominant-baseline%3D%22middle%22%20text-anchor%3D%22middle%22%3EFilter%20Preview%3C%2Ftext%3E%3C%2Fsvg%3E"
+                                style="max-width:100%; max-height:200px; display:none; border-radius:4px; object-fit:cover;">
+
+                            <!-- パーティクル確認用のキャンバス -->
+                            <canvas id="particle-preview-canvas" width="400" height="200"
+                                style="background:#000; border:1px solid #555; cursor:crosshair;"></canvas>
+
+                            <!-- フィルター/オーバーレイ表示用レイヤー -->
+                            <div id="preview-overlay-layer"
+                                style="position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; display:none;">
+                            </div>
+                        </div>
+
+                        <div
+                            style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                            <h3 style="margin:0;">詳細設定</h3>
+                            <button id="test-particle-btn" class="secondary-button"
+                                style="background:#fff7e6; color:#d46b08; border-color:#ffd591;">▶ テスト再生</button>
+                        </div>
+
+                        <div
+                            style="background:#f9f9f9; padding:15px; border-radius:8px; border:1px solid #eee; margin-bottom:20px;">
+                            <div class="form-group-row">
+                                <div style="flex:1">
+                                    <label>ID</label>
+                                    <input type="text" id="particle-id" disabled
+                                        style="background:#eee; font-family:monospace; color:#888;">
+                                </div>
+                                <div style="flex:2">
+                                    <label>名前</label>
+                                    <input type="text" id="particle-name" placeholder="例: 爆発, CRTモニター">
+                                </div>
+                            </div>
+
+                            <!-- エフェクト種別の選択 -->
+                            <div class="form-group" style="margin-top:10px;">
+                                <label style="font-weight:bold; color:#1890ff;">エフェクトの種類</label>
+                                <select id="particle-type-selector"
+                                    style="width:100%; padding:8px; font-weight:bold; border:2px solid #1890ff; border-radius:4px;">
+                                    <option value="particle">✨ パーティクル (粒子・火花・雪)</option>
+                                    <option value="filter">🎨 画面フィルター (色調補正・CRT・暗闇)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- ▼▼▼ パーティクル設定グループ ▼▼▼ -->
+                        <div id="settings-particle-group"
+                            style="display:grid; grid-template-columns: 1fr 1fr; gap:15px;">
+                            <!-- 🎨 見た目エリア -->
+                            <div class="ui-config-card" style="padding:10px; border-color:#91d5ff; background:#e6f7ff;">
+                                <h4 style="margin-top:0; color:#0050b3;">🎨 見た目</h4>
+                                <div class="form-group">
+                                    <label>色</label>
+                                    <input type="color" id="particle-color" value="#ffffff"
+                                        style="width:100%; height:40px; cursor:pointer;">
+                                </div>
+                                <div class="form-group">
+                                    <label>形</label>
+                                    <select id="particle-shape" style="width:100%; padding:8px;">
+                                        <option value="square">■ 四角</option>
+                                        <option value="circle">● 円</option>
+                                    </select>
+                                </div>
+                                <hr style="border:0; border-top:1px dashed #91d5ff; margin:10px 0;">
+                                <div class="form-group">
+                                    <label>サイズ (px)</label>
+                                    <input type="number" id="particle-size" value="4">
+                                </div>
+                                <div class="form-group">
+                                    <label>個数 (1回/1フレームあたり)</label>
+                                    <input type="number" id="particle-count" value="10">
+                                </div>
+                            </div>
+
+                            <!-- 🚀 動きエリア -->
+                            <div class="ui-config-card" style="padding:10px; border-color:#ffd591; background:#fff7e6;">
+                                <h4 style="margin-top:0; color:#d46b08;">🚀 動き</h4>
+                                <div class="form-group"><label>速度</label><input type="number" id="particle-speed"
+                                        value="5" step="0.1"></div>
+                                <div class="form-group"><label>重力</label><input type="number" id="particle-gravity"
+                                        value="0.5" step="0.1"></div>
+                                <div class="form-group"><label>減衰 (消える速さ)</label><input type="number"
+                                        id="particle-decay" value="0.03" step="0.01"></div>
+                                <div class="form-group"><label>バウンド</label><input type="number" id="particle-bounce"
+                                        value="0.6" step="0.1" max="1.0"></div>
+                                <hr style="border:0; border-top:1px dashed #ffd591; margin:10px 0;">
+                                <div class="form-group">
+                                    <label>発生タイプ</label>
+                                    <select id="particle-spawn-type" style="width:100%; padding:8px;">
+                                        <option value="burst">💥 爆発 (単発)</option>
+                                        <option value="weather">☔ 天候 (継続)</option>
+                                    </select>
+                                </div>
+                                <div class="form-group-row">
+                                    <div style="flex:1"><label>角度</label><input type="number" id="particle-angle"
+                                            value="-90"></div>
+                                    <div style="flex:1"><label>幅</label><input type="number" id="particle-area-width"
+                                            value="0"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ▼▼▼ フィルター設定グループ (初期非表示) ▼▼▼ -->
+                        <div id="settings-filter-group"
+                            style="display:none; background:#fff; padding:20px; border-radius:8px; border:1px solid #ccc; box-shadow:0 2px 5px rgba(0,0,0,0.05);">
+                            <h4
+                                style="margin-top:0; color:#333; border-bottom:1px solid #eee; padding-bottom:10px; margin-bottom:15px;">
+                                🎨 画面フィルター設定</h4>
+
+                            <div class="form-group">
+                                <label style="font-weight:bold;">✨ かんたんプリセット</label>
+                                <select id="filter-preset"
+                                    style="width:100%; padding:10px; margin-bottom:5px; font-size:1.1em;">
+                                    <option value="custom">🛠️ カスタム設定 (自由に編集)</option>
+                                    <option value="crt">📺 CRTモニター (走査線 + 色ずれ)</option>
+                                    <option value="retro">🎞️ レトロ・セピア (ノイズ + 古い映画)</option>
+                                    <option value="darkness">🕯️ 暗闇 (周辺減光・ホラー)</option>
+                                    <option value="underwater">💧 水中 (青み + ぼかし)</option>
+                                    <option value="invert">🔄 色反転 (ネガポジ)</option>
+                                    <option value="nightvision">😎 暗視ゴーグル (緑 + ノイズ)</option>
+                                </select>
+                                <p style="font-size:0.8em; color:#666;">プリセットを選ぶと、下の値が自動でセットされます。</p>
+                            </div>
+
+                            <hr style="margin:20px 0; border:0; border-top:1px dashed #ccc;">
+
+                            <div class="form-group">
+                                <label>CSSフィルター (filterプロパティ)</label>
+                                <input type="text" id="filter-css" placeholder="例: grayscale(100%) blur(2px)"
+                                    style="width:100%; font-family:monospace; padding:8px;">
+                                <p style="font-size:0.8em; color:#666; margin-top:5px;">
+                                    使える値: <code>blur(px)</code> <code>brightness(%)</code> <code>contrast(%)</code>
+                                    <code>grayscale(%)</code> <code>sepia(%)</code> <code>invert(%)</code>
+                                    <code>hue-rotate(deg)</code>
+                                </p>
+                            </div>
+
+                            <div class="form-group-row" style="align-items:flex-end;">
+                                <div style="flex:1;">
+                                    <label>オーバーレイ色 (Overlay Color)</label>
+                                    <input type="color" id="filter-overlay-color" value="#000000"
+                                        style="width:100%; height:40px;">
+                                </div>
+                                <div style="flex:1;">
+                                    <label>不透明度 (Opacity)</label>
+                                    <input type="number" id="filter-overlay-opacity" value="0" min="0" max="1"
+                                        step="0.1" style="width:100%; padding:8px;">
+                                </div>
+                                <div style="flex:1.5;">
+                                    <label>合成モード (Blend Mode)</label>
+                                    <select id="filter-blend-mode" style="width:100%; padding:8px;">
+                                        <option value="normal">通常 (Normal)</option>
+                                        <option value="multiply">乗算 (Multiply) [暗く]</option>
+                                        <option value="screen">スクリーン (Screen) [明るく]</option>
+                                        <option value="overlay">オーバーレイ (Overlay) [コントラスト]</option>
+                                        <option value="hard-light">ハードライト (Hard Light) [強光]</option>
+                                        <option value="soft-light">ソフトライト (Soft Light) [柔光]</option>
+                                        <option value="difference">差の絶対値 (Difference) [反転]</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="form-group"
+                                style="margin-top:15px; padding-top:10px; border-top:1px dashed #ccc;">
+                                <label class="checkbox-label" style="cursor:pointer; display:flex; align-items:center;">
+                                    <input type="checkbox" id="filter-exclude-ui">
+                                    <span style="font-weight:bold; color:#d46b08;">UI (メッセージ枠) を除外する</span>
+                                </label>
+                                <p style="font-size:0.8em; color:#666; margin-top:5px;">
+                                    ONにすると、文字やボタンにはフィルターがかからなくなります。<br>
+                                    (オーバーレイもUIの背面に移動します)
+                                </p>
+                            </div>
+
+                        </div>
+
+                        <div style="text-align:right; margin-top:20px; border-top:1px solid #eee; padding-top:20px;">
+                            <button id="delete-particle-btn" class="danger-button">🗑️ 削除</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+<!-- UI設定モード (整理版) -->
         <div id="mode-ui-config" class="mode-content">
             <h2>⚙️ システム・UIデザイン設定</h2>
+            
             <div class="ui-config-layout">
-                <div class="ui-config-card">
-                    <h3>💬 メッセージウィンドウ</h3>
-                    <div class="form-group"><label for="ui-window-bg-transparent" class="checkbox-label"><input type="checkbox" id="ui-window-bg-transparent"><span>背景色なし (完全透過)</span></label></div>
-                    <div class="form-group"><label for="ui-window-color">背景色</label><div class="color-picker-group"><input type="color" id="ui-window-color" value="#000000"><input type="range" id="ui-window-opacity" min="0" max="100" value="75"><span id="ui-window-opacity-label">75%</span></div></div>
-                    <div class="form-group"><label>ウィンドウ画像</label><div class="ui-image-selector"><div id="ui-window-image-preview" class="ui-image-preview">なし</div><div><button id="ui-window-image-btn" class="secondary-button">画像を選択</button><button id="ui-window-image-clear" class="danger-button ui-clear-btn">削除</button></div></div></div>
-                </div>
-                <div class="ui-config-card">
-                    <h3>🔀 選択肢ボタン</h3>
-                    <div class="form-group"><label for="ui-button-bg-transparent" class="checkbox-label"><input type="checkbox" id="ui-button-bg-transparent"><span>背景色なし (完全透過)</span></label></div>
-                    <div class="form-group"><label for="ui-button-color">背景色</label><div class="color-picker-group"><input type="color" id="ui-button-color" value="#1990ff"><input type="range" id="ui-button-opacity" min="0" max="100" value="80"><span id="ui-button-opacity-label">80%</span></div></div>
-                    <div class="form-group"><label for="ui-button-text-color">文字色</label><input type="color" id="ui-button-text-color" value="#FFFFFF" style="height:40px; width:100%;"></div>
-                    <div class="form-group"><label>ボタン画像</label><div class="ui-image-selector"><div id="ui-button-image-preview" class="ui-image-preview">なし</div><div><button id="ui-button-image-btn" class="secondary-button">画像を選択</button><button id="ui-button-image-clear" class="danger-button ui-clear-btn">削除</button></div></div></div>
-                </div>
-                <div class="ui-config-card">
-                    <h3>🎨 枠線 (ボーダー) 設定</h3>
-                    <p style="font-size:0.9em; color:#666; margin-top:-10px; margin-bottom:15px;">※ウィンドウ・ボタン共通</p>
-                    <div class="form-group"><label for="ui-border-width">枠線の太さ (px)</label><input type="number" id="ui-border-width" value="2" min="0"></div>
-                    <div class="form-group"><label for="ui-border-color">枠線の色</label><input type="color" id="ui-border-color" value="#FFFFFF" style="height:40px; width:100%;"></div>
-                    <div class="form-group"><label for="ui-border-radius">角の丸み (px)</label><input type="number" id="ui-border-radius" value="10" min="0"></div>
-                </div>
-            </div>
-        </div>
 
-    </main>
-
-    <!-- ヘルプモーダル -->
-    <div id="help-modal" class="modal hidden">
-        <div class="modal-content">
-            <span class="close-modal">&times;</span>
-            <h2>📖 使い方のヒント</h2>
-            <div class="help-section">
-                <h3>🔢 変数とは？</h3>
-                <p>ゲーム内のデータを記録しておく「箱」です。</p>
-                <ul><li><code>gold</code> : 所持金</li><li><code>love</code> : 好感度</li></ul>
-            </div>
-            <div class="help-section">
-                <h3>🎲 ランダム・ダイス機能</h3>
-                <p>「値」の欄に<code>1d6</code>と書くと1〜6の乱数になります。</p>
-            </div>
-            <div class="help-section">
-                <h3>💬 セリフ内での変数表示</h3>
-                <p><code>{{gold}}</code>のようにダブル波括弧で変数を囲みます。</p>
-            </div>
-            <div class="help-section">
-                <h3>🖼️ キャラクター配置と演出</h3>
-                <p>テキストノードでは、複数のキャラクターを同時に表示し、細かく調整できます。</p>
-                <ul>
-                    <li><strong>基本配置:</strong> 9方向から選べます。</li>
-                    <li><strong>🔍 拡大率:</strong> 大きさを変えます（基準100%）。</li>
-                    <li><strong>↔ 横(X) / ↕ 縦(Y):</strong> 位置をピクセル単位でズラします。</li>
-                    <li><strong>🎭 Mask:</strong> 別の画像を使ってキャラを切り抜けます。</li>
-                </ul>
-            </div>
-            <div class="help-section">
-                <h3>📦 3Dモデル (VRM / GLB)</h3>
-                <p>「3Dモデル管理」タブでファイルをアップロードし、テキストノードの「3Dキャラクター表示」で配置します。</p>
-                <ul>
-                    <li>VRM: 人型キャラクター。表情やポーズが使えます。</li>
-                    <li>GLB: 背景や小物、モンスターなど。サイズを大きくして奥に置けば背景になります。</li>
-                    <li>VRMA: VRM用のアニメーションファイルです。</li>
-                </ul>
+                <!-- 1. ゲーム基本情報 (メタデータ) -->
+                <div class="ui-config-card" >
+                    <h3>📝 ゲーム基本情報 (Title / Copyright)</h3>
+                    <div class="form-group">
+                        <label>ゲームタイトル</label>
+                        <input type="text" id="game-title" placeholder="例: 伝説の冒険">
+                    </div>
+                    <div class="form-group">
+                        <label>制作者 / 権利表記 (Copyright)</label>
+                        <input type="text" id="game-copyright" placeholder="例: © 2026 MyName All Rights Reserved.">
+                        <p style="font-size:0.8em; color:#666;">※タイトル画面の下部に表示されます。</p>
+                    </div>
+                                        <div class="form-group">
+                        <label>配信ガイドライン・ライセンス表記</label>
+                        <textarea id="game-guideline" rows="4" placeholder="例：&#10;【配信について】収益化を含めご自由にどうぞ。&#10;【ネタバレ】SNS等でのネタバレもOKです。&#10;【ライセンス】This game uses Three.js..."></textarea>
+                        <p style="font-size:0.8em; color:#666;">
+                            ※入力すると、タイトル画面に「GUIDELINE」ボタンが表示されます。<br>
+                            （空欄の場合はボタン自体が消えます）
+                        </p>
+                    </div>
+                        <div class="form-group">
+        <label>タイトル画面の背景画像</label>
+        <div class="ui-image-selector">
+            <div id="ui-title-bg-preview" class="ui-image-preview">なし</div>
+            <div>
+                <button id="ui-title-bg-btn" class="secondary-button">画像を選択</button>
+                <button id="ui-title-bg-clear" class="danger-button ui-clear-btn">削除</button>
             </div>
         </div>
     </div>
-    
+                    <div class="form-group">
+                        <label>アイコン (Favicon)</label>
+                        <div class="ui-image-selector">
+                            <div id="ui-favicon-preview" class="ui-image-preview">なし</div>
+                            <div>
+                                <button id="ui-favicon-btn" class="secondary-button">画像を選択</button>
+                                <button id="ui-favicon-clear" class="danger-button ui-clear-btn">削除</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. メッセージウィンドウ設定 (統合) -->
+                <div class="ui-config-card">
+                    <h3>💬 メッセージウィンドウ設定</h3>
+                    <p style="font-size:0.8em; color:#666; margin-bottom:10px;">会話テキストが表示される枠のデザインです。</p>
+                    
+                    <!-- 背景設定 -->
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="ui-window-bg-transparent">
+                            <span>背景色なし (完全透過)</span>
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label>背景色 / 不透明度</label>
+                        <div class="color-picker-group">
+                            <input type="color" id="ui-window-color" value="#000000">
+                            <input type="range" id="ui-window-opacity" min="0" max="100" value="75">
+                            <span id="ui-window-opacity-label">75%</span>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>ウィンドウ画像 (9slice非対応・引き伸ばし)</label>
+                        <div class="ui-image-selector">
+                            <div id="ui-window-image-preview" class="ui-image-preview">なし</div>
+                            <div>
+                                <button id="ui-window-image-btn" class="secondary-button">画像を選択</button>
+                                <button id="ui-window-image-clear" class="danger-button ui-clear-btn">削除</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr style="margin:15px 0; border:0; border-top:1px dashed #ccc;">
+
+                    <!-- 枠線設定 (ここに統合) -->
+                    <div class="form-group-row">
+                        <div style="flex:1">
+                            <label>枠線の太さ (px)</label>
+                            <input type="number" id="ui-border-width" value="2" min="0">
+                        </div>
+                        <div style="flex:1">
+                            <label>角の丸み (px)</label>
+                            <input type="number" id="ui-border-radius" value="10" min="0">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>枠線の色</label>
+                        <input type="color" id="ui-border-color" value="#FFFFFF" style="height:35px; width:100%;">
+                    </div>
+
+                    <hr style="margin:15px 0; border:0; border-top:1px dashed #ccc;">
+
+                    <!-- 表示位置設定 -->
+                    <div class="form-group">
+                        <label>表示位置 (ポジション)</label>
+                        <select id="ui-portrait-win-pos">
+                            <option value="bottom">下部 (標準)</option>
+                            <option value="middle">中央 (映画字幕風)</option>
+                            <option value="top">上部</option>
+                            <option value="full">全画面 (ノベル/NVL風)</option> <!-- 追加 -->
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>高さの割合: <span id="ui-portrait-win-height-label">35%</span></label>
+                        <input type="range" id="ui-portrait-win-height" min="10" max="100" value="35">
+                    </div>
+                </div>
+
+                <!-- 3. 選択肢ボタン設定 -->
+                <div class="ui-config-card">
+                    <h3>🔀 選択肢ボタン設定</h3>
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="ui-button-bg-transparent">
+                            <span>背景色なし (文字のみ)</span>
+                        </label>
+                    </div>
+                    <div class="form-group-row">
+                        <div style="flex:1">
+                            <label>背景色</label>
+                            <div class="color-picker-group">
+                                <input type="color" id="ui-button-color" value="#1990ff">
+                                <input type="range" id="ui-button-opacity" min="0" max="100" value="80">
+                            </div>
+                        </div>
+                        <div style="flex:1">
+                            <label>文字色</label>
+                            <input type="color" id="ui-button-text-color" value="#FFFFFF" style="height:35px; width:100%;">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>ボタン画像</label>
+                        <div class="ui-image-selector">
+                            <div id="ui-button-image-preview" class="ui-image-preview">なし</div>
+                            <div>
+                                <button id="ui-button-image-btn" class="secondary-button">画像を選択</button>
+                                <button id="ui-button-image-clear" class="danger-button ui-clear-btn">削除</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>並び方</label>
+                        <select id="ui-portrait-choice-dir">
+                            <option value="vertical">縦並び (標準)</option>
+                            <option value="horizontal">横並び</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- 4. システムメニュー・機能 -->
+                <div class="ui-config-card">
+                    <h3>🔘 システムメニュー表示設定</h3>
+                    <div class="form-group-row" style="flex-wrap: wrap;">
+                        <div style="flex:1; min-width:120px;"><label class="checkbox-label"><input type="checkbox" id="ui-show-save-menu"><span>💾 SAVE/LOAD</span></label></div>
+                        <div style="flex:1; min-width:120px;"><label class="checkbox-label"><input type="checkbox" id="ui-show-item-btn"><span>🎒 ITEM</span></label></div>
+                        <div style="flex:1; min-width:120px;"><label class="checkbox-label"><input type="checkbox" id="ui-show-log-btn"><span>📜 LOG</span></label></div>
+                        <div style="flex:1; min-width:120px;"><label class="checkbox-label"><input type="checkbox" id="ui-show-config-btn"><span>⚙️ CONFIG</span></label></div>
+                        <div style="flex:1; min-width:120px;"><label class="checkbox-label"><input type="checkbox" id="ui-show-auto-btn"><span>▶ AUTO</span></label></div>
+                        <div style="flex:1; min-width:120px;"><label class="checkbox-label"><input type="checkbox" id="ui-show-skip-btn"><span>⏩ SKIP</span></label></div>
+                        <div style="flex:1; min-width:120px;"><label class="checkbox-label"><input type="checkbox" id="ui-show-pause-btn"><span>⏸️ PAUSE</span></label></div>
+                    </div>
+                    
+                    <div style="margin-top:10px; padding-top:10px; border-top:1px dashed #ddd;">
+                        <label class="checkbox-label" title="ONにすると、右クリックでメッセージウィンドウを一時的に消せます">
+                            <input type="checkbox" id="ui-enable-hide-msg" checked>
+                            <span>👁️ ウィンドウ非表示機能 (右クリック)</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- 5. 画面演出・その他 -->
+                <div class="ui-config-card">
+                    <h3>🎥 画面演出・その他</h3>
+                    <div class="form-group"><label class="checkbox-label"><input type="checkbox" id="ui-auto-shake"><span>💥 被弾時画面シェイク</span></label></div>
+                    <div class="form-group"><label class="checkbox-label"><input type="checkbox" id="ui-show-popups"><span>💬 ダメージポップアップ</span></label></div>
+                    <div class="form-group"><label class="checkbox-label"><input type="checkbox" id="ui-flash-item"><span>✨ アイテム使用時フラッシュ</span></label></div>
+                    <div class="form-group"><label class="checkbox-label"><input type="checkbox" id="ui-flash-invincible"><span>🛡️ 無敵時間点滅</span></label></div>
+                    <div class="form-group">
+                        <label>背景画像の表示モード</label>
+                        <select id="ui-bg-fit">
+                            <option value="cover">裁ち落とし (Cover)</option>
+                            <option value="contain">比率維持 (Contain)</option>
+                            <option value="fill">引き伸ばし (Fill)</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin-top:10px;">
+                        <label>2DキャラY軸調整 (px)</label>
+                        <input type="number" id="ui-portrait-char-offset-y" value="0">
+                    </div>
+                </div>
+
+                <!-- 6. デバッグ・ゲームオーバー -->
+                <div class="ui-config-card" style="background:#f9f0ff; border-color:#b37feb;">
+                    <h3>🛠️ デバッグ・システム</h3>
+                    <div class="form-group"><label class="checkbox-label"><input type="checkbox" id="ui-debug-mode"><span>🐛 デバッグモード有効</span></label></div>
+                    <div class="form-group"><label class="checkbox-label"><input type="checkbox" id="ui-shop-detailed"><span>🛒 ショップ詳細表示</span></label></div>
+                    <hr>
+                    <div class="form-group">
+                        <label style="color:#cf1322;">💀 ゲームオーバー時イベント</label>
+                        <div id="global-gameover-select-container" class="smart-select-container"></div>
+                    </div>
+                </div>
+
+                <!-- 7. アクションボタン -->
+                <div class="ui-config-card" style="min-width: 100%;">
+                    <h3>🎮 アクションボタン設定 (Map Mode)</h3>
+                    <div id="action-buttons-list"></div>
+                    <button id="add-action-btn" class="secondary-button" style="margin-top:10px; width:100%;">＋ ボタンを追加</button>
+                </div>
+
+            </div>
+        </div>
+
+
+    </main>
+
+    <!-- ヘルプ・バトル・プレイヤー設定モーダル (中身は提供されたコードを維持) -->
+    <div id="help-modal" class="modal hidden">
+        <div class="modal-content" style="max-width: 700px;">
+            <span class="close-modal">&times;</span>
+            <h2>📖 制作・スクリプトのヒント</h2>
+            <p style="margin-bottom:15px; color:#666; font-size:0.9em;">クリックして詳細を開閉できます。</p>
+
+            <details class="help-details">
+                <summary>⚠️ 推奨環境と制限事項</summary>
+                <div class="help-content-inner">
+                    <h4>制作ツール (エディタ)</h4>
+                    <ul>
+                        <li><strong>推奨ブラウザ:</strong> Google Chrome, Edge (PC版)</li>
+                        <li><strong>自動保存:</strong> Chrome系ブラウザのみ対応しています。SafariやFirefoxでは手動保存を使ってください。</li>
+                    </ul>
+                    <hr>
+                    <h4>書き出したゲーム</h4>
+                    <ul>
+                        <li><strong>インターネット接続:</strong> 必須です。ゲーム起動時にシステムデータをダウンロードするため、オフラインでは動作しません。</li>
+                        <li><strong>サーバーへのアップロード:</strong> 通常のHTMLファイルとして、レンタルサーバーやGitHub Pages等で公開可能です。</li>
+                    </ul>
+                </div>
+            </details>
+
+            <!-- 1. テキストと変数 -->
+            <!-- 1. テキストと変数 (更新版) -->
+            <details class="help-details">
+                <summary>📝 テキスト表示と変数の埋め込み</summary>
+                <div class="help-content-inner">
+                    <p>メッセージやUIテキスト内に <code>{{変数名}}</code> と書くと、実行時にその値に置き換わります。</p>
+                    <p>例: <code>あと {{$nextExp}} EXPでレベルアップ！</code></p>
+
+                    <hr style="margin:10px 0; border:0; border-top:1px dashed #ccc;">
+
+                    <h4>▼ プレイヤー・システム変数一覧</h4>
+                    <table class="help-table">
+                        <tr style="background:#eee;">
+                            <th>変数名</th>
+                            <th>意味・用途</th>
+                        </tr>
+
+                        <!-- レベル関連 -->
+                        <tr>
+                            <td><span class="help-tag">$level</span></td>
+                            <td>現在のレベル</td>
+                        </tr>
+                        <tr>
+                            <td><span class="help-tag">$exp</span></td>
+                            <td>現在の経験値</td>
+                        </tr>
+                        <tr>
+                            <td><span class="help-tag">$nextExp</span></td>
+                            <td><strong>次のレベルアップに必要な経験値</strong></td>
+                        </tr>
+
+                        <!-- 基本ステータス -->
+                        <tr>
+                            <td><span class="help-tag">$hp</span> / <span class="help-tag">$maxHp</span></td>
+                            <td>現在のHP / 最大HP</td>
+                        </tr>
+                        <tr>
+                            <td><span class="help-tag">$stamina</span> / <span class="help-tag">$maxStamina</span></td>
+                            <td>現在のスタミナ / 最大スタミナ</td>
+                        </tr>
+                        <tr>
+                            <td><span class="help-tag">$magazine</span> / <span class="help-tag">$maxMagazine</span>
+                            </td>
+                            <td>残弾数 / 装弾数 (リロード用)</td>
+                        </tr>
+
+                        <!-- バトルステータス -->
+                        <tr>
+                            <td><span class="help-tag">$atk</span></td>
+                            <td>攻撃力 (装備等の補正込み)</td>
+                        </tr>
+                        <tr>
+                            <td><span class="help-tag">$def</span></td>
+                            <td>防御力 (装備等の補正込み)</td>
+                        </tr>
+                        <tr>
+                            <td><span class="help-tag">$spd</span></td>
+                            <td>移動速度倍率 (標準=1.0)</td>
+                        </tr>
+
+                        <!-- その他 -->
+                        <tr>
+                            <td><span class="help-tag">$isLockedOn</span></td>
+                            <td>ロックオン中なら 1、そうでなければ 0</td>
+                        </tr>
+                    </table>
+
+                    <p style="font-size:0.8em; color:#666; margin-top:10px;">
+                        ※ <code>$</code> で始まる変数はシステムが自動計算するため、代入などの操作には注意してください。<br>
+                        ※ 自分で作った変数（例: <code>flag1</code>）も同様に <code>{{flag1}}</code> で表示できます。
+                    </p>
+                </div>
+            </details>
+
+            <!-- 2. マップ制御・カットシーン -->
+            <details class="help-details">
+                <summary>🎬 強制移動 (カットシーン演出)</summary>
+                <div class="help-content-inner">
+                    <p>「変数操作ノード」を使って、プレイヤーを自動で歩かせることができます。<br>イベントシーン等に使用してください。</p>
+                    <ol>
+                        <li><span class="help-tag">$forceX</span> に <strong>目的地のX座標(マス)</strong> を代入</li>
+                        <li><span class="help-tag">$forceY</span> に <strong>目的地のY座標(マス)</strong> を代入</li>
+                        <li><span class="help-tag">$forceSpd</span> に <strong>速度</strong> を代入 (4:歩き, 8:ダッシュ, 0:ワープ)</li>
+                        <li>最後に <span class="help-tag">$forceOn</span> に <strong>1</strong> を代入すると移動開始</li>
+                    </ol>
+                    <p>※目的地に着くと自動で操作可能に戻ります。</p>
+                </div>
+            </details>
+
+            <!-- 3. 3D・カメラ制御 -->
+            <details class="help-details">
+                <summary>📷 カメラ・3D視点操作</summary>
+                <div class="help-content-inner">
+                    <p>特定の変数に値を代入することで、カメラ挙動を変更できます。</p>
+                    <table class="help-table">
+                        <tr>
+                            <th>変数名</th>
+                            <th>設定値</th>
+                        </tr>
+                        <tr>
+                            <td><span class="help-tag">camera_zoom</span></td>
+                            <td>1.0 (標準) 〜 0.1 (遠景) 〜 3.0 (拡大)</td>
+                        </tr>
+                        <tr>
+                            <td><span class="help-tag">camera_view_mode</span></td>
+                            <td><strong>0</strong>: TPS (背後視点)<br><strong>1</strong>: FPS (一人称視点)</td>
+                        </tr>
+                    </table>
+                </div>
+            </details>
+
+                     <details class="help-details">
+                <summary>🎮 ターン制バトルのコマンド効果</summary>
+                <div class="help-content-inner">
+                    <p>各コマンドを選択した時の効果一覧です。</p>
+                    <table class="help-table">
+                        <tr style="background:#eee;">
+                            <th>コマンド</th>
+                            <th>効果・メリット</th>
+                        </tr>
+                        <tr>
+                            <td><strong>⚔️ 攻撃</strong></td>
+                            <td>敵にダメージを与えます。<br>※敵の方が素早いとミスする可能性があります。</td>
+                        </tr>
+                        <tr>
+                            <td><strong>🛡️ 防御</strong></td>
+                            <td>受けるダメージを半減します。<br>防御力が一時的に2倍として計算されます。</td>
+                        </tr>
+                        <tr>
+                            <td><strong>💨 ダッシュ</strong></td>
+                            <td>回避率が上昇します。<br>敵からのロックオン状態を解除できます。</td>
+                        </tr>
+                        <tr>
+                            <td><strong>🦘 ジャンプ</strong></td>
+                            <td>次のターンの攻撃威力が上昇します（クリティカル補正）。<br>回避率も少し上昇します。</td>
+                        </tr>
+                        <tr>
+                            <td><strong>🎯 ロックオン</strong></td>
+                            <td>敵に照準を合わせます。<br><strong>次の攻撃が必ず命中</strong>するようになります。</td>
+                        </tr>
+                        <tr>
+                            <td><strong>👀 様子を見る</strong></td>
+                            <td>行動をパスしてスタミナを温存します。<br><strong>スタミナが通常の2倍回復</strong>します。</td>
+                        </tr>
+                        <tr>
+                            <td><strong>💊 アイテム</strong></td>
+                            <td>所持しているアイテムを使用します。<br>※スタミナを消費しません。</td>
+                        </tr>
+                        <tr>
+                            <td><strong>🏳️ 逃げる</strong></td>
+                            <td>戦闘から離脱します。<br>失敗すると敵のターンになります。</td>
+                        </tr>
+                    </table>
+                </div>
+            </details>
+
+            <!-- 4. バトル・アイテム -->
+            <details class="help-details">
+                <summary>⚔️ バトル・アイテム計算式</summary>
+                <div class="help-content-inner">
+                    <h4>ダメージ計算式</h4>
+                    <div
+                        style="background:#eee; padding:5px; text-align:center; font-family:monospace; margin-bottom:10px;">
+                        (攻撃力 × クリティカル) - (防御力 ÷ 貫通力)
+                    </div>
+                    <h4>アイテムの効果</h4>
+                    <p>アイテム編集画面で「変数操作」を設定すると、使用時にフラグを立てたりできます。<br>
+                        例: <code>flag_door_open = 1</code> (カギを使うとドアが開く)</p>
+                </div>
+            </details>
+
+            <!-- 5. アクションボタン -->
+            <details class="help-details">
+                <summary>🎮 アクションボタンの特殊機能</summary>
+                <div class="help-content-inner">
+                    <p>「システム設定」でボタンの挙動をカスタマイズできます。</p>
+                    <ul>
+                        <li><strong>🔄 変数切替 (0⇔1)</strong>: 押すたびにON/OFFが切り替わります (懐中電灯など)。</li>
+                        <li><strong>🔢 変数加算 (+1)</strong>: 押すたびに値が増えます (ページ送りなど)。</li>
+                        <li><strong>💊 アイテム使用</strong>: 特定のアイテムを即座に使用するショートカットキーを作れます。</li>
+                    </ul>
+                </div>
+            </details>
+        </div>
+    </div>
+
+    <div id="battle-help-modal" class="modal hidden">
+        <div class="modal-content"><span class="close-modal"
+                onclick="document.getElementById('battle-help-modal').classList.add('hidden')">&times;</span>
+            <h2 style="color:#d46b08; border-bottom:2px solid #ffd591; padding-bottom:10px;">⚔️ ダメージ計算式</h2>
+            <div
+                style="background:#f5f5f5; padding:15px; border-radius:8px; font-weight:bold; font-family:monospace; text-align:center; border:1px solid #ccc;">
+                (攻撃力 × クリティカル) - (防御力 ÷ 貫通力) = ダメージ</div>
+        </div>
+    </div>
+
+
+    <div id="player-settings-modal" class="modal hidden">
+        <div class="modal-content" style="max-width: 500px;"><span class="close-modal"
+                onclick="document.getElementById('player-settings-modal').classList.add('hidden')">&times;</span>
+            <h3 style="border-bottom:1px solid #ddd; padding-bottom:10px;">👤 プレイヤー初期設定</h3>
+
+            <div style="max-height: 70vh; overflow-y: auto; padding-right: 5px;">
+
+                <!-- 1. 基本ステータス -->
+                <div class="form-group-row">
+                    <div style="flex:1"><label>最大HP</label><input type="text" id="player-init-hp" value="10"
+                            list="variable-list-options"></div>
+                    <div style="flex:1"><label>防御力</label><input type="text" id="player-init-def" value="0"
+                            list="variable-list-options"></div>
+                </div>
+                <div class="form-group-row">
+                    <div style="flex:1"><label>移動速度</label><input type="text" id="player-init-spd" value="1.0"
+                            list="variable-list-options"></div>
+                    <div style="flex:1"><label>ジャンプ力</label><input type="text" id="player-init-jump" value="8.0"
+                            list="variable-list-options"></div>
+                </div>
+
+                <div class="form-group-row" style="margin-top:10px; padding-top:10px; border-top:1px dashed #ccc;">
+                    <div style="flex:1">
+                        <label title="プレイヤーの衝突判定の幅 (px)">当たり判定 幅(px)</label>
+                        <input type="number" id="player-init-width" value="32" step="1" style="width:100%;">
+                    </div>
+                    <div style="flex:1">
+                        <label title="プレイヤーの衝突判定の高さ (px)">当たり判定 高さ(px)</label>
+                        <input type="number" id="player-init-height" value="32" step="1" style="width:100%;">
+                    </div>
+                </div>
+
+                <!-- 2. スタミナ設定 -->
+                <details class="help-details" style="margin-top:10px;">
+                    <summary>⚡ スタミナ設定</summary>
+                    <div class="help-content-inner" style="background:#fffbe6;">
+                        <div class="form-group-row">
+                            <div style="flex:1"><label>最大スタミナ</label><input type="text" id="player-init-max-stamina"
+                                    value="100" list="variable-list-options"></div>
+                            <div style="flex:1"><label>回復速度 (毎秒)</label><input type="text"
+                                    id="player-init-stamina-regen" value="20" list="variable-list-options"></div>
+                        </div>
+
+                        <!-- ★ここに追加: システム設定から持ってきたUI -->
+                        <div style="margin-top:10px; border-top:1px dashed #ccc; padding-top:10px;">
+                            <div class="form-group-row" style="align-items: center;">
+                                <label class="checkbox-label" style="flex:1;"><input type="checkbox"
+                                        id="player-dash-consume">ダッシュ消費</label>
+                                <input type="number" id="player-dash-cost" value="0.5" step="0.1" style="width:60px;">
+                                <span style="font-size:0.8em; color:#666;">/frame</span>
+                            </div>
+                            <div class="form-group-row" style="align-items: center; margin-top:5px;">
+                                <label class="checkbox-label" style="flex:1;"><input type="checkbox"
+                                        id="player-jump-consume">ジャンプ消費</label>
+                                <input type="number" id="player-jump-cost" value="10" style="width:60px;">
+                            </div>
+                            <div class="form-group-row" style="align-items: center; margin-top:5px;">
+                                <label class="checkbox-label" style="flex:1;"><input type="checkbox"
+                                        id="player-atk-consume">攻撃消費</label>
+                                <input type="number" id="player-atk-cost" value="20" style="width:60px;">
+                            </div>
+                            <div class="form-group-row"
+                                style="align-items: center; margin-top:5px; border-top:1px dashed #eee; padding-top:5px;">
+                                <label class="checkbox-label" style="flex:1;">
+                                    <input type="checkbox" id="player-invincible-consume">
+                                    <span>🌟 無敵ボタン消費</span>
+                                </label>
+                                <input type="number" id="player-invincible-cost" value="1.0" step="0.1"
+                                    style="width:60px;">
+                                <span style="font-size:0.8em; color:#666;">/frame</span>
+                            </div>
+                        </div>
+
+
+                        <div class="form-group-row"
+                            style="align-items: center; justify-content:space-between; margin-top:5px; border-top:1px dashed #ddd; padding-top:5px;">
+                            <label class="checkbox-label" style="font-weight:bold;">
+                                <input type="checkbox" id="player-guard-consume"> 🛡️ ガード消費
+                            </label>
+                            <div style="display:flex; align-items:center;">
+                                <input type="number" id="player-guard-cost" value="0.5" step="0.1"
+                                    style="width:70px; text-align:right;">
+                                <span style="font-size:0.8em; color:#666; margin-left:3px;">/F</span>
+                            </div>
+                        </div>
+
+
+
+                    </div>
+                </details>
+
+                <!-- 3. 攻撃アクション設定 -->
+                <details class="help-details" style="margin-top:5px;">
+                    <summary>⚔️ 攻撃アクション詳細</summary>
+                    <div class="help-content-inner" style="background:#fff0f6;">
+                        <div class="form-group-row">
+                            <div style="flex:1"><label>攻撃力</label><input type="text" id="player-init-atk" value="1"
+                                    list="variable-list-options"></div>
+                            <div style="flex:1"><label>貫通力</label><input type="text" id="player-init-pen" value="1"
+                                    list="variable-list-options"></div>
+                        </div>
+                        <div class="form-group-row" style="margin-top:5px;">
+                            <div style="flex:1"><label title="攻撃の間隔 (フレーム数)">硬直/連射間隔</label><input type="text"
+                                    id="player-init-cooldown" value="20" list="variable-list-options"></div>
+                            <div style="flex:1"><label title="0=近接攻撃, 1以上=弾を発射">弾速 (0=近接)</label><input type="text"
+                                    id="player-init-proj-speed" value="0" list="variable-list-options"></div>
+                        </div>
+                        <div class="form-group-row" style="margin-top:5px;">
+                            <div style="flex:1"><label>射程 / 飛距離</label><input type="text" id="player-init-range"
+                                    value="32" list="variable-list-options"></div>
+                            <div style="flex:1"><label>判定サイズ</label><input type="text" id="player-init-size" value="32"
+                                    list="variable-list-options"></div>
+                        </div>
+                        <div class="form-group-row" style="margin-top:5px;">
+                            <div style="flex:1"><label>クリティカル率(%)</label><input type="text" id="player-init-crit-rate"
+                                    value="5" list="variable-list-options"></div>
+                            <div style="flex:1"><label>クリティカル倍率</label><input type="text" id="player-init-crit-mult"
+                                    value="2.0" list="variable-list-options"></div>
+                        </div>
+
+
+                        <div class="form-group-row"
+                            style="margin-top:5px; background:#fff7e6; padding:5px; border-radius:4px; border:1px solid #ffe58f;">
+                            <div style="flex:1">
+                                <label title="0で爆発なし。32〜64くらいが目安">💥 爆発範囲 (px)</label>
+                                <input type="text" id="player-init-blast-radius" value="0" list="variable-list-options">
+                            </div>
+                            <div style="flex:1">
+                                <label title="直撃ダメージに対する％">爆風倍率 (%)</label>
+                                <input type="text" id="player-init-blast-rate" value="50" list="variable-list-options">
+                            </div>
+                        </div>
+                    </div>
+                </details>
+
+                <!-- 4. 弾薬・リロード設定 -->
+                <details class="help-details" style="margin-top:5px;">
+                    <summary>🔫 銃・弾薬システム</summary>
+                    <div class="help-content-inner" style="background:#e6f7ff;">
+                        <div class="form-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="player-use-magazine">
+                                <span>弾数制限 (リロード) を有効にする</span>
+                            </label>
+                        </div>
+                        <div class="form-group-row">
+                            <div style="flex:1"><label>装弾数 (マガジン)</label><input type="text" id="player-init-mag-size"
+                                    value="30" list="variable-list-options"></div>
+                            <div style="flex:1"><label>リロード時間(秒)</label><input type="text" id="player-init-reload-time"
+                                    value="2.0" list="variable-list-options"></div>
+                        </div>
+                    </div>
+                </details>
+
+                <!-- 5. グラフィック・表示 -->
+                <details class="help-details" open style="margin-top:5px;">
+                    <summary>🎨 グラフィック・表示</summary>
+                    <div class="help-content-inner">
+                        <div class="form-group">
+                            <label>頭上のバー表示</label>
+                            <select id="player-overhead-type">
+                                <option value="none">なし</option>
+                                <option value="hp">HPのみ</option>
+                                <option value="stamina">スタミナのみ</option>
+                                <option value="both">HPとスタミナ両方</option>
+                            </select>
+                        </div>
+                        <hr>
+                        <div class="form-group">
+                            <label>使用する3Dモデル</label>
+                            <select id="player-init-model-id" style="width:100%;"></select>
+                        </div>
+
+                        <div id="player-settings-2d-group">
+                            <h4 style="margin: 5px 0; font-size:0.9em;">2D画像設定</h4>
+                            <div class="form-group-row">
+                                <div style="flex:1"><label style="font-size:0.8em;">待機</label><select
+                                        id="player-img-idle"></select></div>
+                                <div style="flex:1"><label style="font-size:0.8em;">移動</label><select
+                                        id="player-img-move"></select></div>
+                            </div>
+                            <div class="form-group-row">
+                                <div style="flex:1"><label style="font-size:0.8em;">攻撃</label><select
+                                        id="player-img-attack"></select></div>
+                                <div style="flex:1"><label style="font-size:0.8em;">被弾</label><select
+                                        id="player-img-damage"></select></div>
+                            </div>
+                        </div>
+
+                        <div id="player-settings-3d-group" style="display:none;">
+                            <h4 style="margin: 5px 0; font-size:0.9em;">3Dアニメーション設定</h4>
+                            <div class="form-group-row">
+                                <div style="flex:1"><label style="font-size:0.8em;">待機</label><select
+                                        id="player-anim-idle"></select></div>
+                                <div style="flex:1"><label style="font-size:0.8em;">移動</label><select
+                                        id="player-anim-move"></select></div>
+                            </div>
+                            <div class="form-group-row">
+                                <div style="flex:1"><label style="font-size:0.8em;">攻撃</label><select
+                                        id="player-anim-attack"></select></div>
+                                <div style="flex:1"><label style="font-size:0.8em;">被弾</label><select
+                                        id="player-anim-damage"></select></div>
+                            </div>
+                        </div>
+                    </div>
+                </details>
+            </div>
+
+            <button id="save-player-settings-btn" class="export-button"
+                style="width:100%; margin-top:15px;">保存して閉じる</button>
+        </div>
+    </div>
+
+
+
+    <!-- ★★★ ゲーム実行用 HUD レイヤー (アイテムウィンドウ含む) ★★★ -->
+    <div id="hud-layer"
+        style="display:none; pointer-events:none; position:absolute; top:0; left:0; width:100%; height:100%; z-index:1000;">
+        <div id="hud-crosshair"></div>
+        <div id="hud-radar"><canvas id="radar-canvas" width="120" height="120"></canvas></div>
+
+        <!-- アイテムメニューボタン -->
+        <div id="hud-menu-btn" onclick="toggleInventory()"
+            style="display:none; pointer-events:auto; position:absolute; top:20px; left:20px; width:60px; height:60px; background:rgba(0,0,0,0.5); border:2px solid #fff; border-radius:50%; cursor:pointer; justify-content:center; align-items:center; color:#fff; font-size:30px;">
+            🎒</div>
+
+        <!-- アイテム・インベントリ画面 -->
+        <div id="inventory-window"
+            style="display:none; pointer-events:auto; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:80%; height:70%; background:rgba(0,0,0,0.9); border:4px solid #fff; border-radius:10px; color:#fff; overflow:hidden;">
+            <div style="display:flex; height:100%;">
+                <div id="inventory-list" style="flex:1; border-right:2px solid #555; overflow-y:auto; padding:10px;">
+                </div>
+                <div id="inventory-detail"
+                    style="flex:1; padding:20px; display:flex; flex-direction:column; align-items:center; text-align:center;">
+                    <div id="inv-detail-icon" style="font-size:60px; margin-bottom:20px;">📦</div>
+                    <h2 id="inv-detail-name">選択なし</h2>
+                    <p id="inv-detail-desc" style="flex:1; color:#ccc;"></p>
+                    <button id="inv-use-btn" class="sys-btn"
+                        style="padding:10px 40px; font-size:1.2em; display:none;">使う</button>
+                </div>
+            </div>
+            <div onclick="toggleInventory()"
+                style="position:absolute; top:10px; right:10px; cursor:pointer; font-size:24px;">❌</div>
+        </div>
+
+        <div id="hud-elements-container"></div>
+    </div>
+
+
+
+
+    <!-- 章の一括設定モーダル -->
+    <div id="section-bulk-edit-modal" class="modal hidden">
+        <div class="modal-content" style="max-width: 500px;">
+            <span class="close-modal"
+                onclick="document.getElementById('section-bulk-edit-modal').classList.add('hidden')">&times;</span>
+            <h3 style="border-bottom: 1px solid #ddd; padding-bottom: 10px; margin-top: 0;">
+                📁 <span id="bulk-edit-section-name"></span> の一括設定
+            </h3>
+            <p
+                style="font-size:0.85em; color:#666; background:#fffbe6; padding:10px; border:1px solid #ffe58f; border-radius:4px;">
+                ⚠️ <strong>注意:</strong> ここで設定した項目は、この章にある<strong>全てのノード</strong>に上書きされます。<br>
+                変更したくない項目は「(変更なし)」のままにしてください。
+            </p>
+
+            <div class="form-group" style="margin-top:15px;">
+                <label>ノードの種類 (Type)</label>
+                <select id="bulk-node-type">
+                    <option value="">(変更なし)</option>
+                    <option value="text">💬 テキスト</option>
+                    <option value="choice">🔀 選択肢</option>
+                    <option value="variable">🔢 変数操作</option>
+                    <option value="map">🗺️ マップ移動</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>発言者名 (Name)</label>
+                <input type="text" id="bulk-custom-name" placeholder="(変更なし)">
+            </div>
+
+            <div class="form-group">
+                <label>背景画像 (Background)</label>
+                <select id="bulk-background"></select>
+            </div>
+
+            <div class="form-group">
+                <label>BGM</label>
+                <select id="bulk-bgm"></select>
+            </div>
+
+            <div class="form-group">
+                <label>次のノード (Next Node)</label>
+                <div id="bulk-next-node-container" class="smart-select-container"></div>
+            </div>
+
+            <button id="apply-bulk-edit-btn" class="export-button" style="width:100%; margin-top:15px; padding:12px;">
+                実行 (一括適用)
+            </button>
+        </div>
+    </div>
+    <script src="https://kripken.github.io/ammo.js/builds/ammo.js"></script>
     <script type="module" src="main.js"></script>
 </body>
-</html>
