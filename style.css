@@ -23,7 +23,7 @@ body {
     overflow-x: hidden; /* 全体の横スクロール防止 */
 }
 
-h2, h3, h4 { margin-top: 0; }
+h2, h3, h4 { margin: 0; }
 
 /* --- ヘッダー / ナビゲーション (横スクロール対応) --- */
 #main-nav {
@@ -315,16 +315,17 @@ main { padding: 20px; }
 
 /* --- プレビューエリア --- */
 .preview-area {
-    max-width: 800px;
     margin: 0 auto;
 }
 .preview-window {
     width: 100%;
-    aspect-ratio: 4 / 3;
+    /* aspect-ratio: 4 / 3;  ← これを削除またはコメントアウト */
+    height: 75vh;            /* 画面の高さの75%を使う */
     background-color: #000;
     border: 1px solid var(--border-color);
     border-radius: 4px;
     box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    overflow: hidden; 
 }
 #game-container { position: relative; width: 100%; height: 100%; overflow: hidden; }
 .layer{ position: absolute; top: 0; left: 0; width: 100%; height: 100%; transition: opacity .5s; background-size: cover; background-position: center; }
@@ -751,6 +752,7 @@ input[type="text"]:focus, select:focus, textarea:focus { border-color: var(--pri
     border-radius: 8px;
     background: var(--panel-bg-color);
     box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    box-sizing: border-box; 
 }
 .ui-config-card h3 {
     margin-top: 0;
@@ -833,4 +835,666 @@ input[type="text"]:focus, select:focus, textarea:focus { border-color: var(--pri
     
     /* ★追加: テキストが改行しないようにする */
     white-space: nowrap; 
+}
+.variable-op-item {
+    display: grid;
+    grid-template-columns: 1fr 80px 1fr auto;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 10px;
+    background: #f9f9f9;
+    padding: 10px;
+    border-radius: 4px;
+    border: 1px solid #eee;
+}
+
+/* 右下のボタングループ */
+#map-action-btn-container {
+    position: absolute;
+    bottom: 30px;
+    right: 30px;
+    z-index: 2;
+    display: none; /* マップモードでflexまたはgridになる */
+    
+    /* ボタンの配置設定 (右から左へ並べる) */
+    display: flex;
+    flex-direction: row-reverse;
+    gap: 15px;
+    align-items: flex-end;
+    pointer-events: none; /* コンテナ自体はクリック通す */
+}
+
+#map-action-btn-container.active {
+    display: flex !important;
+}
+
+/* 個別のボタン */
+.map-act-btn {
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.25);
+    border: 2px solid #fff;
+    color: #fff;
+    font-weight: bold;
+    font-size: 1.0em;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    user-select: none;
+    cursor: pointer;
+    pointer-events: auto;
+    touch-action: none;
+    backdrop-filter: blur(4px);
+    transition: transform 0.1s, background 0.1s;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+    
+    /* PCキーのヒント表示用 */
+    position: relative;
+}
+
+.map-act-btn:active, .map-act-btn.pressed {
+    background: rgba(255, 255, 255, 0.5);
+    transform: scale(0.95);
+}
+
+/* PCキーのヒントバッジ */
+.key-badge {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background: #333;
+    color: #fff;
+    font-size: 10px;
+    padding: 2px 5px;
+    border-radius: 4px;
+    border: 1px solid #aaa;
+}
+
+/* style.css に追加 */
+
+/* HUDレイヤー (最前面) */
+#hud-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none; /* クリックは下のゲーム画面に通す */
+    z-index: 50;
+    overflow: hidden;
+}
+
+/* クロスヘア (照準) */
+#hud-crosshair {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 20px;
+    height: 20px;
+    transform: translate(-50%, -50%);
+    border: 2px solid rgba(255, 255, 255, 0.8);
+    border-radius: 50%;
+    display: none; /* 初期は非表示 */
+}
+#hud-crosshair::after {
+    content: '';
+    position: absolute;
+    top: 50%; left: 50%;
+    width: 4px; height: 4px;
+    background: red;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+}
+
+/* レーダー (ミニマップ) */
+#hud-radar {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    width: 120px;
+    height: 120px;
+    background: rgba(0, 20, 0, 0.6);
+    border: 2px solid rgba(100, 255, 100, 0.5);
+    border-radius: 50%;
+    display: none;
+}
+#hud-radar canvas {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+}
+
+/* 汎用HUD要素 (テキスト/ゲージ) */
+.hud-element {
+    position: absolute;
+    color: white;
+    font-family: "DotGothic16", monospace;
+    text-shadow: 1px 1px 0 #000;
+    font-size: 16px;
+}
+
+/* ゲージバー */
+.hud-bar-bg {
+    width: 150px;
+    height: 12px;
+    background: #333;
+    border: 1px solid #fff;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-top: 2px;
+}
+.hud-bar-fill {
+    height: 100%;
+    background: linear-gradient(to right, #f00, #ff6);
+    width: 100%;
+    transition: width 0.2s;
+}
+
+#text-node-settings #node-3d-char-list select option {
+    color: black !important;
+    background-color: white !important; /* 背景も強制的に白に */
+}
+
+/* style.css の末尾に追加・修正 */
+
+/* デスクトップ表示の基本 */
+#item-manager-wrapper {
+    display: flex;
+    gap: 20px;
+}
+
+#item-mobile-header {
+    display: none; /* デスクトップでは常に非表示 */
+}
+
+/* --- モバイル（900px以下）の挙動 --- */
+@media (max-width: 900px) {
+    /* メインレイアウト: 横並びを解除 */
+    .scenario-layout {
+        flex-direction: column;
+        height: auto;
+        min-height: calc(100vh - 80px);
+    }
+    .scenario-sidebar {
+        width: 100%;
+        height: 350px;
+        border-right: none;
+        border-bottom: 1px solid var(--border-color);
+    }
+    .node-editor-panel {
+        width: 100%;
+        flex: 1;
+        min-height: 400px;
+    }
+
+    /* --- アイテム管理 & エネミー管理 共通レイアウト --- */
+    #item-manager-wrapper,
+    #enemy-manager-wrapper,
+    #particle-manager-wrapper { 
+        display: block; /* 横並び解除 */
+        position: relative;
+    }
+
+    /* パネルを画面一杯に広げる */
+    #item-list-panel, #item-editor-panel,
+    #enemy-list-panel, #enemy-editor-panel,
+    #particle-list-panel, #particle-editor-panel {
+        max-width: 100% !important;
+        width: 100% !important;
+        height: calc(100vh - 120px) !important;
+        box-sizing: border-box !important;
+    }
+    /* --- 通常時: リストを表示、エディタを隠す --- */
+    #item-list-panel, 
+    #enemy-list-panel,
+    #particle-list-panel {
+        display: flex;
+    }
+    #item-editor-panel,
+    #enemy-editor-panel,
+    #particle-editor-panel {
+        display: none;
+    }
+
+    /* --- 詳細を開いた時 (.mobile-active-editor): リストを隠し、エディタを表示 --- */
+    /* アイテム管理 */
+    .mobile-active-editor #item-list-panel { display: none; }
+    .mobile-active-editor #item-editor-panel { display: block; }
+    
+    /* エネミー管理 (★ここが不足していました) */
+    .mobile-active-editor #enemy-list-panel { display: none; }
+    .mobile-active-editor #enemy-editor-panel { display: block; }
+
+        .mobile-active-editor #particle-list-panel { display: none; }
+    .mobile-active-editor #particle-editor-panel { display: block; }
+
+    /* --- ヘッダーの切り替え --- */
+    /* スマホ用ヘッダー(戻るボタン)を表示 */
+    #item-mobile-header, 
+    #enemy-mobile-header 
+    #particle-mobile-header {
+        display: flex !important; 
+    }
+    /* デスクトップ用タイトルを隠す */
+    #item-editor-title-desktop,
+    #enemy-editor-title-desktop {
+        display: none; 
+    }
+
+    /* --- その他の調整 --- */
+    /* 変数管理のレイアウト */
+    .add-variable-form { grid-template-columns: 1fr; }
+    .variable-header { display: none; }
+    .variable-row {
+        grid-template-columns: 1fr auto;
+        grid-template-areas: "name delete" "input input";
+        gap: 5px;
+    }
+    .variable-name { grid-area: name; font-size: 1.1em; }
+    .variable-row input { grid-area: input; }
+    .variable-row button { grid-area: delete; }
+    
+    .variable-row-new {
+        grid-template-columns: 1fr auto;
+        grid-template-areas: 
+            "name delete"
+            "value value"
+            "group group"
+            "comment comment";
+    }
+    .variable-row-new > div:nth-child(1) { grid-area: name; font-weight:bold; }
+    .variable-row-new > input:nth-child(2) { grid-area: value; }
+    .variable-row-new > input:nth-child(3) { grid-area: comment; }
+    .variable-row-new > select:nth-child(4) { grid-area: group; }
+    .variable-row-new > button:nth-child(5) { grid-area: delete; }
+
+    /* マップエディタのレイアウト */
+    .map-editor-layout { display: block; height: auto; overflow-y: auto; }
+    .map-sidebar { width: 100%; height: auto; max-height: 50vh; border-right: none; border-bottom: 2px solid var(--border-color); box-sizing: border-box; }
+    .map-canvas-area { min-height: 50vh; }
+    #map-canvas { margin: 10px; }
+
+    /* エディタヘッダーなど */
+    .editor-header { flex-direction: column; align-items: flex-start; gap: 10px; }
+    .editor-actions { width: 100%; justify-content: space-between; }
+    .choice-editor-item, .condition-editor-item { grid-template-columns: 1fr; }
+    .choice-editor-item span, .condition-editor-item span { display: none; }
+}
+
+/* style.css に追加 */
+.filter-btn {
+    border: 1px solid #ccc;
+    background: #f9f9f9;
+    cursor: pointer;
+    border-radius: 3px;
+    transition: background 0.2s;
+}
+.filter-btn:hover { background: #eee; }
+.filter-btn.active {
+    background: #1890ff;
+    color: white;
+    border-color: #1890ff;
+}
+
+/* style.css の末尾に追加 */
+
+/* --- ポケモン風エンカウント演出 --- */
+
+/* タイプA: 激しいフラッシュ → 暗転 */
+@keyframes encounter-flash {
+    0% { background-color: transparent; opacity: 0; }
+    10% { background-color: #fff; opacity: 0.8; }
+    20% { background-color: transparent; opacity: 0; }
+    30% { background-color: #fff; opacity: 0.8; }
+    40% { background-color: transparent; opacity: 0; }
+    50% { background-color: #fff; opacity: 1; }
+    60% { background-color: #000; opacity: 0; }
+    100% { background-color: #000; opacity: 1; }
+}
+.fx-encounter-flash {
+    animation: encounter-flash 1.5s step-end forwards;
+    z-index: 9999 !important; /* 最前面に表示 */
+}
+
+/* タイプB: 上下からシャッターが閉じる */
+@keyframes encounter-shutter {
+    0% { clip-path: polygon(0 0, 100% 0, 100% 0, 0 0, 0 100%, 100% 100%, 100% 100%, 0 100%); background-color: #000; opacity: 1; }
+    50% { clip-path: polygon(0 0, 100% 0, 100% 10%, 0 10%, 0 90%, 100% 90%, 100% 100%, 0 100%); background-color: #000; opacity: 1; }
+    100% { clip-path: polygon(0 0, 100% 0, 100% 50%, 0 50%, 0 50%, 100% 50%, 100% 100%, 0 100%); background-color: #000; opacity: 1; }
+}
+.fx-encounter-shutter {
+    background-color: #000;
+    opacity: 1;
+    animation: encounter-shutter 1.0s ease-in-out forwards;
+    z-index: 9999 !important;
+}
+
+/* タイプC: 渦巻き (簡易版: 画面が回転しながら収束) */
+@keyframes encounter-spin {
+    0% { transform: scale(1) rotate(0deg); opacity: 1; background-color: transparent; }
+    50% { transform: scale(0.5) rotate(180deg); opacity: 0.5; background-color: #000; }
+    100% { transform: scale(0) rotate(360deg); opacity: 1; background-color: #000; }
+}
+/* 注: 渦巻きは全画面を回す必要があるため、effect-overlayだけ回しても雰囲気が出にくいですが、
+   簡易的に「黒い画面が迫ってくる」ような演出として定義します */
+.fx-encounter-spin {
+    background-color: #000;
+    opacity: 0;
+    animation: fade-black 1.0s ease-in; /* 既存のフェードを流用 */
+}
+
+/* --- ヒント画面用スタイル (追加) --- */
+.help-details {
+    margin-bottom: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: #fff;
+}
+.help-details summary {
+    padding: 10px 15px;
+    font-weight: bold;
+    cursor: pointer;
+    background-color: #f7f7f7;
+    list-style: none; /* 三角マーカーを消す(一部ブラウザ用) */
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.help-details summary::after {
+    content: '+';
+    font-weight: bold;
+    color: #888;
+}
+.help-details[open] summary::after {
+    content: '-';
+}
+.help-details summary:hover {
+    background-color: #eee;
+}
+.help-content-inner {
+    padding: 15px;
+    font-size: 0.9em;
+    line-height: 1.6;
+    border-top: 1px solid #ddd;
+}
+.help-tag {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: #e6f7ff;
+    border: 1px solid #91d5ff;
+    color: #0050b3;
+    font-family: monospace;
+    font-size: 0.9em;
+    margin: 0 2px;
+}
+.help-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+}
+.help-table th, .help-table td {
+    border: 1px solid #ddd;
+    padding: 6px;
+    font-size: 0.85em;
+}
+.help-table th {
+    background-color: #f0f0f0;
+    text-align: left;
+}
+
+/* style.css の一番下に追加 */
+
+/* 章リストの右側に表示する数字バッジ */
+.node-count-badge {
+    display: inline-block;
+    background-color: #ddd;
+    color: #333;
+    font-size: 0.8em;
+    padding: 2px 8px;
+    border-radius: 10px;
+    margin-left: auto; /* 右寄せ */
+    cursor: pointer;
+    transition: all 0.2s;
+    border: 1px solid #ccc;
+}
+
+.node-count-badge:hover {
+    background-color: #1890ff;
+    color: white;
+    border-color: #1890ff;
+}
+
+/* style.css 末尾に追加 */
+
+/* --- 変数マネージャー 2.0 --- */
+.var-group-container {
+    margin-bottom: 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    overflow: hidden;
+    background: #fff;
+}
+
+.var-group-header {
+    background-color: #e6f7ff;
+    padding: 10px;
+    font-weight: bold;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #ddd;
+    user-select: none;
+}
+.var-group-header:hover {
+    background-color: #d6e4ff;
+}
+
+.var-group-content {
+    display: block; /* JSでトグル */
+    padding: 5px;
+    background-color: #fafafa;
+}
+
+.variable-row-new {
+    display: grid;
+    /* 名前 : 値 : 説明 : [移動] : 削除 */
+    /* 4列から5列に変更 */
+    grid-template-columns: 1.5fr 1fr 2fr 1.2fr auto;
+    gap: 10px;
+    align-items: center;
+    padding: 8px;
+    border-bottom: 1px solid #eee;
+    background: #fff;
+}
+
+/* スマホ対応も修正 */
+@media (max-width: 768px) {
+    .variable-row-new {
+        grid-template-columns: 1fr auto;
+        grid-template-areas: 
+            "name delete"
+            "value value"
+            "group group"   /* 追加 */
+            "comment comment";
+    }
+    .variable-row-new > div:nth-child(1) { grid-area: name; font-weight:bold; }
+    .variable-row-new > input:nth-child(2) { grid-area: value; }
+    .variable-row-new > input:nth-child(3) { grid-area: comment; }
+    .variable-row-new > select:nth-child(4) { grid-area: group; } /* 追加 */
+    .variable-row-new > button:nth-child(5) { grid-area: delete; }
+}
+
+/* エネミー編集などの詳細設定アコーディオン */
+.advanced-settings-group {
+    background-color: #fff;
+    border: 1px solid #d9d9d9;
+    border-radius: 4px;
+    margin-top: 10px;
+    overflow: hidden;
+}
+
+.advanced-settings-group summary {
+    background-color: #f5f5f5;
+    padding: 10px 15px;
+    cursor: pointer;
+    font-weight: bold;
+    color: #555;
+    list-style: none; /* デフォルトの三角を消す */
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: background 0.2s;
+}
+
+.advanced-settings-group summary:hover {
+    background-color: #e6f7ff;
+    color: #1890ff;
+}
+
+/* 開いている時のスタイル */
+.advanced-settings-group[open] summary {
+    border-bottom: 1px solid #d9d9d9;
+    background-color: #e6f7ff;
+    color: #1890ff;
+}
+
+/* 開閉アイコン（＋/-） */
+.advanced-settings-group summary::after {
+    content: '+';
+    font-size: 1.2em;
+    font-weight: bold;
+}
+.advanced-settings-group[open] summary::after {
+    content: '-';
+}
+
+.advanced-settings-content {
+    padding: 15px;
+    background-color: #fafafa;
+}
+textarea {
+  resize: vertical; /* 縦方向のみリサイズ許可 */
+}
+
+/* ステータスバッジの基本スタイル */
+.status-badge {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.85em;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: #333;
+    color: #aaa; /* デフォルト（未定/オフライン）はグレー */
+    cursor: pointer; 
+    transition: all 0.3s;
+    border: 1px solid #555;
+}
+
+/* 正常 (Online / Loaded) */
+.status-badge.status-ok {
+    color: #52c41a;       /* 緑 */
+    border-color: #52c41a;
+    background: #f6ffed;
+}
+
+/* 警告/エラー (Offline / Failed) */
+.status-badge.status-ng {
+    color: #ff4d4f;       /* 赤 */
+    border-color: #ff4d4f;
+    background: #fff1f0;
+}
+.status-badge:hover {
+    opacity: 0.8;
+    transform: translateY(-1px); /* 少し浮く演出 */
+}
+
+.status-badge:active {
+    transform: translateY(0); /* 押した感 */
+}
+
+/* 3D無効モード時のナビゲーションボタンへの警告 */
+body.mode-offline-no-3d .nav-button[data-mode="models"]::after,
+body.mode-offline-no-3d .nav-button[data-mode="animations"]::after {
+    content: "⚠️";
+    margin-left: 4px;
+    font-size: 0.8em;
+}
+
+/* ステータスバッジのスタイル調整 */
+.status-badge {
+    cursor: pointer;
+    user-select: none;
+    position: relative;
+    overflow: hidden;
+}
+
+.status-badge:hover::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(255, 255, 255, 0.2);
+}
+
+/* ツールチップ（PC用予備） */
+.status-badge:hover::after {
+    content: "クリックで詳細を表示";
+    position: absolute;
+    bottom: -25px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #333;
+    color: #fff;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    white-space: nowrap;
+    z-index: 1000;
+}
+
+/* --- style.css の末尾に追加 --- */
+
+/* 条件分岐ノードのエディタ用スタイル (カード型) */
+.condition-card {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-left: 4px solid #9b59b6; /* 条件分岐カラー(紫) */
+    border-radius: 4px;
+    padding: 10px;
+    margin-bottom: 15px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.cond-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    padding-bottom: 5px;
+    border-bottom: 1px dashed #eee;
+}
+
+.cond-logic-row {
+    display: flex;
+    gap: 5px;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+/* スマホでは縦並びに */
+@media (max-width: 600px) {
+    .cond-logic-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+}
+
+.cond-action-row {
+    background: #f5f5f5;
+    padding: 8px;
+    border-radius: 4px;
+    border: 1px solid #eee;
 }
