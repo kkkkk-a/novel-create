@@ -1,4 +1,4 @@
-// scenarioHandlers.js (Fixed: Rename Section Added)
+// scenarioHandlers.js (一括設定機能付き)
 
 import * as state from './state.js';
 import * as ui from './ui.js';
@@ -12,13 +12,11 @@ function selectSection(id) {
     ui.renderAll();
 }
 
-function selectNode(id) {
+async function selectNode(id) {
     if (!id) return;
     state.setActiveNodeId(id);
-    ui.updateAssetDropdowns();
-    ui.updateVariableSelects(); 
-    ui.renderScenarioTree();
-    ui.renderNodeEditor();
+    ui.highlightActiveNode();
+    await ui.renderNodeEditor();
 }
 
 // --- CRUD操作関数 ---
@@ -26,13 +24,15 @@ function selectNode(id) {
 function addSection() {
     const name = prompt('新しい章(セクション)の名前を入力してください:', '第一章');
     if (!name) return;
-    const id = `sec_${Date.now()}`;
+    
+    // state.js の関数を呼び出す
+    const id = state.generateId('sec');
+    
     const projectData = state.getProjectData();
     projectData.scenario.sections[id] = { name: name, nodes: {} };
     selectSection(id);
 }
 
-// ★追加: 章の名前変更機能
 function renameSection() {
     const activeSectionId = state.getActiveSectionId();
     if (!activeSectionId) {
@@ -47,13 +47,11 @@ function renameSection() {
     if (!newName || newName.trim() === "") return;
     
     section.name = newName;
-    
-    // ツリーとエディタ（プルダウン内の章名など）を更新
     ui.renderScenarioTree();
     ui.updateAllNodeSelects();
 }
 
-function addNode() {
+async function addNode() {
     const activeSectionId = state.getActiveSectionId();
     if (!activeSectionId) {
         alert('ノードを追加する章(セクション)を選択してください。');
@@ -63,33 +61,30 @@ function addNode() {
     const projectData = state.getProjectData();
     const section = projectData.scenario.sections[activeSectionId];
 
-    // 新しいノードのIDとデータを作成
-    const newId = `node_${Date.now()}`;
+    // ★変更: ランダムIDを使用
+const newId = state.generateId('node');
+    
     section.nodes[newId] = { type: 'text', message: '' };
     
-    // ★修正: 自動接続ロジック
     const autoLinkCheckbox = document.getElementById('auto-link-next-node');
     const activeNodeId = state.getActiveNodeId();
     
-    // チェックボックスがONで、かつノードが選択されている場合
+    // 直前のノードから自動リンク
     if (autoLinkCheckbox && autoLinkCheckbox.checked && activeNodeId) {
         const activeNode = section.nodes[activeNodeId];
-        // 選択中のノードのタイプに応じて、適切な「次のノードID」プロパティに設定
         if (activeNode) {
-            if (activeNode.type === 'text' || activeNode.type === 'variable') {
+            if (activeNode.type === 'text' || activeNode.type === 'variable' || activeNode.type === 'ui_control') {
                 activeNode.nextNodeId = newId;
             }
-            // 選択肢や条件分岐は複雑なので、ここではテキストと変数操作ノードのみ対象とするのが安全
         }
     }
 
-    // まだ開始ノードがなければ、これを開始ノードにする
-    if (!projectData.scenario.startNodeId) { 
+   if (!projectData.scenario.startNodeId) { 
         projectData.scenario.startNodeId = newId; 
     }
     
-    // 新しく作ったノードを選択状態にする
-    selectNode(newId);
+    ui.renderScenarioTree();
+    await selectNode(newId);
 }
 
 function deleteNode() {
@@ -111,8 +106,6 @@ function deleteNode() {
     }
 }
 
-// --- データ更新関数 ---
-
 function updateNodeData(target) {
     const activeNodeId = state.getActiveNodeId();
     const activeSectionId = state.getActiveSectionId();
@@ -124,42 +117,26 @@ function updateNodeData(target) {
     if (target.classList.contains('section-filter-select')) return;
 
     if (node.type === 'text') {
-        const charEl = document.getElementById('node-character');
-        if(charEl) node.characterId = charEl.value;
-
-        const customNameEl = document.getElementById('node-custom-name');
-        if(customNameEl) node.customName = customNameEl.value;
-
-        const posEl = document.getElementById('node-position');
-        if(posEl) node.characterPosition = posEl.value;
-
-        const bgEl = document.getElementById('node-background');
-        if(bgEl) node.backgroundId = bgEl.value;
-
-        const bgmEl = document.getElementById('node-bgm');
-        if(bgmEl) node.bgmId = bgmEl.value;
-
-        const soundEl = document.getElementById('node-sound');
-        if(soundEl) node.soundId = soundEl.value;
-
-        const nextEl = document.getElementById('node-next-text');
-        if(nextEl) node.nextNodeId = nextEl.value;
-        
-        const effectEl = document.getElementById('node-effect');
-        if(effectEl) node.effect = effectEl.value;
+        const charEl = document.getElementById('node-character'); if(charEl) node.characterId = charEl.value;
+        const customNameEl = document.getElementById('node-custom-name'); if(customNameEl) node.customName = customNameEl.value;
+        const posEl = document.getElementById('node-position'); if(posEl) node.characterPosition = posEl.value;
+        const bgEl = document.getElementById('node-background'); if(bgEl) node.backgroundId = bgEl.value;
+        const bgmEl = document.getElementById('node-bgm'); if(bgmEl) node.bgmId = bgmEl.value;
+        const soundEl = document.getElementById('node-sound'); if(soundEl) node.soundId = soundEl.value;
+        const ptclEl = document.getElementById('node-particle'); 
+        if(ptclEl) node.particleId = ptclEl.value;
+        const nextEl = document.getElementById('node-next-text'); if(nextEl) node.nextNodeId = nextEl.value;
+        const effectEl = document.getElementById('node-effect'); if(effectEl) node.effect = effectEl.value;
     } 
     else if (node.type === 'variable') {
-        const targetEl = document.getElementById('var-target');
-        if(targetEl) node.targetVariable = targetEl.value;
-
-        const opEl = document.getElementById('var-operator');
-        if(opEl) node.operator = opEl.value;
-
-        const valEl = document.getElementById('var-value');
-        if(valEl) node.value = valEl.value;
-
-        const nextEl = document.getElementById('node-next-variable');
-        if(nextEl) node.nextNodeId = nextEl.value;
+        if (target.id === 'node-next-variable') {
+            node.nextNodeId = target.value;
+        } else {
+            const { index, field } = target.dataset;
+            if (index !== undefined && field && node.operations[index]) {
+                node.operations[index][field] = target.value;
+            }
+        }
     }
     else if (node.type === 'choice') {
         const { index, field } = target.dataset;
@@ -178,48 +155,187 @@ function updateNodeData(target) {
         }
     }
     else if (node.type === 'map') {
-        const destEl = document.getElementById('node-map-dest');
-        if(destEl) node.mapId = destEl.value;
-        
-        const spawnEl = document.getElementById('node-map-spawn');
-        if(spawnEl) node.spawnId = spawnEl.value;
+        const destEl = document.getElementById('node-map-dest'); if(destEl) node.mapId = destEl.value;
+        const spawnEl = document.getElementById('node-map-spawn'); if(spawnEl) node.spawnId = spawnEl.value;
+    }
+    else if (node.type === 'ui_control') {
+        const nextEl = document.getElementById('node-next-ui');
+        if (nextEl) node.nextNodeId = nextEl.value;
     }
 }
 
-// --- ノード並べ替え機能 ---
-
-function reorderNodes(sectionId, draggedId, targetId, position) {
+function reorderNodes(sourceSecId, targetSecId, draggedId, targetId, position) {
     const projectData = state.getProjectData();
-    const section = projectData.scenario.sections[sectionId];
+    const sourceSection = projectData.scenario.sections[sourceSecId];
+    const targetSection = projectData.scenario.sections[targetSecId];
+
+    if (!sourceSection || !targetSection) return;
+
+    // 1. 移動するノードのデータを確保
+    const nodeData = sourceSection.nodes[draggedId];
+    if (!nodeData) return;
+
+    // 2. 元の場所から削除 (キー順序を保つため再構築)
+    const sourceNodeIds = Object.keys(sourceSection.nodes).filter(id => id !== draggedId);
+    const newSourceNodes = {};
+    sourceNodeIds.forEach(id => {
+        newSourceNodes[id] = sourceSection.nodes[id];
+    });
+    sourceSection.nodes = newSourceNodes;
+
+    // 3. 新しい場所へ挿入
+    const targetNodeIds = Object.keys(targetSection.nodes);
+    
+    // targetId が null (章ヘッダーへのドロップ時) なら末尾に追加
+    let insertIndex = targetNodeIds.length; 
+
+    if (targetId) {
+        const targetIndex = targetNodeIds.indexOf(targetId);
+        if (targetIndex !== -1) {
+            // position: 'before' ならその前、'after' ならその後ろ
+            insertIndex = (position === 'before') ? targetIndex : targetIndex + 1;
+        }
+    }
+
+    // 配列操作でIDを挿入
+    targetNodeIds.splice(insertIndex, 0, draggedId);
+
+    // 新しい順序でオブジェクトを再構築
+    const newTargetNodes = {};
+    targetNodeIds.forEach(id => {
+        if (id === draggedId) {
+            newTargetNodes[id] = nodeData; // 移動してきたデータ
+        } else {
+            newTargetNodes[id] = targetSection.nodes[id]; // 既存データ
+        }
+    });
+    targetSection.nodes = newTargetNodes;
+
+    // 4. UI更新
+    ui.renderScenarioTree();
+    
+    // 移動したノードをアクティブにする
+    state.setActiveSectionId(targetSecId);
+    // selectNode は export されていない内部関数のため、クリックイベントを擬似発火するか
+    // ここで state 更新とハイライトだけ行う
+    state.setActiveNodeId(draggedId);
+    ui.highlightActiveNode();
+    ui.renderNodeEditor();
+}
+
+// --- ★追加: 一括設定関連の処理 ---
+
+// モーダルを開いて準備する
+function openBulkEditModal(secId) {
+    const projectData = state.getProjectData();
+    const section = projectData.scenario.sections[secId];
     if (!section) return;
 
-    const oldNodes = section.nodes;
-    const nodeIds = Object.keys(oldNodes);
-    
-    const fromIndex = nodeIds.indexOf(draggedId);
-    const toIndex = nodeIds.indexOf(targetId);
-    
-    if (fromIndex === -1 || toIndex === -1) return;
+    // モーダル要素取得
+    const modal = document.getElementById('section-bulk-edit-modal');
+    document.getElementById('bulk-edit-section-name').textContent = section.name;
 
-    nodeIds.splice(fromIndex, 1);
+    // 各入力をリセット (空文字 = 変更なし)
+    document.getElementById('bulk-node-type').value = "";
+    document.getElementById('bulk-custom-name').value = "";
     
-    let insertIndex = toIndex;
-    if (fromIndex < toIndex) {
-        insertIndex = (position === 'after' ? toIndex : toIndex - 1);
-    } else {
-        insertIndex = (position === 'after' ? toIndex + 1 : toIndex);
+    const bgSelect = document.getElementById('bulk-background');
+    ui.populateAssetSelect(bgSelect, 'backgrounds', '(変更なし)');
+    
+    const bgmSelect = document.getElementById('bulk-bgm');
+    ui.populateAssetSelect(bgmSelect, 'sounds', '(変更なし)');
+
+    // 「次のノード」選択肢を生成
+    const nextContainer = document.getElementById('bulk-next-node-container');
+    // ui.js のヘルパーを使ってリストを生成させる
+    ui.createLinkedSelects(nextContainer, 'bulk-next-node', '');
+    
+    // 生成されたセレクトボックスに「(変更なし)」オプションを先頭に追加して選択する
+    const nodeSelect = document.getElementById('bulk-next-node');
+    if(nodeSelect) {
+        const defaultOpt = new Option('(変更なし)', '');
+        // 現在のオプションリストの先頭に挿入
+        nodeSelect.insertBefore(defaultOpt, nodeSelect.firstChild);
+        nodeSelect.value = ''; // (変更なし)を選択
     }
 
-    nodeIds.splice(insertIndex, 0, draggedId);
+    // 適用ボタンにクリックイベントを設定 (重複登録防止のため、一旦cloneNodeでリセットするか、onclickで上書きする)
+    const applyBtn = document.getElementById('apply-bulk-edit-btn');
+    applyBtn.onclick = () => applyBulkEdit(secId);
 
-    const newNodes = {};
-    nodeIds.forEach(id => {
-        newNodes[id] = oldNodes[id];
-    });
-
-    section.nodes = newNodes;
-    ui.renderScenarioTree();
+    // モーダル表示
+    modal.classList.remove('hidden');
 }
+
+// 一括設定を適用する
+function applyBulkEdit(secId) {
+    const projectData = state.getProjectData();
+    const section = projectData.scenario.sections[secId];
+    if (!section) return;
+
+    const newType = document.getElementById('bulk-node-type').value;
+    const newName = document.getElementById('bulk-custom-name').value;
+    const newBg = document.getElementById('bulk-background').value;
+    const newBgm = document.getElementById('bulk-bgm').value;
+    
+    const nextNodeSelect = document.getElementById('bulk-next-node');
+    const newNextNode = nextNodeSelect ? nextNodeSelect.value : '';
+
+    let count = 0;
+
+    if (confirm('本当にこの章の全ノードに対して一括変更を行いますか？\nこの操作は取り消せません。')) {
+        // 全ノードループ
+        for (const nodeId in section.nodes) {
+            const node = section.nodes[nodeId];
+
+            // 1. タイプ変更 (データ構造が変わるため注意)
+            if (newType && newType !== "") {
+                // タイプが変わる場合、最低限のプロパティ初期化を行う
+                node.type = newType;
+                if (newType === 'text' && !node.characters) node.characters = [];
+                if (newType === 'choice' && !node.choices) node.choices = [];
+                // 他のタイプへの変換も必要に応じて...
+            }
+
+            // 2. 名前変更 (テキストノードのみ)
+            if (newName !== "" && node.type === 'text') {
+                node.customName = newName;
+            }
+
+            // 3. 背景変更 (テキスト、ショップ)
+            if (newBg !== "") {
+                if (node.type === 'text' || node.type === 'shop') {
+                    node.backgroundId = newBg;
+                }
+            }
+
+            // 4. BGM変更
+            if (newBgm !== "") {
+                if (node.type === 'text' || node.type === 'shop') {
+                    node.bgmId = newBgm;
+                }
+            }
+
+            // 5. 次のノード変更
+            // 構造的に nextNodeId を持つタイプのみ適用
+            if (newNextNode !== "") {
+                if (['text', 'variable', 'ui_control', 'shop'].includes(node.type)) {
+                    node.nextNodeId = newNextNode;
+                }
+            }
+            
+            count++;
+        }
+
+        // 完了処理
+        document.getElementById('section-bulk-edit-modal').classList.add('hidden');
+        ui.renderScenarioTree(); // ツリー再描画（アイコン等が変わるため）
+        ui.renderNodeEditor();   // エディタ再描画 (現在選択中のノードが変わった可能性があるため)
+        
+        alert(`${count}個のノードを一括更新しました！`);
+    }
+}
+
 
 // --- メイン初期化関数 ---
 
@@ -228,13 +344,40 @@ export function initScenarioHandlers() {
     const editorPanel = document.getElementById('node-editor');
     const treeContainer = document.getElementById('scenario-tree');
 
+    // サイドバー内のクリックイベント
     sidebar.addEventListener('click', e => {
         if (e.target.id === 'add-section-btn') addSection();
-        // ★追加: 名前変更ボタンのイベント
         if (e.target.id === 'rename-section-btn') renameSection();
-        
         if (e.target.id === 'add-node-btn') addNode();
-        if (e.target.matches('.tree-section-header')) selectSection(e.target.dataset.id);
+        
+        // ★★★ 数字バッジクリック時の処理 (一括設定) ★★★
+        if (e.target.matches('.node-count-badge')) {
+            e.stopPropagation(); // 親要素(ヘッダー)へのバブリングを止める（開閉させない）
+            const header = e.target.closest('.tree-section-header');
+            if (header) {
+                openBulkEditModal(header.dataset.id);
+            }
+            return;
+        }
+        
+        // 章ヘッダーの開閉処理
+        if (e.target.matches('.tree-section-header') || e.target.closest('.tree-section-header')) {
+            const header = e.target.closest('.tree-section-header');
+            const secId = header.dataset.id;
+            const projectData = state.getProjectData();
+            const section = projectData.scenario.sections[secId];
+            
+            section.collapsed = !section.collapsed;
+            
+            const group = header.nextElementSibling;
+            if (group) {
+                group.style.display = section.collapsed ? 'none' : '';
+            }
+            
+            selectSection(secId);
+        }
+        
+        // ノード選択処理
         if (e.target.closest('.tree-node')) {
             const nodeEl = e.target.closest('.tree-node');
             const sectionId = nodeEl.closest('.tree-section').querySelector('.tree-section-header').dataset.id;
@@ -249,6 +392,13 @@ export function initScenarioHandlers() {
         if (!activeNodeId) return;
         const projectData = state.getProjectData();
         const node = projectData.scenario.sections[activeSectionId].nodes[activeNodeId];
+
+        if (e.target.id === 'node-label') {
+            node.nodeLabel = e.target.value;
+            ui.renderScenarioTree(); 
+            ui.renderNodeEditor();
+            return;
+        }
         
         if (e.target.id === 'is-start-node') {
             projectData.scenario.startNodeId = e.target.checked ? activeNodeId : null;
@@ -260,6 +410,8 @@ export function initScenarioHandlers() {
             node.type = e.target.value;
             if (node.type === 'choice' && !node.choices) node.choices = [];
             if (node.type === 'conditional' && !node.conditions) node.conditions = [];
+            if (node.type === 'variable' && !node.operations) node.operations = [];
+            if (node.type === 'ui_control' && !node.uiOperations) node.uiOperations = [];
             
             ui.renderNodeEditor();
             ui.renderScenarioTree(); 
@@ -293,21 +445,6 @@ export function initScenarioHandlers() {
                 }
                 break;
         }
-        
-        if (e.target.matches('.danger-button')) {
-            const index = parseInt(e.target.dataset.index, 10);
-            if (isNaN(index)) return;
-            
-            if (node.type === 'choice' && node.choices) {
-                node.choices.splice(index, 1);
-                ui.renderChoicesEditor(node.choices);
-                ui.renderScenarioTree();
-            } else if (node.type === 'conditional' && node.conditions) {
-                node.conditions.splice(index, 1);
-                ui.renderConditionsEditor(node.conditions);
-                ui.renderScenarioTree();
-            }
-        }
     });
 
     if (state.quill) {
@@ -324,6 +461,7 @@ export function initScenarioHandlers() {
         });
     }
 
+    // ドラッグ＆ドロップ イベントリスナー
     let draggedItem = null;
 
     if (treeContainer) {
@@ -348,21 +486,41 @@ export function initScenarioHandlers() {
             });
         });
 
-        treeContainer.addEventListener('dragover', e => {
-            e.preventDefault(); 
-            const targetNode = e.target.closest('.tree-node');
-            if (!targetNode || !draggedItem || targetNode === draggedItem) return;
-
-            const sourceSection = draggedItem.closest('.tree-section');
-            const targetSection = targetNode.closest('.tree-section');
-            if (sourceSection !== targetSection) return;
-
-            const rect = targetNode.getBoundingClientRect();
-            const next = (e.clientY - rect.top) / (rect.height) > 0.5;
+       treeContainer.addEventListener('dragover', e => {
+            e.preventDefault();
             
-            targetNode.style.borderTop = next ? '' : '2px solid #1890ff';
-            targetNode.style.borderBottom = next ? '2px solid #1890ff' : '';
-            targetNode.dataset.dropPos = next ? 'after' : 'before';
+            // ドロップ対象: ノード または 章ヘッダー
+            const targetNode = e.target.closest('.tree-node');
+            const targetHeader = e.target.closest('.tree-section-header');
+            
+            if (!draggedItem) return;
+
+            // A. ノードの上にいる場合
+            if (targetNode && targetNode !== draggedItem) {
+                const rect = targetNode.getBoundingClientRect();
+                const next = (e.clientY - rect.top) / (rect.height) > 0.5;
+                
+                targetNode.style.borderTop = next ? '' : '2px solid #1890ff';
+                targetNode.style.borderBottom = next ? '2px solid #1890ff' : '';
+                targetNode.dataset.dropPos = next ? 'after' : 'before';
+                
+                // ヘッダーのスタイルは消す
+                document.querySelectorAll('.tree-section-header').forEach(h => h.style.backgroundColor = '');
+            }
+            // B. 章ヘッダーの上にいる場合 (その章の末尾へ移動)
+            else if (targetHeader) {
+                // 自分自身の親セクションヘッダーでない場合のみハイライト
+                const sourceSectionId = draggedItem.closest('.tree-section').querySelector('.tree-section-header').dataset.id;
+                if (targetHeader.dataset.id !== sourceSectionId) {
+                    targetHeader.style.backgroundColor = '#d6e4ff';
+                }
+                
+                // ノードのスタイルは消す
+                document.querySelectorAll('.tree-node').forEach(el => {
+                    el.style.borderTop = '';
+                    el.style.borderBottom = '';
+                });
+            }
         });
         
         treeContainer.addEventListener('dragleave', e => {
@@ -371,27 +529,48 @@ export function initScenarioHandlers() {
                 targetNode.style.borderTop = '';
                 targetNode.style.borderBottom = '';
             }
+            const targetHeader = e.target.closest('.tree-section-header');
+            if (targetHeader) {
+                targetHeader.style.backgroundColor = '';
+            }
         });
 
         treeContainer.addEventListener('drop', e => {
             e.preventDefault();
+            
+            // スタイルリセット
+            document.querySelectorAll('.tree-node').forEach(el => {
+                el.style.borderTop = '';
+                el.style.borderBottom = '';
+            });
+            document.querySelectorAll('.tree-section-header').forEach(h => h.style.backgroundColor = '');
+
             const targetNode = e.target.closest('.tree-node');
-            if (!targetNode || !draggedItem || targetNode === draggedItem) return;
-
-            targetNode.style.borderTop = '';
-            targetNode.style.borderBottom = '';
-
-            const sourceSection = draggedItem.closest('.tree-section');
-            const targetSection = targetNode.closest('.tree-section');
+            const targetHeader = e.target.closest('.tree-section-header');
             
-            if (sourceSection !== targetSection) return;
+            if (!draggedItem) return;
 
+            const sourceSectionEl = draggedItem.closest('.tree-section');
+            const sourceSecId = sourceSectionEl.querySelector('.tree-section-header').dataset.id;
             const draggedId = draggedItem.dataset.id;
-            const targetId = targetNode.dataset.id;
-            const position = targetNode.dataset.dropPos || 'after';
-            const sectionId = targetSection.querySelector('.tree-section-header').dataset.id;
-            
-            reorderNodes(sectionId, draggedId, targetId, position);
+
+            // ケース1: ノード上にドロップ (挿入)
+            if (targetNode && targetNode !== draggedItem) {
+                const targetSecId = targetNode.closest('.tree-section').querySelector('.tree-section-header').dataset.id;
+                const targetId = targetNode.dataset.id;
+                const position = targetNode.dataset.dropPos || 'after';
+                
+                reorderNodes(sourceSecId, targetSecId, draggedId, targetId, position);
+            }
+            // ケース2: 章ヘッダー上にドロップ (末尾に追加)
+            else if (targetHeader) {
+                const targetSecId = targetHeader.dataset.id;
+                
+                // 自分の章へのドロップは無視（末尾移動ならアリだが、今回は誤操作防止のため変化なしとする）
+                if (sourceSecId !== targetSecId) {
+                    reorderNodes(sourceSecId, targetSecId, draggedId, null, 'after');
+                }
+            }
         });
     }
 }
