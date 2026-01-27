@@ -51,6 +51,15 @@
     border: 1px solid #aaa;
 }
 
+#map-3d-canvas {
+    position: absolute;
+    top: 20px;  /* map-canvasのマージンに合わせる */
+    left: 20px;
+    z-index: 0; /* 下層 */
+    pointer-events: none; /* クリックは通過させる */
+    display: none; /* 初期は非表示 */
+}
+
 #map-canvas {
     background: #fff;
     box-shadow: 0 0 10px rgba(0,0,0,0.3);
