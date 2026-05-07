@@ -327,13 +327,10 @@ function spawnPreviewParticle(forceBurst = false, rateMultiplier = 1.0) {
 
 // --- CRUD ---
 
-function generateId(prefix) {
-    return prefix + '_' + Date.now().toString(36) + '_' + Math.random().toString(36).substr(2, 5);
-}
 
 function createParticle() {
-    // ★変更: ランダムIDを使用
-    const id = generateId('fx');
+    // ★変更: state.jsの共通ID生成関数を使用する
+    const id = state.generateId('fx');
     const projectData = state.getProjectData();
     if (!projectData.particles) projectData.particles = {};
 
