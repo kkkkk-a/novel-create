@@ -130,12 +130,15 @@ export function initMapEditor() {
     });
 
     // オブジェクト設定フォームの変更検知
-    const objForm = document.getElementById('obj-settings-form');
+        const objForm = document.getElementById('obj-settings-form');
     objForm.addEventListener('change', (e) => {
         if (e.target.tagName === 'BUTTON') return;
+        
+        // ★修正: パラメータの数値を変更する前に、現在の状態を履歴(Undo用)に保存する
+        pushHistory();
+        
         syncDataFromForm();
     });
-
     // シナリオノードの選択肢更新が必要な項目
     document.getElementById('obj-spawn-id').addEventListener('change', () => {
          updateAllNodeSelects();
@@ -519,7 +522,22 @@ map.gravity = document.getElementById('map-gravity').value;
             const opt3d = typeSelect.querySelector('option[value="3d"]'); if (opt3d) opt3d.remove();
             map.type = 'topdown'; typeSelect.value = 'topdown';
         } else {
-            map.type = typeSelect.value;
+            const newType = typeSelect.value;
+            
+            // ★最適化: マップタイプが変更された時の自動クリーンアップ
+            if (map.type !== newType) {
+                if (newType !== 'side' && map.objects) {
+                    // 横スクロール(side)以外になった場合、ハシゴとジャンプ台をただの障害物に戻す
+                    map.objects.forEach(obj => {
+                        if (obj.roleType === 'ladder' || obj.roleType === 'jump') {
+                            obj.roleType = 'obstacle';
+                            obj.effectType = 'none';
+                            obj.isWall = true;
+                        }
+                    });
+                }
+            }
+            map.type = newType;
         }
     }
 
@@ -848,6 +866,38 @@ function syncDataFromForm() {
 
     // 3. 全ターゲットに対して適用ループ
     targets.forEach(t => {
+        // ★最適化: 役割(Role)が変更された場合、古い不要なデータ（幽霊ステータス）を完全に削除してバグを防ぐ
+        if (t.roleType && t.roleType !== role) {
+            if (role !== 'enemy') {
+                delete t.enemyId;
+                delete t.stamina;
+                delete t.aiPattern;
+                delete t.detectionRange;
+                delete t.territoryRange;
+                delete t.blastRadius;
+                delete t.blastDamageRate;
+            }
+            if (role !== 'item') {
+                delete t.itemId;
+                delete t.itemAmount;
+                delete t.itemPickup;
+            }
+            if (role === 'deco') {
+                // 装飾なら当たり判定やHPなどを一切持たせない
+                t.isWall = false;
+                delete t.hp;
+                delete t.damage;
+                delete t.defense;
+                delete t.penetration;
+                delete t.exp;
+                delete t.dropItemId;
+                delete t.dropRate;
+                delete t.attackRange;
+                delete t.attackCooldown;
+                delete t.projectileSpeed;
+            }
+        }
+
         // --- A. 基本情報 ---
         t.roleType = role;
 
@@ -1105,12 +1155,21 @@ function resizeMapCanvas() {
     }
 }
 
+let mapEditorAnimId = null;
+
 function drawMap() {
     if (!currentMapId) return;
     
     const projectData = state.getProjectData();
     const map = projectData.maps[currentMapId];
     const zoom = map.zoom || 1.0;
+
+    // ★最適化: 古いループをキャンセルして重複実行を防ぐ
+    if (mapEditorAnimId) {
+        cancelAnimationFrame(mapEditorAnimId);
+        mapEditorAnimId = null;
+    }
+    let hasAnimatedAssets = false; // アニメーションする素材があるかチェック用フラグ
 
     // 3Dキャンバスの表示制御
     const canvas3d = document.getElementById('map-3d-canvas');
@@ -1139,6 +1198,23 @@ function drawMap() {
     // 2Dキャンバスのリセットとクリア
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // 外側背景 (Sky/Outer) のエディタ上でのプレビュー描画
+    if (!map.stageModelId && map.bgOutsideId && projectData.assets.backgrounds[map.bgOutsideId]) {
+        const assetOut = projectData.assets.backgrounds[map.bgOutsideId];
+        if (!assetOut.data.startsWith('data:video')) {
+            let imgOut = imageCache[map.bgOutsideId];
+            if (!imgOut) {
+                imgOut = new Image();
+                imgOut.src = assetOut.data;
+                imageCache[map.bgOutsideId] = imgOut;
+            }
+            if (imgOut.complete && imgOut.naturalWidth !== 0) {
+                ctx.drawImage(imgOut, 0, 0, canvas.width, canvas.height);
+            }
+        }
+    }
+
     ctx.scale(zoom, zoom);
     
     // 背景描画
@@ -1171,11 +1247,8 @@ function drawMap() {
                     let srcX = 0, srcY = 0, srcW = img.width, srcH = img.height;
                     
                     if (cols > 1 || rows > 1) {
+                        hasAnimatedAssets = true; // ★追加: アニメーション背景あり
                         const frame = Math.floor(performance.now() / (1000 / fps)) % (cols * rows);
-                        srcW /= cols;
-                        srcH /= rows;
-                        srcX = (frame % cols) * srcW;
-                        srcY = Math.floor(frame / cols) * srcH;
                     }
                     
                     if (map.type === 'shooter') {
@@ -1320,6 +1393,9 @@ function drawMap() {
             if (img.complete && img.naturalWidth !== 0) {
                 const cols = asset.cols || 1;
                 const rows = asset.rows || 1;
+                
+                if (cols > 1 || rows > 1) hasAnimatedAssets = true; // ★追加: アニメーションキャラあり
+                
                 const srcW = img.width / cols;
                 const srcH = img.height / rows;
                 const frame = Math.floor(performance.now() / (1000 / (asset.fps || 12))) % (cols * rows);
@@ -1390,8 +1466,9 @@ function drawMap() {
         }
     });
     
-    // ループ再生
-    requestAnimationFrame(drawMap);
+if (hasAnimatedAssets) {
+        mapEditorAnimId = requestAnimationFrame(drawMap);
+    }
 }
 
 function getGridPos(e) { 
@@ -1433,24 +1510,25 @@ function handleCanvasDown(e) {
         
         drawMap();
     } else if (currentTool === 'pen') {
-        // ★★★ 修正ポイント: 配置直前に設定を強制同期 ★★★
-        // これにより「数値入力後、エンターを押さずに即クリック」しても
-        // 入力中の数値（高さなど）が penSettings に反映されます。
-        // 引数の true は「ここでは履歴保存しない（配置処理側でするため）」という意味です。
         syncDataFromForm(true); 
-
         pushHistory();
-        const idx = map.objects.findIndex(o => o.x === x && o.y === y); if (idx !== -1) map.objects.splice(idx, 1);
         
-        // 最新の penSettings を使ってオブジェクト生成
-        const newObj = JSON.parse(JSON.stringify(penSettings)); 
-        newObj.id = `obj_${Date.now()}_${Math.random()}`; 
-        newObj.x = x; 
-        newObj.y = y;
+        // 完全に同一の要素(座標と高さ、Role)がある場合のみ重複とみなし、重ね置きを許可する
+        const isExactDuplicate = map.objects.some(o => 
+            o.x === x && o.y === y && o.z === penSettings.z && o.roleType === penSettings.roleType
+        );
         
-        map.objects.push(newObj); 
-        drawMap();
+        if (!isExactDuplicate) {
+            const newObj = JSON.parse(JSON.stringify(penSettings)); 
+            newObj.id = `obj_${Date.now()}_${Math.random()}`; 
+            newObj.x = x; 
+            newObj.y = y;
+            
+            map.objects.push(newObj); 
+            drawMap();
+        }
     } else if (currentTool === 'erase') {
+
         pushHistory();
         const idx = map.objects.findIndex(o => o.x === x && o.y === y); if (idx !== -1) { 
             map.objects.splice(idx, 1); 
@@ -1474,8 +1552,14 @@ function handleCanvasMove(e) {
     } 
     else if (currentTool === 'pen') {
         if (x < 0 || x >= map.width || y < 0 || y >= map.height) return;
-        const isDuplicate = map.objects.some(o => o.x === x && o.y === y);
-        if (!isDuplicate) { const newObj = JSON.parse(JSON.stringify(penSettings)); newObj.id = `obj_${Date.now()}_${Math.random()}`; newObj.x = x; newObj.y = y; map.objects.push(newObj); drawMap(); }
+        const isDuplicate = map.objects.some(o => o.x === x && o.y === y && o.z === penSettings.z && o.roleType === penSettings.roleType);
+        if (!isDuplicate) { 
+            const newObj = JSON.parse(JSON.stringify(penSettings)); 
+            newObj.id = `obj_${Date.now()}_${Math.random()}`; 
+            newObj.x = x; newObj.y = y; 
+            map.objects.push(newObj); 
+            drawMap(); 
+        }
     } else if (currentTool === 'erase') {
         if (x < 0 || x >= map.width || y < 0 || y >= map.height) return;
         const idx = map.objects.findIndex(o => o.x === x && o.y === y); if (idx !== -1) { map.objects.splice(idx, 1); drawMap(); }
