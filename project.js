@@ -1,18 +1,64 @@
-
-
-// project.js (Interval Control Version)
+// project.js (IndexedDB AutoSave Version)
 
 import * as state from './state.js';
 import * as ui from './ui.js';
-import { pixelsToWebPDataURL } from './utils.js'; 
 import { resetMapEditor } from './mapEditor.js';
 
 // 自動保存用の状態変数
-let autoSaveHandle = null;
 let autoSaveIntervalId = null;
+let isAutoSaving = false; // ロック用フラグ
+
+// --- ★最適化: エディタ用の IndexedDB ヘルパー ---
+const DB_NAME = 'NovelEditorDB';
+const STORE_NAME = 'editor_backups';
+const DB_VERSION = 1;
+
+function openEditorDB() {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open(DB_NAME, DB_VERSION);
+        request.onupgradeneeded = (e) => {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains(STORE_NAME)) {
+                db.createObjectStore(STORE_NAME);
+            }
+        };
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+    });
+}
+
+async function saveBackupToDB(key, data) {
+    const db = await openEditorDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        
+        // ★最適化: IndexedDBの容量制限(QuotaExceededError)やトランザクションの強制終了を確実にキャッチする
+        tx.onabort = (e) => {
+            const err = tx.error || new Error("保存処理がブラウザによって中断されました。容量不足の可能性があります。");
+            reject(err);
+        };
+        
+        const request = store.put(data, key);
+        request.onsuccess = () => resolve();
+        request.onerror = (e) => reject(request.error || e.target.error);
+    });
+}
+
+
+async function loadBackupFromDB(key) {
+    const db = await openEditorDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, 'readonly');
+        const store = tx.objectStore(STORE_NAME);
+        const request = store.get(key);
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+    });
+}
 
 /**
- * 現在のプロジェクトデータをJSONファイルとして手動保存する
+ * 現在のプロジェクトデータをJSONファイルとして手動保存(ダウンロード)する
  */
 function saveProject() {
     try {
@@ -50,40 +96,22 @@ function saveProject() {
 }
 
 /**
- * File System Access API を使用して自動保存を開始する
+ * IndexedDB を使用してブラウザ内部に自動保存を開始する
  */
 async function startAutoSave() {
-    // ブラウザ対応チェック
-    if (!('showSaveFilePicker' in window)) {
-        // ▼▼▼ 修正: 具体的でわかりやすいメッセージに変更 ▼▼▼
-        alert(
-            "【非対応ブラウザです】\n\n" +
-            "自動保存機能は、セキュリティの仕様上\n" +
-            "以下のPC版ブラウザでのみ動作します。\n\n" +
-            "✅ Google Chrome\n" +
-            "✅ Microsoft Edge\n" +
-            "✅ Opera\n\n" +
-            "※Firefox, Safari(iPhone/Mac), IE等では使用できません。\n" +
-            "手動での「保存」をご利用ください。"
-        );
-        // ▲▲▲ 修正ここまで ▲▲▲
-        return;
-    }
-
-    // ★追加: 設定された間隔を取得
     const intervalInput = document.getElementById('autosave-interval-input');
     let minutes = 5;
     if (intervalInput) {
         const val = parseInt(intervalInput.value, 10);
         if (!isNaN(val) && val > 0) {
             minutes = val;
+            localStorage.setItem('autosave_interval_minutes', minutes);
         } else {
-            intervalInput.value = 5; // 不正値ならリセット
+            intervalInput.value = 5; 
         }
     }
     const intervalMs = minutes * 60 * 1000;
 
-    // すでに実行中の場合は停止確認
     if (autoSaveIntervalId) {
         if (!confirm(`自動保存は既に有効です。設定を変更して再開しますか？\n(設定間隔: ${minutes}分)`)) {
             return;
@@ -92,64 +120,45 @@ async function startAutoSave() {
     }
 
     try {
-        const now = new Date();
-        const defaultName = `autosave_${now.getFullYear()}${String(now.getMonth()+1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}.json`;
+        // 1. 初回の保存を実行
+        await performAutoSave();
 
-        // 1. 保存先ファイルを選択させる（ユーザー許可）
-        autoSaveHandle = await window.showSaveFilePicker({
-            suggestedName: defaultName,
-            types: [{
-                description: 'Project JSON File',
-                accept: { 'application/json': ['.json'] },
-            }],
-        });
-
-        // 2. 初回の保存を実行
-        await performAutoSaveToHandle(autoSaveHandle);
-
-        // 3. 定期実行タイマーをセット (可変間隔)
+        // 2. 定期実行タイマーをセット (可変間隔)
         autoSaveIntervalId = setInterval(async () => {
-            await performAutoSaveToHandle(autoSaveHandle);
+            await performAutoSave();
         }, intervalMs);
 
-        // UI更新
         updateAutoSaveStatusUI(true);
-        alert(`自動保存を開始しました。\n\n保存先: ${autoSaveHandle.name}\n間隔: ${minutes}分ごと\n\n※このタブを開いている間のみ有効です。`);
+        alert(`ブラウザ内部への自動保存を開始しました。\n\n間隔: ${minutes}分ごと\n\n※万が一ブラウザがフリーズしても、次回起動時に「読込」から復元できます。`);
 
     } catch (err) {
-        if (err.name !== 'AbortError') {
-            console.error("自動保存の開始に失敗:", err);
-            alert("自動保存のセットアップに失敗しました。");
-        }
+        console.error("自動保存の開始に失敗:", err);
+        alert("自動保存のセットアップに失敗しました。");
     }
 }
 
 /**
- * 保持しているハンドルに対してデータを上書き保存する
+ * データベースにプロジェクトデータを上書き保存する
  */
-let isAutoSaving = false; // ★追加: ロック用フラグ
+async function performAutoSave() {
+    if (isAutoSaving) return; 
 
-async function performAutoSaveToHandle(handle) {
-    if (!handle) return;
-    if (isAutoSaving) return; // ★追加: 実行中ならスキップ
-
-    isAutoSaving = true; // ロック開始
-
+    isAutoSaving = true; 
 
     try {
         const statusIndicator = document.getElementById('autosave-status-text');
         if (statusIndicator) statusIndicator.textContent = "保存中...";
 
+        // プロジェクトデータのコピー（JSON化は不要、そのままDBに入れられるのがIndexedDBの強み）
+        // ※ Structured Clone エラーを防ぐため、念のためJSON経由でディープコピーする
         const projectData = state.getProjectData();
-        const jsonString = JSON.stringify(projectData, null, 2);
+        const cleanData = JSON.parse(JSON.stringify(projectData));
 
-        // WritableStreamを作成して書き込む
-        const writable = await handle.createWritable();
-        await writable.write(jsonString);
-        await writable.close();
+        // DBに書き込む
+        await saveBackupToDB('latest_backup', cleanData);
 
         const timeStr = new Date().toLocaleTimeString();
-        console.log(`[AutoSave] Saved to ${handle.name} at ${timeStr}`);
+        console.log(`[AutoSave] Backup saved at ${timeStr}`);
         
         if (statusIndicator) {
             statusIndicator.textContent = `最終保存: ${timeStr}`;
@@ -159,9 +168,9 @@ async function performAutoSaveToHandle(handle) {
     } catch (err) {
         console.error("[AutoSave] Write Error:", err);
         stopAutoSave();
-        alert(`自動保存に失敗しました。\n保存先の権限が失われた可能性があります。\n\nエラー: ${err.message}`);
+        alert(`自動保存に失敗しました。\n素材が多すぎてブラウザの容量制限に引っかかった可能性があります。\n手動で「保存」(JSONダウンロード) を行ってください。\n\nエラー: ${err.message}`);
     } finally {
-        isAutoSaving = false; // ★追加: 必ずロック解除
+        isAutoSaving = false; 
     }
 }
 
@@ -173,7 +182,6 @@ function stopAutoSave() {
         clearInterval(autoSaveIntervalId);
         autoSaveIntervalId = null;
     }
-    autoSaveHandle = null;
     updateAutoSaveStatusUI(false);
 }
 
@@ -183,7 +191,7 @@ function stopAutoSave() {
 function updateAutoSaveStatusUI(isActive) {
     const btn = document.getElementById('toggle-autosave-btn');
     const statusText = document.getElementById('autosave-status-text');
-    const intervalInput = document.getElementById('autosave-interval-input'); // ★追加
+    const intervalInput = document.getElementById('autosave-interval-input');
     
     if (btn) {
         if (isActive) {
@@ -193,7 +201,7 @@ function updateAutoSaveStatusUI(isActive) {
             btn.style.color = '#1890ff';
             btn.style.borderColor = '#1890ff';
             
-            // ★実行中は間隔を変更できないようにロックする
+            // 実行中は間隔を変更できないようにロックする
             if(intervalInput) intervalInput.disabled = true;
         } else {
             btn.innerHTML = "自動保存<br>OFF";
@@ -202,7 +210,7 @@ function updateAutoSaveStatusUI(isActive) {
             btn.style.color = '';
             btn.style.borderColor = '';
             
-            // ★停止中は変更可能にする
+            // 停止中は変更可能にする
             if(intervalInput) intervalInput.disabled = false;
         }
     }
@@ -213,7 +221,7 @@ function updateAutoSaveStatusUI(isActive) {
 }
 
 /**
- * ファイル読み込み処理 (既存)
+ * ファイル読み込み処理 (JSONから)
  */
 function loadProject(event) {
     const file = event.target.files[0];
@@ -241,28 +249,6 @@ function loadProject(event) {
 
             if (!newData.maps) newData.maps = {};
 
-            const assetTypes = ['characters', 'backgrounds', 'sounds'];
-            const assetData = newData.assets;
-            const defaultQuality = newData.settings && newData.settings.quality ? newData.settings.quality : 85; 
-            
-            for (const type of assetTypes) {
-                if (!assetData[type]) continue;
-                for (const id in assetData[type]) {
-                    const asset = assetData[type][id];
-                    if (asset.isSpriteSheet === true && Array.isArray(asset.pixelData) && asset.width && asset.height) {
-                        const webPDataUrl = pixelsToWebPDataURL(asset.pixelData, asset.width, asset.height, defaultQuality);
-                        assetData[type][id] = {
-                            name: asset.name || id,
-                            data: webPDataUrl, 
-                            cols: asset.cols || 1,
-                            rows: asset.rows || 1,
-                            fps: asset.fps || 12,
-                            loop: asset.loop !== undefined ? asset.loop : true
-                        };
-                    }
-                }
-            }
-
             state.setProjectData(newData);
             state.setActiveSectionId(null);
             state.setActiveNodeId(null);
@@ -274,7 +260,7 @@ function loadProject(event) {
             }
             resetMapEditor();
             
-            // ロード時に自動保存は停止する
+            // ロード時に自動保存は一旦停止する（別プロジェクトの上書き防止）
             stopAutoSave();
             
             alert(`プロジェクト「${file.name}」を読み込みました。`);
@@ -293,14 +279,70 @@ export function initProjectHandlers() {
     const saveButton = document.getElementById('save-project-btn');
     const loadButton = document.getElementById('load-project-btn');
     const loadInput = document.getElementById('load-project-input');
-    
-    // 自動保存ボタン
     const autoSaveButton = document.getElementById('toggle-autosave-btn');
+    
+    // ローカルストレージから自動保存間隔を復元
+    const intervalInput = document.getElementById('autosave-interval-input');
+    if (intervalInput) {
+        const savedInterval = localStorage.getItem('autosave_interval_minutes');
+        if (savedInterval) {
+            intervalInput.value = savedInterval;
+        }
+        intervalInput.addEventListener('change', (e) => {
+            const val = parseInt(e.target.value, 10);
+            if (!isNaN(val) && val > 0) {
+                localStorage.setItem('autosave_interval_minutes', val);
+                // 実行中なら再スタートして間隔を適用
+                if (autoSaveIntervalId) startAutoSave();
+            }
+        });
+    }
 
     if(saveButton) saveButton.addEventListener('click', saveProject);
     
+    // ★最適化: 読込ボタンを押した時の動作を安全に（キャンセル＝中止）
     if(loadButton && loadInput) {
-        loadButton.addEventListener('click', () => loadInput.click());
+        loadButton.addEventListener('click', async () => {
+            // ダイアログではなく、専用の確認プロンプトを使って意図しない動作を防ぐ
+            const choice = prompt(
+                "📂 プロジェクトを読み込みます。\nどちらから読み込みますか？\n\n" +
+                "【1】パソコン内のファイル(.json)から読み込む\n" +
+                "【2】ブラウザの自動保存バックアップから復元する\n\n" +
+                "※半角数字の 1 または 2 を入力してください。\n(空白やキャンセルで中止します)",
+                "1"
+            );
+            
+            if (choice === "1") {
+                // ファイルから読み込む
+                loadInput.click();
+            } else if (choice === "2") {
+                // バックアップからの復元処理
+                try {
+                    const backupData = await loadBackupFromDB('latest_backup');
+                    if (!backupData) {
+                        alert("バックアップデータが見つかりません。");
+                        return;
+                    }
+                    if (confirm("前回の自動保存データを復元しますか？\n(現在の編集中のデータはすべて上書きされます)")) {
+                        state.setProjectData(backupData);
+                        state.setActiveSectionId(null);
+                        state.setActiveNodeId(null);
+                        ui.renderAll();
+                        ui.initUISettings();
+                        if (window.threeHandler) window.threeHandler.resetEditorAssetLoader();
+                        resetMapEditor();
+                        stopAutoSave();
+                        alert("バックアップからプロジェクトを復元しました！");
+                    }
+                } catch (e) {
+                    console.error(e);
+                    alert("バックアップの復元に失敗しました。");
+                }
+            } else {
+                // キャンセル、または無効な入力
+                return;
+            }
+        });
         loadInput.addEventListener('change', loadProject);
     }
 
