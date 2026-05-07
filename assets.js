@@ -1,6 +1,5 @@
 import * as state from './state.js';
 import * as ui from './ui.js';
-import { pixelsToWebPDataURL } from './utils.js';
 
 async function processFiles(files, type, acceptString) {
     if (!files || files.length === 0) return;
@@ -38,7 +37,10 @@ async function processFiles(files, type, acceptString) {
 
                 const resources = {};
                 textureResults.forEach(res => {
-                    resources[res.name] = res.data;
+                    // ★修正: Mac/Windowsでのパスの違いや、大文字・小文字の違いによる
+                    // テクスチャの読み込み失敗(真っ白になるバグ)を防ぐため、ファイル名だけを小文字で抽出して保存する
+                    let safeName = res.name.split('\\').pop().split('/').pop().toLowerCase();
+                    resources[safeName] = res.data;
                 });
 
                 const projectData = state.getProjectData();
@@ -78,28 +80,70 @@ async function processFiles(files, type, acceptString) {
         // JSON処理 (スプライトシート)
         if (fileExtension === 'json') {
             const reader = new FileReader();
-            reader.onload = (event) => {
+            reader.onload = async (event) => {
                 try {
                     const json = JSON.parse(event.target.result);
-                    if (json.pixels && Array.isArray(json.pixels) && json.width && json.height) {
+                    
+                    // スプライトキャンバス v2形式 (レイヤーデータがある場合)
+                    if (json.version >= 2 && json.layers && Array.isArray(json.layers) && json.width && json.height) {
+                        
+                        // レイヤーを合成するためのオフスクリーンキャンバスを準備
+                        const tempCanvas = document.createElement('canvas');
+                        tempCanvas.width = json.width;
+                        tempCanvas.height = json.height;
+                        const tempCtx = tempCanvas.getContext('2d');
+                        
+                        // CSSのblendModeをCanvas用に変換するマッピング
+                        const blendMap = {
+                            'normal': 'source-over', 'multiply': 'multiply', 'screen': 'screen',
+                            'overlay': 'overlay', 'lighten': 'lighten', 'darken': 'darken', 'source-over': 'source-over'
+                        };
+
+                        // 各レイヤーの画像を読み込んで順番に合成
+                        for (const layer of json.layers) {
+                            if (layer.visible === false || !layer.image) continue;
+                            
+                            await new Promise((resolve) => {
+                                const img = new Image();
+                                img.onload = () => {
+                                    tempCtx.save();
+                                    tempCtx.globalAlpha = (layer.opacity !== undefined) ? layer.opacity : 1.0;
+                                    tempCtx.globalCompositeOperation = blendMap[layer.blendMode] || 'source-over';
+                                    tempCtx.drawImage(img, 0, 0);
+                                    tempCtx.restore();
+                                    resolve();
+                                };
+                                img.onerror = resolve; // エラーでも止まらないように
+                                img.src = layer.image;
+                            });
+                        }
+
+                        // 合成結果を WebP 化 (品質85%)
+                        const mergedDataUrl = tempCanvas.toDataURL('image/webp', 0.85);
+
                         const id = `${type.slice(0, -1)}_${Date.now()}_${Math.floor(Math.random()*1000)}`;
                         const projectData = state.getProjectData();
-                        const webPDataUrl = pixelsToWebPDataURL(json.pixels, json.width, json.height, 85); 
                         
                         projectData.assets[type][id] = { 
-                            name: file.name, // ★修正: 拡張子(.json)を消さずにそのまま使う
-                            data: webPDataUrl, 
+                            name: file.name,
+                            data: mergedDataUrl, 
                             isSpriteSheet: true,
-                            width: json.width, height: json.height,
-                            cols: json.cols || 1, rows: json.rows || 1, fps: json.fps || 12, loop: json.loop !== undefined ? json.loop : true
+                            width: json.width, 
+                            height: json.height,
+                            cols: json.cols || 1, 
+                            rows: json.rows || 1, 
+                            fps: json.fps || 12, 
+                            loop: (json.loop !== undefined) ? json.loop : true
                         };
+                        
                         ui.renderAssetList(type); 
                         ui.updateAssetDropdowns();
-                        alert(`アニメーションJSON「${file.name}」を読み込みました！`);
+                        alert(`アニメーションJSON「${file.name}」を合成して読み込みました！`);
+                        
                     } else { 
-                        console.warn(`Invalid JSON structure: ${file.name}`);
+                        console.warn(`対応していないJSON形式です: ${file.name}`);
                     }
-                } catch(err) { console.error(`JSON Error: ${file.name}`, err); }
+                } catch(err) { console.error(`JSON Load Error: ${file.name}`, err); }
             };
             reader.readAsText(file);
             continue;
@@ -266,7 +310,7 @@ function checkAssetUsage(id, type) {
         }
     }
 
-    // 3. プレイヤー設定 (Player)
+// 3. プレイヤー設定 (Player)
     const p = projectData.player || {};
     if ((type === 'characters' && [p.imageId, p.imageIdMove, p.imageIdAttack, p.imageIdDamage, p.imageIdJump].includes(id)) ||
         (type === 'models' && p.modelId === id) ||
@@ -293,10 +337,23 @@ function checkAssetUsage(id, type) {
                 (type === 'models' && enemy.modelId === id)) {
                 usage.push(`・エネミー[${enemy.name}]`);
             }
+            // ★追加: エネミーのヒットパーティクルに使用されているか
+            if (type === 'particles' && enemy.hitParticleId === id) {
+                usage.push(`・エネミー[${enemy.name}] のヒットエフェクト`);
+            }
+        }
+    }
+
+    // ★追加 6. パーティクル・エフェクト (Particles)
+    if (projectData.particles && type === 'particles') {
+        for (const pId in projectData.particles) {
+            if (id === pId) {
+                // パーティクル自体は別管理だが、将来的に画像素材をパーティクルに組み込む場合などの拡張用
+            }
         }
     }
     
-    // 6. システム設定 (Settings)
+    // 7. システム設定 (Settings)
     const s = projectData.settings || {};
     if (type === 'backgrounds' && (s.windowImage === id || s.buttonImage === id || s.titleImage === id || s.favicon === id)) {
         usage.push(`・システムUI設定`);
@@ -305,7 +362,6 @@ function checkAssetUsage(id, type) {
     return [...new Set(usage)]; // 重複を除去して返す
 }
 
-// ★修正: 既存の handleAssetDelete を書き換え
 function handleAssetDelete(e) {
     const { id, type } = e.target.dataset;
     if (!id || !type) return;
@@ -320,7 +376,8 @@ function handleAssetDelete(e) {
     if (usage.length > 0) {
         const displayList = usage.slice(0, 10).join("\n");
         const more = usage.length > 10 ? `\n...他 ${usage.length - 10} 箇所` : "";
-        confirmMsg = `⚠️ 警告: この素材は以下の場所で使用されています！\n削除すると表示エラーやリンク切れが発生します。\n\n${displayList}${more}\n\nそれでも本当に削除しますか？`;
+        // 警告文に「自動で空欄にリセットされる」旨を追加
+        confirmMsg = `⚠️ 警告: この素材は以下の場所で使用されています！\n\n${displayList}${more}\n\n本当に削除しますか？\n※使用されていた箇所（ノードやマップの設定）は、自動的に「なし（空欄）」にリセットされます。`;
     } else {
         confirmMsg = `この素材を削除しますか？\n(現在のプロジェクト内では使用されていないようです)`;
     }
@@ -329,9 +386,110 @@ function handleAssetDelete(e) {
         if (type === 'models' && window.threeHandler?.unloadModel) {
             window.threeHandler.unloadModel(id);
         }
+        
+        // --- ★追加: 全データから該当IDを消し去る（クリーンアップ） ---
+        const cleanUpID = (obj, key) => { if (obj[key] === id) obj[key] = ''; };
+        const cleanUpArray = (arr, key) => { 
+            if(Array.isArray(arr)) {
+                for (let i = arr.length - 1; i >= 0; i--) {
+                    if (arr[i][key] === id) arr[i][key] = '';
+                }
+            }
+        };
+
+        // 1. シナリオの掃除
+        if (projectData.scenario && projectData.scenario.sections) {
+            for (const secId in projectData.scenario.sections) {
+                const section = projectData.scenario.sections[secId];
+                for (const nodeId in section.nodes) {
+                    const node = section.nodes[nodeId];
+                    if (type === 'backgrounds') cleanUpID(node, 'backgroundId');
+                    if (type === 'sounds') { cleanUpID(node, 'bgmId'); cleanUpID(node, 'soundId'); }
+                    
+                    // 2Dキャラのクリーンアップ
+                    if (type === 'characters' && node.characters) {
+                        for (let i = node.characters.length - 1; i >= 0; i--) {
+                            const c = node.characters[i];
+                            // キャラ画像そのものが消えたら、その設定枠ごと削除する
+                            if (c.characterId === id) {
+                                node.characters.splice(i, 1);
+                            } else if (c.maskId === id) {
+                                c.maskId = ''; // マスクだけなら空欄に戻す
+                            }
+                        }
+                    }
+                    
+                    // ★最適化: 3Dキャラのクリーンアップ（モデルが消えたら、付随する表情や座標もすべて消去する）
+                    if (type === 'models' && node.characters3d) {
+                        for (let i = node.characters3d.length - 1; i >= 0; i--) {
+                            if (node.characters3d[i].modelId === id) {
+                                // モデルIDが一致したら、その設定枠(オブジェクト)を丸ごと配列から削除
+                                node.characters3d.splice(i, 1);
+                            }
+                        }
+                    }
+                    
+                    // アニメーションだけが消された場合は空欄に戻す
+                    if (type === 'animations' && node.characters3d) {
+                        cleanUpArray(node.characters3d, 'animationId');
+                    }
+                    
+                    // UIの上書き設定なども掃除
+                    if (node.uiStyle) { cleanUpID(node.uiStyle, 'imageId'); }
+                }
+            }
+        }
+
+        // 2. マップの掃除
+        if (projectData.maps) {
+            for (const mapId in projectData.maps) {
+                const map = projectData.maps[mapId];
+                if (type === 'backgrounds') { cleanUpID(map, 'bgImageId'); cleanUpID(map, 'bgOutsideId'); }
+                if (type === 'sounds') cleanUpID(map, 'bgmId');
+                if (type === 'models') cleanUpID(map, 'stageModelId');
+                
+                if (map.objects) {
+                    map.objects.forEach(obj => {
+                        if (type === 'characters') { cleanUpID(obj, 'charId'); cleanUpID(obj, 'charIdMove'); cleanUpID(obj, 'charIdAttack'); cleanUpID(obj, 'charIdDamage'); }
+                        if (type === 'models') cleanUpID(obj, 'modelId');
+                    });
+                }
+            }
+        }
+
+        // 3. システム・プレイヤーの掃除
+        const p = projectData.player || {};
+        if (type === 'characters') { cleanUpID(p, 'imageId'); cleanUpID(p, 'imageIdMove'); cleanUpID(p, 'imageIdAttack'); cleanUpID(p, 'imageIdDamage'); cleanUpID(p, 'imageIdJump'); }
+        if (type === 'models') cleanUpID(p, 'modelId');
+        if (type === 'animations') { cleanUpID(p, 'animIdIdle'); cleanUpID(p, 'animIdMove'); cleanUpID(p, 'animIdAttack'); cleanUpID(p, 'animIdDamage'); cleanUpID(p, 'animIdJump'); }
+
+        const s = projectData.settings || {};
+        if (type === 'backgrounds') { cleanUpID(s, 'windowImage'); cleanUpID(s, 'buttonImage'); cleanUpID(s, 'titleImage'); cleanUpID(s, 'favicon'); }
+
+        // 4. アイテム・エネミーの掃除
+        if (projectData.items && type === 'characters') {
+            for (const iId in projectData.items) cleanUpID(projectData.items[iId], 'iconImage');
+        }
+        if (projectData.items && type === 'sounds') {
+            for (const iId in projectData.items) if (projectData.items[iId].effects) cleanUpID(projectData.items[iId].effects, 'sound');
+        }
+        if (projectData.enemies) {
+            for (const eId in projectData.enemies) {
+                const e = projectData.enemies[eId];
+                if (type === 'characters') { cleanUpID(e, 'imageId'); cleanUpID(e, 'imageIdMove'); cleanUpID(e, 'imageIdAttack'); cleanUpID(e, 'imageIdDamage'); }
+                if (type === 'models') cleanUpID(e, 'modelId');
+                if (type === 'particles') cleanUpID(e, 'hitParticleId');
+            }
+        }
+
+        // --- クリーンアップ完了、アセットを削除 ---
         delete projectData.assets[type][id];
+        
+        // UIの再描画
         ui.renderAssetList(type);
         ui.updateAssetDropdowns();
+        // 現在開いているノードエディタなども再描画して、画面上からゴミを消す
+        ui.updateAllNodeSelects();
     }
 }
 
