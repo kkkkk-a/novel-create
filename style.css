@@ -20,7 +20,10 @@ body {
     color: var(--primary-text-color);
     font-size: 14px;
     line-height: 1.5;
-    overflow-x: hidden; /* 全体の横スクロール防止 */
+    overflow-x: hidden; 
+    /* ★最適化: スマホの「引っ張って更新」やスワイプ戻るをブラウザレベルで禁止する */
+    overscroll-behavior-y: none;
+    overscroll-behavior-x: none;
 }
 
 h2, h3, h4 { margin: 0; }
@@ -1057,22 +1060,24 @@ input[type="text"]:focus, select:focus, textarea:focus { border-color: var(--pri
         display: none;
     }
 
-    /* --- 詳細を開いた時 (.mobile-active-editor): リストを隠し、エディタを表示 --- */
+/* --- 詳細を開いた時 (.mobile-active-editor): リストを隠し、エディタを表示 --- */
     /* アイテム管理 */
     .mobile-active-editor #item-list-panel { display: none; }
     .mobile-active-editor #item-editor-panel { display: block; }
     
-    /* エネミー管理 (★ここが不足していました) */
+    /* エネミー管理 */
     .mobile-active-editor #enemy-list-panel { display: none; }
     .mobile-active-editor #enemy-editor-panel { display: block; }
 
-        .mobile-active-editor #particle-list-panel { display: none; }
+    /* エフェクト(パーティクル)管理 */
+    .mobile-active-editor #particle-list-panel { display: none; }
     .mobile-active-editor #particle-editor-panel { display: block; }
 
     /* --- ヘッダーの切り替え --- */
     /* スマホ用ヘッダー(戻るボタン)を表示 */
+    /* ★修正: カンマ(,) が抜けているとCSSが機能しないため修正しました */
     #item-mobile-header, 
-    #enemy-mobile-header 
+    #enemy-mobile-header,
     #particle-mobile-header {
         display: flex !important; 
     }
