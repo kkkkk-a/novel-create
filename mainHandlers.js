@@ -19,6 +19,20 @@ function switchMode(newMode) {
     
     // マップモードの処理
     if (newMode === 'map') {
+        // ★最適化: 他のタブ(シナリオ等)で3Dプレビューを使用していた場合、カメラやモデルが競合するため強制リセットする
+        if (window.threeHandler) {
+            if (window.threeHandler.clearAll) window.threeHandler.clearAll();
+            
+            // ★最適化: 3Dプレビュー後にカメラが迷子になるのを防ぐため、位置と角度を初期化する
+            if (window.threeHandler.camera) {
+                window.threeHandler.camera.position.set(0, 1.3, 3.0);
+                window.threeHandler.camera.rotation.set(0, 0, 0);
+            }
+            if (window.threeHandler.tpsCameraState) {
+                window.threeHandler.tpsCameraState.zoomLevel = 1.0;
+            }
+        }
+
         const mapCanvas3d = document.getElementById('map-3d-canvas');
         
         if (mapCanvas3d) {
