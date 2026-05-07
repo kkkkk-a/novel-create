@@ -64,11 +64,7 @@ export function initEnemyHandlers() {
     inputs.forEach(id => {
         const el = document.getElementById(id);
         if (el) {
-            if (el.tagName === 'INPUT' && el.type === 'text') {
-                el.addEventListener('input', syncEnemyData);
-            } else {
-                el.addEventListener('change', syncEnemyData);
-            }
+            el.addEventListener('change', syncEnemyData);
         }
     });
 }
