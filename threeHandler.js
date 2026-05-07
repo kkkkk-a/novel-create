@@ -67,12 +67,19 @@ export async function ensureEditorAssetsAreLoaded() {
 }
 
 export function init(canvas) {
-    // 既存のループがあれば止める
     stopRendering(); 
     
+    // ★追加: 既にエンジンが起動している場合は作り直さず、再利用する（クラッシュ防止）
+    if (renderer && renderer.domElement === canvas) {
+        hideAllModels(); // 表示を一旦リセット
+        onResize(canvas.clientWidth, canvas.clientHeight);
+        startRendering();
+        return;
+    }
+
     if (renderer) {
-        // 既存のレンダラーがあれば破棄 (念のため)
         renderer.dispose();
+        if (renderer.forceContextLoss) renderer.forceContextLoss(); // メモリを強制解放
     }
 
     scene = new THREE.Scene();
@@ -96,7 +103,6 @@ export function init(canvas) {
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     
-    // ★修正: animate() を直接呼ばず、startRendering() を呼ぶ
     startRendering();
 }
 
@@ -209,7 +215,13 @@ export function showModel(id, config = {}) {
                 vrm.expressionManager.resetValues();
                 if (config.expression) vrm.expressionManager.setValue(config.expression, 1.0);
             }
-            if (vrm.springBoneManager) vrm.springBoneManager.reset();
+            
+            // ★最適化: 物理演算（髪・服の揺れ）が瞬間移動で爆発するのを防ぐため、
+            // 位置が決まった直後に一度だけリセットをかける
+            if (vrm.springBoneManager) {
+                vrm.scene.updateMatrixWorld(true); // 世界座標を確定
+                vrm.springBoneManager.reset();     // その場で静止させる
+            }
         }
     }
 }
@@ -256,7 +268,13 @@ export function hideAllModels() {
         if (models[key] !== currentStageModel && models[key] !== currentPlayerModel) {
             models[key].visible = false;
             const vrm = vrms[key];
-            if (vrm && vrm.expressionManager) vrm.expressionManager.resetValues();
+            if (vrm && vrm.expressionManager) {
+                vrm.expressionManager.resetValues();
+            }
+            // ★最適化: 非表示になった瞬間に物理演算を止める（裏で計算が荒ぶるのを防ぐ）
+            if (vrm && vrm.springBoneManager) {
+                vrm.springBoneManager.reset();
+            }
         }
     }
     mixers = [];
