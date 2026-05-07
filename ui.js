@@ -51,7 +51,7 @@ const elements = {
     closeHelpBtn: document.querySelector('.close-modal')
 };
 
-// --- Helper Functions (Defined before they are used) ---
+// ★最適化: ノード選択UIの改善（章ごとの絞り込み機能の強化）
 export function createLinkedSelects(container, selectId, currentValue, options = {}) {
     if (!container) return; 
     container.innerHTML = ''; 
@@ -65,15 +65,17 @@ export function createLinkedSelects(container, selectId, currentValue, options =
         return;
     }
     
-    // 1. 章（セクション）選択プルダウン作成
+    // 1. UIを囲むコンテナのスタイリング
+    container.style.cssText = 'display: flex; flex-direction: column; gap: 5px;';
+
+    // 2. 章（セクション）選択プルダウン作成
     const sectionSelect = document.createElement('select');
     sectionSelect.className = 'section-filter-select';
-    sectionSelect.style.cssText = 'margin-bottom:5px; background-color:#f0f8ff; width:100%;';
+    sectionSelect.style.cssText = 'background-color:#f0f8ff; border:1px solid #1890ff; color:#0050b3; font-weight:bold;';
 
-    // 2. ノード選択プルダウン作成
+    // 3. ノード選択プルダウン作成
     const nodeSelect = document.createElement('select');
     if (selectId) nodeSelect.id = selectId;
-    nodeSelect.style.width = '100%';
     
     // データセット（メタデータ）の適用
     if (options) {
@@ -85,7 +87,6 @@ export function createLinkedSelects(container, selectId, currentValue, options =
     // --- 初期セクション決定ロジック ---
     let targetSectionId = null;
 
-    // A. 現在設定されている値(currentValue)から逆引き
     if (currentValue) {
         for (const secId in sections) {
             if (sections[secId].nodes[currentValue]) {
@@ -94,30 +95,21 @@ export function createLinkedSelects(container, selectId, currentValue, options =
             }
         }
     }
-    
-    // B. 見つからない（または未設定）場合は、リストの先頭をデフォルトにする
-    // ※以前はここで activeSectionId を使っていましたが、それが「勝手に切り替わる」原因でした。
+    // 未設定時はアクティブな章、それもなければ最初の章
     if (!targetSectionId) {
-        targetSectionId = sectionIds[0];
+        targetSectionId = state.getActiveSectionId() || sectionIds[0];
     }
 
     // セクション選択肢の追加
     sectionIds.forEach(secId => {
         sectionSelect.add(new Option('📁 ' + sections[secId].name, secId));
     });
-    
-    // 決定した初期セクションを選択状態にする
     sectionSelect.value = targetSectionId;
-    
-    // 念のため、DOM上で実際に選択された値を再取得（存在しないIDだった場合のブラウザ挙動に対応）
-    const actualSectionId = sectionSelect.value;
 
     // --- ノードリスト更新関数 ---
     const updateNodeOptions = (secId) => {
         nodeSelect.innerHTML = '';
-        
-        // デフォルト選択肢
-        nodeSelect.add(new Option('(なし / 終了)', ''));
+        nodeSelect.add(new Option('--- (なし / 終了) ---', ''));
 
         const section = sections[secId];
         if (section && section.nodes) {
@@ -137,15 +129,16 @@ export function createLinkedSelects(container, selectId, currentValue, options =
 
                 if(node.type === 'text') {
                     icon = '💬';
-                    summary = stripHtml(node.message).replace(/\s+/g, ' ').trim().substring(0, 10);
+                    summary = stripHtml(node.message).replace(/\s+/g, ' ').trim().substring(0, 12);
                 } else if(node.type === 'choice') {
-                    icon = '🔀';
-                    summary = `選択肢(${node.choices ? node.choices.length : 0})`;
+                    icon = '🔀'; summary = `選択肢(${node.choices ? node.choices.length : 0})`;
                 } else if(node.type === 'variable') icon = '🔢';
                 else if(node.type === 'conditional') icon = '❓';
                 else if(node.type === 'ui_control') icon = '🖥️';
                 else if(node.type === 'shop') icon = '🛒';
+                else if(node.type === 'battle') icon = '⚔️';
                 else if(node.type === 'map') icon = '🗺️';
+                else if(node.type === 'input') icon = '⌨️';
 
                 let labelText = `${nodeId.slice(-4)}: ${icon}`;
                 if (node.nodeLabel) labelText += ` 【${node.nodeLabel}】`;
@@ -157,40 +150,29 @@ export function createLinkedSelects(container, selectId, currentValue, options =
     };
 
     // 初期状態のリスト生成
-    updateNodeOptions(actualSectionId);
+    updateNodeOptions(targetSectionId);
     
     // ノード値の復元（リンク切れチェック含む）
     if (currentValue) {
-        // リストにあるか確認
         let exists = false;
         for (let i = 0; i < nodeSelect.options.length; i++) {
             if (nodeSelect.options[i].value === currentValue) {
-                exists = true;
-                break;
+                exists = true; break;
             }
         }
-        
-        // なければ「リンク切れ」として警告付きで追加
         if (!exists) {
             const errorOption = new Option(`⚠ リンク切れ: ${currentValue}`, currentValue);
             errorOption.style.color = 'red';
-            errorOption.style.fontWeight = 'bold';
             nodeSelect.add(errorOption);
         }
-        
         nodeSelect.value = currentValue;
-    } else {
-        nodeSelect.value = "";
     }
 
     // --- イベントリスナー ---
-    
-    // 章が変更されたらノードリストを書き換える
     sectionSelect.addEventListener('change', () => {
         updateNodeOptions(sectionSelect.value);
-        nodeSelect.value = ""; // 章を変えたらノード選択はリセット
-        
-        // 重要: ノードが変わったことを親（設定保存側）に通知する
+        nodeSelect.value = ""; // 章を変えたらノード選択は一旦リセット
+        // 変更を親のイベントハンドラに通知
         nodeSelect.dispatchEvent(new Event('change', { bubbles: true }));
     });
     
@@ -1022,14 +1004,150 @@ export async function renderNodeEditor() {
     document.getElementById('is-start-node').checked = (activeId === proj.scenario.startNodeId);
     document.getElementById('node-type').value = node.type;
 
+    // ★新機能: 逆引き検索（どこからリンクされているか）の表示
+    const findIncomingLinks = (targetId) => {
+        const links = [];
+        for (const sId in proj.scenario.sections) {
+            const sec = proj.scenario.sections[sId];
+            for (const nId in sec.nodes) {
+                if (nId === targetId) continue; // 自分自身は除外
+                const n = sec.nodes[nId];
+                let isLinked = false;
+                let reason = "";
+
+                if (n.nextNodeId === targetId) { isLinked = true; reason = "次のノード"; }
+                if (n.type === 'conditional') {
+                    if (n.elseNextNodeId === targetId) { isLinked = true; reason = "条件(ELSE)"; }
+                    if (n.conditions) n.conditions.forEach((c, i) => { if (c.nextNodeId === targetId) { isLinked = true; reason = `条件(IF #${i+1})`; }});
+                }
+                if (n.type === 'choice' && n.choices) {
+                    n.choices.forEach((c, i) => { if (c.nextNodeId === targetId) { isLinked = true; reason = `選択肢(${c.text})`; }});
+                }
+                if (n.type === 'battle') {
+                    if (n.nextWinNodeId === targetId) { isLinked = true; reason = "勝利時"; }
+                    if (n.nextRunNodeId === targetId) { isLinked = true; reason = "逃走時"; }
+                    if (n.nextLoseNodeId === targetId) { isLinked = true; reason = "敗北時"; }
+                }
+                if (n.type === 'input') {
+                    const c = n.inputConfig || {};
+                    if (c.nextSuccessId === targetId) { isLinked = true; reason = "正解時"; }
+                    if (c.nextFailId === targetId) { isLinked = true; reason = "失敗時"; }
+                }
+
+                if (isLinked) links.push({ sId, nId, name: sec.name, label: n.nodeLabel, reason });
+            }
+        }
+        return links;
+    };
+
+    // 逆引きリストのUI構築
+    let reverseLinksDiv = document.getElementById('reverse-links-container');
+    if (!reverseLinksDiv) {
+        reverseLinksDiv = document.createElement('div');
+        reverseLinksDiv.id = 'reverse-links-container';
+        reverseLinksDiv.style.cssText = "margin-bottom: 15px; padding: 10px; background: #fffbe6; border: 1px solid #ffe58f; border-radius: 4px; font-size: 0.85em;";
+        
+        // ヘッダー（IDバッジのある行）のすぐ下に追加する
+        const headerEl = document.querySelector('.editor-header');
+        if (headerEl) headerEl.after(reverseLinksDiv);
+    }
+
+    const incoming = findIncomingLinks(activeId);
+    if (incoming.length === 0) {
+        reverseLinksDiv.innerHTML = `<span style="color:#d46b08;">🔗 リンク元: (なし / またはSTART地点)</span>`;
+    } else {
+        let html = `<span style="color:#d46b08; font-weight:bold;">🔗 以下のノードから呼ばれています (${incoming.length}箇所):</span><ul style="margin:5px 0 0 20px; padding:0; color:#555;">`;
+        incoming.forEach(link => {
+            const displayName = link.label ? `【${link.label}】` : link.nId.slice(-4);
+            html += `<li style="margin-bottom:3px;">
+                        <a href="#" class="reverse-link-btn" data-sid="${link.sId}" data-nid="${link.nId}" style="color:#1890ff; text-decoration:none;">
+                            ${link.name} > ${displayName}
+                        </a>
+                        <span style="color:#888;"> ... (${link.reason})</span>
+                     </li>`;
+        });
+        html += `</ul>`;
+        reverseLinksDiv.innerHTML = html;
+
+        // リンククリックでそのノードへジャンプする処理
+        reverseLinksDiv.querySelectorAll('.reverse-link-btn').forEach(a => {
+            a.onclick = async (e) => {
+                e.preventDefault();
+                state.setActiveSectionId(e.target.dataset.sid);
+                state.setActiveNodeId(e.target.dataset.nid);
+                // ツリーを開いて選択状態にする
+                const sec = proj.scenario.sections[e.target.dataset.sid];
+                if (sec) sec.collapsed = false;
+                
+                // 再描画
+                if (typeof renderScenarioTree === 'function') renderScenarioTree();
+                await renderNodeEditor(); // 自分自身を呼び直してジャンプ
+            };
+        });
+    }
+
     // タイプ別設定エリアの表示切り替え
     document.querySelectorAll('.node-type-settings').forEach(el => el.classList.add('hidden'));
     const setEl = document.getElementById(node.type + '-node-settings');
     if (setEl) setEl.classList.remove('hidden');
 
     // --- ノードタイプごとの処理 ---
+if (node.type === 'input') {
+        if (!node.inputConfig) {
+            node.inputConfig = {
+                targetVar: '$name',
+                typeLimit: 'text',
+                maxLength: 10,
+                btnText: '決定',
+                allowEmpty: false,
+                initialValue: '',     // ★追加
+                cancelText: '',       // ★追加
+                correctAnswer: '',
+                retryLimit: 0,
+                nextSuccessId: '',
+                nextFailId: '',
+                nextCancelId: ''      // ★追加
+            };
+        }
+        
+        const conf = node.inputConfig;
+        
+        // 要素取得と値セット
+        const elVar = document.getElementById('input-target-var');
+        const elLimit = document.getElementById('input-type-limit');
+        const elMax = document.getElementById('input-max-length');
+        const elBtn = document.getElementById('input-btn-text');
+        const elAns = document.getElementById('input-correct-answer');
+        const elRetry = document.getElementById('input-retry-limit');
+        const elEmpty = document.getElementById('input-allow-empty');
+        // ★追加要素の取得
+        const elInitVal = document.getElementById('input-initial-value');
+        const elCancelText = document.getElementById('input-cancel-text');
 
-    if (node.type === 'text') {
+        if(elVar) { elVar.value = conf.targetVar || ''; elVar.onchange = e => conf.targetVar = e.target.value; }
+        if(elLimit) { elLimit.value = conf.typeLimit || 'text'; elLimit.onchange = e => conf.typeLimit = e.target.value; }
+        if(elMax) { elMax.value = conf.maxLength || 10; elMax.onchange = e => conf.maxLength = parseInt(e.target.value)||10; }
+        if(elBtn) { elBtn.value = conf.btnText || '決定'; elBtn.onchange = e => conf.btnText = e.target.value; }
+        if(elAns) { elAns.value = conf.correctAnswer || ''; elAns.onchange = e => conf.correctAnswer = e.target.value; }
+        if(elRetry) { elRetry.value = conf.retryLimit || 0; elRetry.onchange = e => conf.retryLimit = parseInt(e.target.value)||0; }
+        if(elEmpty) { elEmpty.checked = !!conf.allowEmpty; elEmpty.onchange = e => conf.allowEmpty = e.target.checked; }
+        
+        // ★追加イベント
+        if(elInitVal) { elInitVal.value = conf.initialValue || ''; elInitVal.onchange = e => conf.initialValue = e.target.value; }
+        if(elCancelText) { elCancelText.value = conf.cancelText || ''; elCancelText.onchange = e => conf.cancelText = e.target.value; }
+        
+        // 移動先のセレクトボックス生成
+        createLinkedSelects(document.getElementById('container-next-input-success'), 'node-next-input-success', conf.nextSuccessId);
+        document.getElementById('container-next-input-success').onchange = e => conf.nextSuccessId = document.getElementById('node-next-input-success').value;
+        
+        createLinkedSelects(document.getElementById('container-next-input-fail'), 'node-next-input-fail', conf.nextFailId);
+        document.getElementById('container-next-input-fail').onchange = e => conf.nextFailId = document.getElementById('node-next-input-fail').value;
+
+        // ★追加移動先
+        createLinkedSelects(document.getElementById('container-next-input-cancel'), 'node-next-input-cancel', conf.nextCancelId);
+        document.getElementById('container-next-input-cancel').onchange = e => conf.nextCancelId = document.getElementById('node-next-input-cancel').value;
+    }
+    else if (node.type === 'text') {
         // 1. テキスト本文
         state.quill.root.innerHTML = node.message || '';
         
@@ -1229,7 +1347,19 @@ export async function renderNodeEditor() {
         };
         createLinkedSelects(document.getElementById('container-next-variable'), 'node-next-variable', node.nextNodeId);
 
-    } 
+    } else if (node.type === 'wait') {
+        // ★新機能: 待機(Wait)ノードの保存処理
+        const elTime = document.getElementById('wait-time-seconds');
+        if (elTime) {
+            elTime.value = node.waitTime || 1.0;
+            elTime.onchange = (e) => node.waitTime = parseFloat(e.target.value) || 1.0;
+        }
+        createLinkedSelects(document.getElementById('container-next-wait'), 'node-next-wait', node.nextNodeId);
+        document.getElementById('container-next-wait').onchange = () => {
+            const select = document.getElementById('node-next-wait');
+            if (select) node.nextNodeId = select.value;
+        };
+    }
     else if (node.type === 'conditional') {
         // 条件分岐
         if (typeof renderConditionsEditor === 'function') renderConditionsEditor(node.conditions || []);
@@ -1707,6 +1837,7 @@ export function renderScenarioTree() {
             else if(n.type === 'ui_control') { i = '🖥️'; s = 'UI操作'; }
             else if(n.type === 'map') { i = '🗺️'; s = 'マップ移動'; }
             else if(n.type === 'shop') { i = '🛒'; s = 'ショップ'; }
+            else if(n.type === 'input') { i = '⌨️'; s = 'テキスト入力'; }
 
             if (n.nodeLabel) {
                 s = `<span style="color:#1890ff; font-weight:bold;">${n.nodeLabel}</span> <span style="color:#888; font-size:0.9em;">- ${s}</span>`;
@@ -2141,15 +2272,28 @@ export function renderVariablesList() {
             varsInGroup.forEach(key => {
                 const row = document.createElement('div');
                 row.className = 'variable-row-new';
-
-                // 1. 変数名
-                const nameDiv = document.createElement('div');
-                nameDiv.textContent = key;
+                const nameDiv = document.createElement('input');
+                nameDiv.type = 'text';
+                nameDiv.value = key;
+                nameDiv.placeholder = '変数名 (変更可)';
+                
+                // style.css の input[type="text"] と同じ見た目を適用
+                nameDiv.style.width = '100%';
+                nameDiv.style.padding = '8px';
+                nameDiv.style.border = '1px solid #d9d9d9'; // 他と同じ枠線
+                nameDiv.style.borderRadius = '4px';
+                nameDiv.style.boxSizing = 'border-box';
+                nameDiv.style.fontSize = '14px';
+                
+                // 変数名らしさを出すためのフォントと色
                 nameDiv.style.fontFamily = 'monospace';
                 nameDiv.style.fontWeight = 'bold';
-                nameDiv.style.overflow = 'hidden';
-                nameDiv.style.textOverflow = 'ellipsis';
-                nameDiv.title = key;
+                nameDiv.style.color = '#333';
+                nameDiv.style.backgroundColor = '#fff';
+                
+                nameDiv.title = 'ここを書き換えると変数名を一括変更できます';
+                nameDiv.dataset.varName = key;
+                nameDiv.dataset.fieldType = 'name';
 
                 // 2. 値
                 const valInput = document.createElement('input');
@@ -3083,17 +3227,20 @@ function initPlayerSettings() {
         p.maxHp = getRaw('p-init-hp', '10');
         p.atk = getRaw('p-init-atk', '1');
         p.def = getRaw('p-init-def', '0');
-        p.spd = getRaw('p-init-spd', '4');
-        
+        p.spd = getRaw('p-init-spd', '1.0'); // デフォルトは1.0が安全
+        p.maxStamina = getRaw('p-init-stamina', '100'); 
+
+        // ★修正: HTML側のID名（p-init-stamina-regen）に合わせてタイポを修正
+        p.staminaRegen = getRaw('p-init-stamina-regen', '20');
+
+        // テストプレイ(プレビュー)を開始する時のために現在値にも反映しておく
         p.$maxHp = p.maxHp; 
         p.$hp = p.maxHp; 
         p.$atk = p.atk; 
         p.$def = p.def; 
         p.$spd = p.spd;
-
-        p.maxStamina = getRaw('p-init-stamina', '100'); 
         p.$maxStamina = p.maxStamina; 
-        p.staminaRegen = getRaw('p-stamina-regen', '20');
+        p.$stamina = p.maxStamina;
 
         p.limitHp = getRaw('p-limit-hp', '100');
         p.limitAtk = getRaw('p-limit-atk', '10');
@@ -3161,8 +3308,7 @@ function initPlayerSettings() {
         p.animIdDamage = getStr('p-anim-damage');
         p.animIdJump = getStr('p-anim-jump');
 
-                p.staminaRegen = getRaw('p-init-stamina-regen', '20');
-        p.limitStaminaRegen = getRaw('p-limit-stamina-regen', '50');
+p.limitStaminaRegen = getRaw('p-limit-stamina-regen', '50');
         
         p.penetration = getRaw('p-init-pen', '1');
         p.limitPenetration = getRaw('p-limit-pen', '10');
