@@ -1,25 +1,36 @@
 // state.js (Ultimate Final 3D Version - Fixed with $)
 
 // Quill Rich Text Editorのインスタンスを先に初期化
-const Font = Quill.import('formats/font');
-Font.whitelist = [
-    'sans-serif', 'serif', 'monospace', 'dotgothic', 'rounded', 'klee', 'mincho-b'
-];
-Quill.register(Font, true);
+export let quill = null;
 
-export const quill = new Quill('#rich-text-editor', {
-    theme: 'snow',
-    modules: {
-        toolbar: [
-            [{ 'font': Font.whitelist }],
-            ['bold', 'italic', 'underline'],
-            [{ 'color': [] }, { 'background': [] }],
-            [{ 'size': ['small', false, 'large', 'huge'] }],
-            [{ 'align': [] }],
-            ['clean']
-        ]
+export function initQuill() {
+    const editorEl = document.getElementById('rich-text-editor');
+    if (!editorEl) {
+        console.warn("Quill: editor element not found!");
+        return;
     }
-});
+    
+    const Font = Quill.import('formats/font');
+    Font.whitelist = [
+        'sans-serif', 'serif', 'monospace', 'dotgothic', 'rounded', 'klee', 'mincho-b'
+    ];
+    Quill.register(Font, true);
+
+    quill = new Quill(editorEl, {
+        theme: 'snow',
+        modules: {
+            toolbar: [
+                [{ 'font': Font.whitelist }],
+                ['bold', 'italic', 'underline'],
+                [{ 'color': [] }, { 'background': [] }],
+                [{ 'size': ['small', false, 'large', 'huge'] }],
+                [{ 'align': [] }],
+                ['clean']
+            ]
+        }
+    });
+}
+
 
 // --- アプリケーションの状態 ---
 
