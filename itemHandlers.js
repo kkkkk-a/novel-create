@@ -57,16 +57,10 @@ export function initItemHandlers() {
     ];
     
     // ★ここを修正: テキスト入力は 'input' イベントで即時反映させる
-    inputs.forEach(id => {
+     inputs.forEach(id => {
         const el = document.getElementById(id);
         if(el) {
-            // テキスト入力欄なら、キーを打つたびに更新
-            if (el.tagName === 'INPUT' && el.type === 'text') {
-                el.addEventListener('input', syncItemData);
-            } else {
-                // セレクトボックスや数値入力は、確定時(change)に更新
-                el.addEventListener('change', syncItemData);
-            }
+            el.addEventListener('change', syncItemData);
         }
     });
 
