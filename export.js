@@ -12,7 +12,7 @@ const dataString = JSON.stringify(data)
         .replace(/\$\{/g, '\\${'); // 追加: テンプレート変数をエスケープ
     const initialNodeId = startNodeOverride || data.scenario.startNodeId;
     
-    // --- Settings ---
+// --- Settings ---
     const s = data.settings || {};
     const titleBgStyle = s.titleImage 
         ? `background: url('${s.titleImage}') center/cover no-repeat;` 
@@ -22,7 +22,8 @@ const dataString = JSON.stringify(data)
     s.buttonColor = s.buttonColor || '#1990ff';
     s.buttonOpacity = s.buttonOpacity !== undefined ? s.buttonOpacity : 80;
     s.buttonTextColor = s.buttonTextColor || '#FFFFFF';
-        // 背景表示モードのCSS値を決定
+    
+    // 背景表示モードのCSS値を決定
     const bgFitSetting = s.backgroundFit || 'cover';
     let cssBgSize = 'cover';      // 画像用 (background-size)
     let cssObjFit = 'cover';      // 動画用 (object-fit)
@@ -32,8 +33,9 @@ const dataString = JSON.stringify(data)
         cssObjFit = 'contain';
     } else if (bgFitSetting === 'fill') {
         cssBgSize = '100% 100%';
-        cssObjFit = 'fill';
+        cssObjFit = 'fill'; // ★ 動画の場合は 'fill' を使って画面に合わせる
     }
+    
     s.borderRadius = s.borderRadius !== undefined ? s.borderRadius : 10;
     s.borderWidth = s.borderWidth !== undefined ? s.borderWidth : 2;
     s.borderColor = s.borderColor || '#FFFFFF';
@@ -75,6 +77,9 @@ const dataString = JSON.stringify(data)
             choiceBoxCss += ` top: 50%; left: 50%; transform: translate(-50%, -50%); width: 80%; flex-direction: column; align-items: stretch;`;
             break;
     }
+    // ★修正: 入力ノードでフォームを上書きした際に、操作が効かなくなる(沈黙する)のを防ぐ
+    choiceBoxCss += ` z-index: 150 !important; `;
+    
     m.choiceDirection = m.choiceDirection || 'vertical';
     m.choiceAlign = m.choiceAlign || 'center';
     m.characterOffsetY = m.characterOffsetY !== undefined ? m.characterOffsetY : 0;
@@ -166,7 +171,16 @@ return `
 
 <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        html, body { height: 100%; margin: 0; padding: 0; font-family: sans-serif; background-color: #000; overflow: hidden; user-select: none; -webkit-user-select: none; touch-action: none; }
+        html, body { height: 100%; margin: 0; padding: 0; font-family: sans-serif; background-color: #000; overflow: hidden; user-select: none; -webkit-user-select: none; touch-action: none; overscroll-behavior: none; }
+        #game-container { position: relative; width: 100%; height: 100%; margin: 0; padding: 0; background-color: #000; overflow: hidden; touch-action: none; overscroll-behavior: none; }
+        
+        /* ★最適化: 入力フォームだけは、文字の選択やタッチ操作を許可する（これをしないとフォーカスが当たらず真っ黒になる） */
+        input, textarea {
+            user-select: auto;
+            -webkit-user-select: auto;
+            touch-action: auto;
+        }
+
         #game-container { position: relative; width: 100%; height: 100%; margin: 0; padding: 0; background-color: #000; overflow: hidden; }
         #loading-screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; color: #fff; transition: opacity 0.5s; cursor: default; }
         #loading-screen.ready { cursor: pointer; background: #111; }
@@ -176,8 +190,8 @@ return `
         .spinner { width: 40px; height: 40px; border: 4px solid rgba(255,255,255,0.3); border-top: 4px solid #fff; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 15px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         
-        .layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; transition: opacity 0.5s; background-size: ${cssBgSize}; background-repeat: no-repeat; background-position: 50% 50%; pointer-events: none; }
-        .bg-video { width: 100%; height: 100%; object-fit: ${cssObjFit}; position: absolute; top: 0; left: 0; pointer-events: none; z-index: 0; }
+                .layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; transition: opacity 0.5s; background-size: ${cssBgSize}; background-repeat: no-repeat; background-position: 50% 50%; pointer-events: none; }
+        .bg-video { width: 100%; height: 100%; object-fit: ${cssObjFit}; position: absolute; top: 0; left: 0; pointer-events: none; z-index: 0; overflow: hidden; }
         
         #character-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; transition: transform 0.3s ease-out; }
         .sprite-char-img { position: absolute; width: auto; height: 95%; object-fit: contain; opacity: 0; transition: opacity 0.3s, transform 0.3s; transform-origin: bottom center; }
@@ -694,9 +708,16 @@ let isGamePaused = false;
         const AudioManager = {
     _bgm: null,
     _bgmId: null,
-    
+    _sePool: {}, // ★最適化: SEを使い回すための保管庫（オーディオプール）
+
     playBgm: function(assetId, volume) {
         // 同じ曲なら何もしない
+        if (!assetId || assetId === 'stop') {
+            this.stopBgm();
+            return;
+        }
+
+        // 同じ曲なら音量だけ変えて継続
         if (this._bgmId === assetId && this._bgm && !this._bgm.paused) {
             this._bgm.volume = volume;
             return;
@@ -704,8 +725,6 @@ let isGamePaused = false;
         
         // 前の曲を停止・破棄
         this.stopBgm();
-
-        if (!assetId || assetId === 'stop') return;
 
         const asset = gameData.assets.sounds[assetId];
         if (asset) {
@@ -730,16 +749,28 @@ let isGamePaused = false;
     playSe: function(assetId, volume) {
         if (!assetId) return;
         const asset = gameData.assets.sounds[assetId];
-        if (asset) {
-            const se = new Audio(asset.data);
-            se.volume = volume;
-            se.play().catch(e => {});
-            // 再生終了後に参照を切る（ガベージコレクション対策）
-            se.onended = () => {
-                se.src = "";
-                se.load();
-            };
+        if (!asset) return;
+
+        // 保管庫の準備
+        if (!this._sePool[assetId]) {
+            this._sePool[assetId] = [];
         }
+        
+        // ★最適化: 保管庫の中から「今鳴っていない（空いている）スピーカー」を探す
+        let se = this._sePool[assetId].find(audio => audio.paused || audio.ended);
+        
+        if (!se) {
+            // 空きがなければ新しく作るが、同時に鳴らすのは最大5個までに制限（爆音・フリーズ防止）
+            if (this._sePool[assetId].length >= 5) return; 
+            
+            se = new Audio(asset.data);
+            this._sePool[assetId].push(se);
+        }
+        
+        // 空いているスピーカーの音量と再生位置をリセットして鳴らす
+        se.volume = volume;
+        se.currentTime = 0; 
+        se.play().catch(e => console.warn("SE Play Error:", e));
     },
 
     resume: function() {
@@ -822,6 +853,7 @@ let executionCounter = 0;
          const MAX_HISTORY = 100;
 let hitStopTimer = 0;
 const MAX_PARTICLES = 1500;
+let activePopups = [];
 function spawnParticle(id, x, y, overrideOptions = {}) {
     if (particles.length >= MAX_PARTICLES) {
         return; 
@@ -1059,17 +1091,37 @@ function renderParticles() {
 }
 
 function updateParticles(dt) {
-    // dt (前フレームからの経過時間) が大きすぎる場合 = 処理落ちしている
-    // 60FPSなら約16ms。もし32ms(30FPS)以上かかっていたら生成をスキップ
-    if (dt > 32) {
-        return; // 更新処理自体をスキップ、または発生量を半分にするなど
-    }
+    // 処理落ち時の安全装置：過負荷時は更新をスキップ（または減速）
+    if (dt > 100) return; // 1秒間に10回以下の処理速度なら完全にストップ
+    
+    // 最大パーティクル制限 (MAX_PARTICLES がすでに定義されている前提)
+    const MAX_PARTICLES = 1500; 
+
+    // 天候の発生量コントロール（timeScale に依存させない固定レートに近づける）
     const timeScale = dt / 16.666;
 
     // --- 1. 天候エミッターからの発生処理 ---
     if (typeof activeEmitters !== 'undefined') {
         activeEmitters.forEach(emitter => {
-            const spawnCount = Math.max(1, Math.round((emitter.count || 5) * 0.2)); 
+            // ★変更: 画面上に十分なパーティクルがある場合は新規生成を抑える
+            if (particles.length >= MAX_PARTICLES) return;
+
+            // 発生間隔の調整用プロパティを初期化
+            if (!emitter._timer) emitter._timer = 0;
+            emitter._timer += dt;
+
+            // 1秒間に生成する量の設定（目安: fpsを考慮）
+            // 例: count=10 なら 1秒間に約30個 ではなく、指定数を徐々に散らす
+            // 処理を軽くするため、3フレームに1回の間隔にする
+            if (emitter._timer < 50) return; 
+            emitter._timer = 0;
+
+            // 発生数の調整（一度に大量に出さない）
+            let spawnCount = Math.ceil((emitter.count || 5) * 0.5); 
+            // 限界を超えそうなら切り捨て
+            if (particles.length + spawnCount > MAX_PARTICLES) {
+                spawnCount = MAX_PARTICLES - particles.length;
+            }
             
             // 画面サイズ取得
             const canvas = document.getElementById('overhead-canvas');
@@ -1109,13 +1161,13 @@ function updateParticles(dt) {
                 let startX = camX - (moveX * diag * 0.6) + (-moveY * spread);
                 let startY = camY - (moveY * diag * 0.6) + (moveX * spread);
                 
-                const startZ = Math.random() * 200; // 3D用の高さバラつき
+                const startZ = Math.random() * 200; 
 
                 spawnParticle(emitter.id, startX, startY, {
                     isWeather: true,
                     z: startZ,
                     overrideAngle: emitter.angle,
-                    isScreenSpace: !isMapMode // ノベルモードならスクリーン座標フラグをON
+                    isScreenSpace: !isMapMode
                 });
             }
         });
@@ -1266,8 +1318,41 @@ function recalculatePlayerStats() {
                 if (buff.type === 'atk') valAtk += buff.value;
                 if (buff.type === 'def') valDef += buff.value;
                 if (buff.type === 'spd') valSpd += buff.value;
-                // 必要ならここにも range などを追加可能
             });
+
+            // --- 3.5 永続バフ（アイテム使用による成長）の加算 ---
+            if (p.permanentBuffs) {
+                if (p.permanentBuffs.hpMax) valHp += p.permanentBuffs.hpMax;
+                if (p.permanentBuffs.staminaMax) valSt += p.permanentBuffs.staminaMax;
+                if (p.permanentBuffs.atk) valAtk += p.permanentBuffs.atk;
+                if (p.permanentBuffs.def) valDef += p.permanentBuffs.def;
+                if (p.permanentBuffs.spd) valSpd += p.permanentBuffs.spd;
+                if (p.permanentBuffs.projSpeed) valProj += p.permanentBuffs.projSpeed;
+            }
+
+            // ★追加: 装備等によって「最大HP」や「最大スタミナ」が変化した場合、
+            // その差分だけ「現在値」も連動して増減させる処理
+            
+            // 変化前の値を記憶
+            const oldMaxHp = p.$maxHp || valHp;
+            const oldMaxSt = p.$maxStamina || valSt;
+
+            // 差分を計算
+            const diffHp = valHp - oldMaxHp;
+            const diffSt = valSt - oldMaxSt;
+
+            // 現在値に差分を足す（HPが0未満にならないようにガード、かつ新しい最大値を超えないようにガード）
+            if (p.$hp !== undefined) {
+                p.$hp = Math.max(1, Math.min(valHp, p.$hp + diffHp));
+            } else {
+                p.$hp = valHp;
+            }
+
+            if (p.$stamina !== undefined) {
+                p.$stamina = Math.max(0, Math.min(valSt, p.$stamina + diffSt));
+            } else {
+                p.$stamina = valSt;
+            }
 
             // --- 4. 結果を適用 ---
             p.$maxHp = valHp;
@@ -1275,7 +1360,6 @@ function recalculatePlayerStats() {
             p.$atk = valAtk;
             p.$def = valDef;
             p.$spd = parseFloat(valSpd.toFixed(2));
-            
             
     p.staminaRegen = valStRegen; // $をつけない（内部パラメータとして保持）
     p.attackRange = Math.max(1, valRange);
@@ -1285,6 +1369,9 @@ function recalculatePlayerStats() {
     p.penetration = Math.max(1, valPen); // 計算結果を適用
 
             p.$nextExp = calculateNextExp(lv, p.growthType || 'normal');
+            
+            // ★最適化: ステータスが変わったら、必ず画面上のHUD（HPバーやテキスト）も最新に更新する
+            if (typeof updateHUD === 'function') updateHUD();
         }
 // 経験値を獲得してレベルアップ判定
 function gainExp(amount) {
@@ -1543,7 +1630,6 @@ const threeHandler = ${needs3D} ? {
 
                 const models = gameData.assets.models || {};
                 const anims = gameData.assets.animations || {};
-                const BS = String.fromCharCode(92); 
 
                 const modelPromises = Object.keys(models).map(async (id) => {
                     try {
@@ -1557,17 +1643,25 @@ const threeHandler = ${needs3D} ? {
                                     const res = await fetch(dataUrl);
                                     const blob = await res.blob();
                                     const url = URL.createObjectURL(blob);
-                                    resourceMap.set(fileName.toLowerCase(), url);
+                                    
+                                    // ★最適化: Shift-JIS文字化け対策。
+                                    // 確実にファイル名だけを取り出し、小文字化して登録
+                                    const cleanName = fileName.split('\\\\').join('/').split('/').pop().toLowerCase();
+                                    resourceMap.set(cleanName, url);
                                 }
                             }
 
                             const manager = new THREE.LoadingManager();
                             manager.setURLModifier((url) => {
-                                const decodedUrl = decodeURIComponent(url);
-                                let fileName = decodedUrl.split('/').pop();
-                                if (fileName.includes(BS)) fileName = fileName.split(BS).pop();
-                                const key = fileName.toLowerCase();
-                                if (resourceMap.has(key)) return resourceMap.get(key);
+                                // ★最適化: PMX内部に記録されたパスも同様に、ファイル名だけを抽出して比較する
+                                let fileName = url;
+                                try { fileName = decodeURIComponent(url); } catch(e){}
+                                
+                                const cleanKey = fileName.replace(/\\\\/g, '/').split('/').pop().toLowerCase();
+                                
+                                if (resourceMap.has(cleanKey)) {
+                                    return resourceMap.get(cleanKey);
+                                }
                                 return url;
                             });
 
@@ -2018,18 +2112,17 @@ window.toggleConfig = () => {
     }
 };
 
-window.updateVolume = (type, val) => {
+window.updateVolume = async (type, val) => {
     const vol = val / 100;
     if (type === 'bgm') {
         masterVolBgm = vol;
         document.getElementById('vol-bgm-val').textContent = val + '%';
-if (AudioManager._bgm) AudioManager._bgm.volume = masterVolBgm;
-        localStorage.setItem('cfg_vol_bgm', val);
+        if (AudioManager._bgm) AudioManager._bgm.volume = masterVolBgm;
+        await saveToDB('cfg_vol_bgm', val); 
     } else {
         masterVolSe = vol;
         document.getElementById('vol-se-val').textContent = val + '%';
-        // ★保存
-        localStorage.setItem('cfg_vol_se', val);
+        await saveToDB('cfg_vol_se', val);
     }
 };
 
@@ -2147,7 +2240,26 @@ window.execSL = (target) => {
         };
 
         // --- 共通: セーブデータオブジェクト作成関数 ---
-        function createSaveData() {
+         function createSaveData() {
+            // ★最適化: 3Dモデルの現在の「表情」と「ポーズ」をすべて記録する
+            const currentModelStates = {};
+            if (window.threeHandler && window.threeHandler.models) {
+                for (const id in window.threeHandler.models) {
+                    const m = window.threeHandler.models[id];
+                    if (m && m.visible) {
+                        currentModelStates[id] = {
+                            animId: window.threeHandler.currentAnimId || null,
+                            // VRM特有の表情データは直接取れないため、表示時の指定（config）から推測するか、
+                            // 最新のノード設定（characters3d）をロード時に再適用させる方式をとります
+                            // ここでは「表示されていたかどうか」と「位置」を記録します
+                            pos: m.position.clone(),
+                            rot: m.rotation.clone(),
+                            scale: m.scale.clone()
+                        };
+                    }
+                }
+            }
+
             return {
                 gameState, 
                 playerState, 
@@ -2156,8 +2268,12 @@ window.execSL = (target) => {
                 backLog,
                 isMapMode,
                 activeEmitters, 
-                // 現在の日時 (表示用)
                 timestamp: Date.now(),
+                // ★最適化: Inputノードの失敗回数など、現在のノードの内部状態を保存する
+                nodeContext: {
+                    failCount: (findNode(currentPlayingNodeId) && findNode(currentPlayingNodeId)._failCount) || 0
+                },
+                modelStates: currentModelStates, // ★追加
                 mapContext: isMapMode ? {
                     mapId: mapEngine.currentMapId,
                     playerX: mapEngine.player.x,
@@ -2165,6 +2281,11 @@ window.execSL = (target) => {
                     playerZ: mapEngine.player.z || 0,
                     dir: mapEngine.player.dir,
                     pitch: mapEngine.player.pitch,
+                    // ★最適化: ジャンプ中などの「勢い(慣性)」も保存し、ロード時の不自然な落下を防ぐ
+                    vx: mapEngine.player.vx || 0,
+                    vy: mapEngine.player.vy || 0,
+                    vz: mapEngine.player.vz || 0,
+                    onGround: mapEngine.player.onGround || false,
                     camH: tpsCameraAngle.horizontal,
                     camV: tpsCameraAngle.vertical,
                     zoom: mapEngine.currentZoom || 1.0,
@@ -2173,32 +2294,79 @@ window.execSL = (target) => {
             };
         }
 
-        // --- ブラウザに保存 (Local Storage) ---
-        window.saveGameLocal = () => { 
+        // --- ★最適化・厳格化: IndexedDB ヘルパー関数 ---
+        const DB_NAME = 'NovelGameDB';
+        const STORE_NAME = 'saves';
+        const DB_VERSION = 1;
+
+        function openDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(DB_NAME, DB_VERSION);
+                request.onupgradeneeded = (e) => {
+                    const db = e.target.result;
+                    if (!db.objectStoreNames.contains(STORE_NAME)) {
+                        db.createObjectStore(STORE_NAME);
+                    }
+                };
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        async function saveToDB(key, data) {
+            const db = await openDB();
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(STORE_NAME, 'readwrite');
+                const store = tx.objectStore(STORE_NAME);
+                // IndexedDBはJSON変換(文字列化)不要でオブジェクトそのまま保存可能
+                const request = store.put(data, key);
+                request.onsuccess = () => resolve();
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        async function loadFromDB(key) {
+            const db = await openDB();
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(STORE_NAME, 'readonly');
+                const store = tx.objectStore(STORE_NAME);
+                const request = store.get(key);
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            });
+        }
+        
+        async function deleteFromDB(key) {
+            const db = await openDB();
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(STORE_NAME, 'readwrite');
+                const store = tx.objectStore(STORE_NAME);
+                const request = store.delete(key);
+                request.onsuccess = () => resolve();
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        // --- ブラウザに保存 (IndexedDB版) ---
+        window.saveGameLocal = async () => { 
             try { 
                 const d = createSaveData();
-                const json = JSON.stringify(d);
-                try {
-                    localStorage.setItem('save01', json);
-                    // バックスラッシュを2つにします
-alert('ブラウザに保存しました。\\n(キャッシュ削除で消える可能性があります)');
-                } catch (e) {
-                    if (e.name === 'QuotaExceededError' || e.code === 22) {
-                        alert('【エラー】容量不足で保存できませんでした。');
-                    } else { throw e; }
-                }
-            } catch(e){ console.error(e); alert('Save Error: ' + e.message); } 
+                await saveToDB('save01', d);
+                alert('ブラウザに保存しました。\\n(大容量の画像や3Dモデルも安全に記録されます)');
+            } catch(e) { 
+                console.error("Save Error:", e); 
+                alert('【エラー】保存に失敗しました。ブラウザの設定でデータベースへのアクセスが制限されている可能性があります。\\n\\n詳細: ' + e.message); 
+            } 
         };
 
         // --- ファイルに保存 (JSON Download) ---
         window.saveGameFile = () => {
             try {
                 const d = createSaveData();
-                const json = JSON.stringify(d, null, 2); // 少し整形
+                const json = JSON.stringify(d, null, 2);
                 const blob = new Blob([json], { type: 'application/json' });
                 const url = URL.createObjectURL(blob);
                 
-                // ファイル名に日時をつける
                 const now = new Date();
                 const timeStr = now.getFullYear() +
                     ('0' + (now.getMonth() + 1)).slice(-2) +
@@ -2220,6 +2388,7 @@ alert('ブラウザに保存しました。\\n(キャッシュ削除で消える
             }
         };
 
+
 // --- 共通: セーブデータ適用関数 ---
         function applySaveData(d) {
             if (d.activeEmitters) {
@@ -2231,6 +2400,9 @@ alert('ブラウザに保存しました。\\n(キャッシュ削除で消える
             
             gameState = { ...gameData.variables, ...d.gameState };
             backLog = d.backLog || [];
+
+            // ★修正: 死亡フラグを確実にリセットし、ロード直後の即死を防ぐ
+            if (playerState) playerState._isDeadTriggered = false;
 
             // 1. 現在のプロジェクトのデフォルト値を取得
             const defaultPlayerState = JSON.parse(JSON.stringify(gameData.player));
@@ -2244,9 +2416,35 @@ alert('ブラウザに保存しました。\\n(キャッシュ削除で消える
                 playerState.equipment = [playerState.equipment];
             }
 
-            // 4. HPが未定義の場合の安全策
-            if (playerState.$hp === undefined) {
-                playerState.$hp = playerState.$maxHp || 10;
+            // 4. 数値データの破損（NaNや未定義）を検知して自動修復する安全装置
+            const safeNum = (val, def) => (val !== undefined && val !== null && !isNaN(Number(val))) ? Number(val) : def;
+
+            playerState.$hp = safeNum(playerState.$hp, gameData.player.maxHp || 10);
+            playerState.$maxHp = safeNum(playerState.$maxHp, gameData.player.maxHp || 10);
+            playerState.$stamina = safeNum(playerState.$stamina, gameData.player.maxStamina || 100);
+            playerState.$maxStamina = safeNum(playerState.$maxStamina, gameData.player.maxStamina || 100);
+            playerState.$level = safeNum(playerState.$level, gameData.player.initialLevel || 1);
+            playerState.$exp = safeNum(playerState.$exp, 0);
+            playerState.$atk = safeNum(playerState.$atk, gameData.player.atk || 1);
+            playerState.$def = safeNum(playerState.$def, gameData.player.def || 0);
+            playerState.$spd = safeNum(playerState.$spd, gameData.player.spd || 4);
+
+            // 5. 必須オブジェクトの初期化（空データによるエラー進行防止）
+            if (!playerState.inventory) playerState.inventory = {};
+            if (!playerState.activeBuffs) playerState.activeBuffs = [];
+            if (!playerState.itemCooldowns) playerState.itemCooldowns = {};
+            if (!playerState.shortcuts) playerState.shortcuts = {};
+
+            // ★最適化: セーブデータ肥大化防止。現在のマップ以外の「破壊済みオブジェクト」情報を削除し、
+            // 別マップに行けば復活するようにする（完全な永続化が必要な重要イベントは通常変数を使うべき）
+            if (gameState._sys_destroyed && d.mapContext) {
+                const currentMapId = d.mapContext.mapId;
+                for (const key in gameState._sys_destroyed) {
+                    // key は "mapId_objId" の形式になっている
+                    if (!key.startsWith(currentMapId + '_')) {
+                        delete gameState._sys_destroyed[key];
+                    }
+                }
             }
 
             // HUD復元
@@ -2290,13 +2488,20 @@ alert('ブラウザに保存しました。\\n(キャッシュ削除で消える
                 mapEngine.player.y = d.mapContext.playerY;
                 mapEngine.player.z = d.mapContext.playerZ || 0;
                 mapEngine.player.dir = d.mapContext.dir || 0;
+                
+                // ★最適化: 慣性の復元
+                mapEngine.player.vx = d.mapContext.vx || 0;
+                mapEngine.player.vy = d.mapContext.vy || 0;
+                mapEngine.player.vz = d.mapContext.vz || 0;
+                mapEngine.player.onGround = d.mapContext.onGround || false;
+
                 if (d.mapContext.pitch !== undefined) mapEngine.player.pitch = d.mapContext.pitch;
                 if (d.mapContext.camH !== undefined) tpsCameraAngle.horizontal = d.mapContext.camH;
                 if (d.mapContext.camV !== undefined) tpsCameraAngle.vertical = d.mapContext.camV;
                 if (d.mapContext.zoom !== undefined) mapEngine.currentZoom = d.mapContext.zoom;
                 if (d.mapContext.scrollY !== undefined) mapEngine.bgScrollY = d.mapContext.scrollY;
             } else {
-                if (isMapMode) endMapMode();
+                 if (isMapMode) endMapMode();
                 
                 let targetId = d.currentNodeId;
                 
@@ -2305,21 +2510,66 @@ alert('ブラウザに保存しました。\\n(キャッシュ削除で消える
                     targetId = gameData.scenario.startNodeId;
                 }
                 
-                processNode(targetId);
+                // ★最適化: ロードしたノードが「Input(テキスト入力)」だった場合、フォームを再表示する
+                const targetNode = findNode(targetId);
+                if (targetNode) {
+                    // 失敗回数の復元
+                    if (d.nodeContext && d.nodeContext.failCount !== undefined) {
+                        targetNode._failCount = d.nodeContext.failCount;
+                    }
+                    
+                    if (targetNode.type === 'input') {
+                        currentPlayingNodeId = targetId;
+                        processInputNode(targetNode);
+                        
+                        // ★最適化: 3Dモデルの状態復元（Input中やWait中などでセーブされた場合）
+                        if (targetNode.characters3d && window.threeHandler) { 
+                            targetNode.characters3d.forEach(c => { 
+                                if(c.modelId) {
+                                    window.threeHandler.showModel(c.modelId, { 
+                                        posX:c.posX, posY:c.posY, posZ:c.posZ, 
+                                        rotX:c.rotX, rotY:c.rotY, rotZ:c.rotZ, 
+                                        scale:c.scale, 
+                                        animationId:c.animationId, 
+                                        expression: c.expression, 
+                                        loop: (c.loop !== undefined) ? c.loop : true 
+                                    });
+                                }
+                            }); 
+                        }
+                    } else {
+                        processNode(targetId);
+                    }
+                } else {
+                    alert("保存された場所が見つかりません。スタート地点から再開します。");
+                    processNode(gameData.scenario.startNodeId);
+                }
             }
+            
+            // ★最適化: ロード直後に一度だけタイマーとHUDを強制更新し、
+            // ゲージの見た目や自動進行の状態を画面に完全に同期させる
+            if (typeof updateTimers === 'function') updateTimers(0);
+            if (typeof updateHUD === 'function') updateHUD();
             
             alert('ロードしました！');
         }
 
         // --- ブラウザからロード ---
-        window.loadGameLocal = () => {
+        window.loadGameLocal = async () => {
             try {
-                const j = localStorage.getItem('save01');
-                if (!j) return alert('ブラウザにセーブデータがありません。');
-                applySaveData(JSON.parse(j));
+                // DBからデータを取得
+                const data = await loadFromDB('save01');
+                if (!data) return alert('ブラウザにセーブデータがありません。');
+                
+                // ★厳格化: データ構造の破損チェック（古いデータでクラッシュしないようにする）
+                if (!data.gameState || !data.playerState) {
+                    throw new Error("セーブデータが破損しています (必須プロパティ欠損)。");
+                }
+                
+                applySaveData(data);
             } catch (e) {
-                console.error(e);
-                alert('Load Error');
+                console.error("Load Error:", e);
+                alert('ロード中にエラーが発生しました。\\nデータが壊れているか、古い形式の可能性があります。\\n\\n詳細: ' + e.message);
             }
         };
 
@@ -2332,16 +2582,16 @@ alert('ブラウザに保存しました。\\n(キャッシュ削除で消える
             reader.onload = (e) => {
                 try {
                     const json = JSON.parse(e.target.result);
-                    // 簡易チェック
+                    
+                    // ★厳格化: 構造チェック
                     if (!json.gameState || !json.playerState) {
-                        throw new Error("Invalid save data format");
+                        throw new Error("不正なセーブデータフォーマットです。");
                     }
                     applySaveData(json);
-                    // モーダルを閉じる
                     window.closeSLModal();
                 } catch(err) {
-                    alert("不正なセーブデータファイルです。");
-                    console.error(err);
+                    alert("不正なセーブデータファイルです。読み込みを中断しました。\\n\\n詳細: " + err.message);
+                    console.error("File Load Error:", err);
                 }
                 // 同じファイルを再度選べるようにリセット
                 input.value = '';
@@ -2349,21 +2599,26 @@ alert('ブラウザに保存しました。\\n(キャッシュ削除で消える
             reader.readAsText(file);
         };
 
-        // --- リセット ---
-        window.deleteSave = () => { 
-            // 文言を修正: ブラウザ上のデータであることを強調
+        // --- リセット (IndexedDB版) ---
+        window.deleteSave = async () => { 
             const msg = "【警告】\\n" +
                         "ブラウザに保存されたセーブデータと設定を全て削除しますか？\\n\\n" +
                         "※ダウンロード済みのセーブファイル(JSON)は消えません。\\n" +
                         "※この操作は取り消せません。";
 
             if(confirm(msg)){ 
-                localStorage.removeItem('save01'); 
-                localStorage.removeItem('cfg_vol_bgm');
-                localStorage.removeItem('cfg_vol_se');
-                
-                alert('ブラウザのデータを初期化しました。\\nタイトルに戻ります。'); 
-                location.reload();
+                try {
+                    // DB内のデータをすべて消去（これで音量設定もリセットされる）
+                    await deleteFromDB('save01'); 
+                    await deleteFromDB('cfg_vol_bgm');
+                    await deleteFromDB('cfg_vol_se');
+                    
+                    alert('ブラウザのデータを初期化しました。\\タイトルに戻ります。'); 
+                    location.reload();
+                } catch (e) {
+                    console.error("Delete Error:", e);
+                    alert("データの削除に失敗しました。");
+                }
             } 
         };
 
@@ -3023,23 +3278,23 @@ function useItem(itemId) {
                 }
             }
 
-            // ★追加: 最大HPアップ (永続)
             if (fx.hpMax) {
                 const val = calc(fx.hpMax);
                 if (val !== 0) {
-                    playerState.$maxHp += val;
-                    playerState.$hp += val; // 現在HPも増やす
+                    if (!playerState.permanentBuffs) playerState.permanentBuffs = {};
+                    playerState.permanentBuffs.hpMax = (playerState.permanentBuffs.hpMax || 0) + val;
+                    if (typeof recalculatePlayerStats === 'function') recalculatePlayerStats();
                     if (isBattle) battleLog("最大HPが " + val + " 上がった！");
                     else if (typeof showDamagePopup === 'function') showDamagePopup(mapEngine.player, "MaxHP+" + val, 'heal');
                 }
             }
 
-            // ★追加: 最大スタミナアップ (永続)
             if (fx.staminaMax) {
                 const val = calc(fx.staminaMax);
                 if (val !== 0) {
-                    playerState.$maxStamina += val;
-                    playerState.$stamina += val; // 現在スタミナも増やす
+                    if (!playerState.permanentBuffs) playerState.permanentBuffs = {};
+                    playerState.permanentBuffs.staminaMax = (playerState.permanentBuffs.staminaMax || 0) + val;
+                    if (typeof recalculatePlayerStats === 'function') recalculatePlayerStats();
                     if (isBattle) battleLog("最大スタミナが " + val + " 上がった！");
                     else if (typeof showDamagePopup === 'function') showDamagePopup(mapEngine.player, "MaxST+" + val, 'heal');
                 }
@@ -3083,17 +3338,12 @@ function useItem(itemId) {
                     if (typeof recalculatePlayerStats === 'function') recalculatePlayerStats();
                 } else {
                     // 永続バフ
-                    if (type === 'atk') playerState.$atk += value;
-                    if (type === 'def') { if(playerState.$def===undefined) playerState.$def=0; playerState.$def += value; }
-        if (type === 'spd') playerState.$spd = parseFloat((playerState.$spd + value).toFixed(2));
-        
-        // ★追加: 弾速 (projSpeed) は「projectileSpeed」に加算
-        if (type === 'projSpeed') {
-             if(playerState.projectileSpeed === undefined) playerState.projectileSpeed = 0;
-             playerState.projectileSpeed += value;
-        }
-    }
-};
+                    if (!playerState.permanentBuffs) playerState.permanentBuffs = {};
+                    playerState.permanentBuffs[type] = (playerState.permanentBuffs[type] || 0) + value;
+                    if (typeof recalculatePlayerStats === 'function') recalculatePlayerStats();
+                    if (!isBattle && typeof showDamagePopup === 'function') showDamagePopup(mapEngine.player, label + ' UP!', 'heal');
+                }
+            };
             applyStatEffect('atk', fx.atk, 'ATK');
             applyStatEffect('def', fx.def, 'DEF');
 applyStatEffect('spd', fx.spd, 'SPD');
@@ -3415,9 +3665,10 @@ function refreshMapObjects() {
 
 // --- Turn-based Battle System ---
         
+// --- Turn-based Battle System ---
+        
         let battleState = null;
-function processBattle(node) {
-            // 1. 敵IDリストの取得 (新旧データ互換)
+        function processBattle(node) {
             const enemyIds = node.enemyIds || (node.enemyId ? [node.enemyId] : []);
             
             if (!enemyIds || enemyIds.length === 0) {
@@ -3426,7 +3677,6 @@ function processBattle(node) {
                 return;
             }
 
-            // 2. 敵データの構築 (同名モンスターのA/B表記対応)
             const enemies = [];
             const nameCount = {}; 
 
@@ -3437,21 +3687,17 @@ function processBattle(node) {
                 if (!nameCount[def.name]) nameCount[def.name] = 0;
                 nameCount[def.name]++;
                 
-                // 変数解決ヘルパー
                 const val = (v, d) => (v !== undefined && v !== "") ? Number(resolveValue(v)) : d;
 
                 const enemyObj = {
                     id: eid,
                     originalName: def.name,
-                    name: def.name, // 後でサフィックス付与
-                    
-                    // ステータス
+                    name: def.name,
                     hp: val(def.hp, 10),
                     maxHp: val(def.hp, 10),
                     stamina: val(def.stamina, 100),
                     maxStamina: val(def.stamina, 100),
                     staminaRegen: val(def.staminaRegen, 10),
-                    
                     atk: val(def.atk, 1),
                     def: val(def.def, 0),
                     spd: (def.spd !== undefined) ? val(def.spd, 2.0) : 2.0,
@@ -3459,77 +3705,63 @@ function processBattle(node) {
                     penetration: val(def.pen, 1),
                     critRate: val(def.critRate, 5),
                     critMult: val(def.critMult, 1.5),
-                    
-                    // 画像・演出用
                     imageId: def.imageId,
                     hitParticleId: def.hitParticleId,
-                    
-                    // AI・ドロップ
                     aiPattern: def.aiPattern || 'tactical',
                     dropItemId: def.dropItemId,
                     dropRate: def.dropRate,
-
-                    // 状態フラグ
                     isDead: false,
                     isLockedOn: false
                 };
                 enemies.push(enemyObj);
             });
 
-            // 名前の重複処理 (A, B...)
             const currentNameCount = {};
             enemies.forEach(e => {
                 if (nameCount[e.originalName] > 1) {
                     if (!currentNameCount[e.originalName]) currentNameCount[e.originalName] = 0;
                     const suffix = String.fromCharCode(65 + currentNameCount[e.originalName]); 
-                    e.name = \`\${e.originalName}\${suffix}\`;
+                    e.name = e.originalName + suffix;
                     currentNameCount[e.originalName]++;
                 }
             });
 
-            // 3. バトル状態の保存
             battleState = {
                 node: node,
-                enemies: enemies,     // ★配列で管理
-                turnQueue: [],        // 行動順キュー
+                enemies: enemies, 
+                turnQueue: [],
                 isOver: false,
                 turnCount: 0,
-                
-                // ターゲット選択モード用
                 isTargetSelection: false,
                 pendingAction: null,
-                
-                // プレイヤーの一時状態
                 isGuard: false,
                 isDash: false,
                 isJump: false
             };
 
-            // 4. 背景・BGM設定
             if (node.backgroundId && gameData.assets.backgrounds[node.backgroundId]) {
-                document.getElementById('background-layer-1').style.backgroundImage = \`url('\${gameData.assets.backgrounds[node.backgroundId].data}')\`;
+                document.getElementById('background-layer-1').style.backgroundImage = "url('" + gameData.assets.backgrounds[node.backgroundId].data + "')";
             }
+            
+            battleState.previousBgmId = AudioManager._bgmId;
+
             if (node.bgmId) {
                 AudioManager.playBgm(node.bgmId, masterVolBgm);
             }
 
-            // 5. 画面描画 (敵エリアの動的生成)
             const area = document.getElementById('battle-enemy-area');
             area.innerHTML = ''; 
 
             enemies.forEach((e, index) => {
-                // コンテナ
                 const container = document.createElement('div');
                 container.className = 'enemy-container';
-                container.id = \`enemy-cnt-\${index}\`;
+                container.id = 'enemy-cnt-' + index;
                 
-                // クリックイベント (ターゲット選択用)
                 container.onclick = () => window.onEnemyClicked(index);
 
-                // 画像
                 const img = document.createElement('img');
                 img.className = 'battle-enemy-img';
-                img.id = \`enemy-img-\${index}\`; 
+                img.id = 'enemy-img-' + index; 
                 if (e.imageId && gameData.assets.characters[e.imageId]) {
                     img.src = gameData.assets.characters[e.imageId].data;
                 } else {
@@ -3540,14 +3772,13 @@ function processBattle(node) {
                     container.appendChild(dummy);
                 }
                 
-                // 個別HPバー
                 const barBg = document.createElement('div');
                 barBg.className = 'enemy-hp-bar-bg';
                 barBg.style.display = 'block'; 
                 
                 const barFill = document.createElement('div');
                 barFill.className = 'enemy-hp-bar-fill';
-                barFill.id = \`enemy-hp-bar-\${index}\`;
+                barFill.id = 'enemy-hp-bar-' + index;
                 barBg.appendChild(barFill);
 
                 container.appendChild(img);
@@ -3555,47 +3786,52 @@ function processBattle(node) {
                 area.appendChild(container);
             });
 
-            // 6. UI初期化
             ui.textBox.style.display = 'none';
             ui.overlay.style.display = 'none';
             document.getElementById('battle-overlay').style.display = 'flex';
             
-            // コマンドボタン生成
             setupBattleCommands(node);
 
             document.getElementById('battle-msg-box').innerHTML = '';
             battleLog("モンスターたちが あらわれた！");
             
-            // ロックオンマーカー隠す
             const marker = document.getElementById('battle-lock-marker');
             if(marker) marker.style.display = 'none';
 
             updateBattleStatus();
-
-            // 戦闘開始
             startBattleRound();
         }
-      window.battleAction = function(action) {
+
+        window.battleAction = function(action) {
             if (!battleState || battleState.isOver) return;
             
-            // ターゲット不要なアクションは即実行
+            if (battleState.isActing) return;
+
+            if (battleState.isTargetSelection) {
+                battleState.isTargetSelection = false;
+                const msgEl = document.getElementById('battle-target-msg');
+                if (msgEl) msgEl.style.display = 'none';
+                battleState.enemies.forEach((e, i) => {
+                    const el = document.getElementById('enemy-cnt-' + i); 
+                    if (el) el.classList.remove('target-mode');
+                });
+            }
+
             if (['guard', 'dash', 'jump', 'wait', 'run', 'item'].includes(action)) {
                 executePlayerAction(action, null);
                 return;
             }
 
-            // ターゲットが必要なアクション (attack, lockon)
             const aliveEnemies = battleState.enemies.filter(e => !e.isDead);
             
-            // 敵が1体だけなら自動選択
             if (aliveEnemies.length === 1) {
                 const targetIndex = battleState.enemies.indexOf(aliveEnemies[0]);
                 executePlayerAction(action, targetIndex);
             } else {
-                // 複数いるなら選択モードへ
                 startTargetSelection(action);
             }
         };
+
         function setupBattleCommands(node) {
             const cmdBox = document.getElementById('battle-cmd-box');
             cmdBox.innerHTML = ''; 
@@ -3617,7 +3853,8 @@ function processBattle(node) {
             if (node.canWait !== false) cmdBox.appendChild(createBtn('👀 様子を見る', 'wait'));
             if (node.canEscape !== false) cmdBox.appendChild(createBtn('🏳️ にげる', 'run'));
         }
-            function startTargetSelection(action) {
+
+        function startTargetSelection(action) {
             battleState.isTargetSelection = true;
             battleState.pendingAction = action;
             
@@ -3628,7 +3865,7 @@ function processBattle(node) {
 
             battleState.enemies.forEach((e, i) => {
                 if (!e.isDead) {
-                    const el = document.getElementById(\`enemy-cnt-\${i}\`);
+                    const el = document.getElementById('enemy-cnt-' + i);
                     if(el) el.classList.add('target-mode');
                 }
             });
@@ -3646,14 +3883,16 @@ function processBattle(node) {
             if(msgEl) msgEl.style.display = 'none';
             
             battleState.enemies.forEach((e, i) => {
-                const el = document.getElementById(\`enemy-cnt-\${i}\`);
+                const el = document.getElementById('enemy-cnt-' + i);
                 if(el) el.classList.remove('target-mode');
             });
 
             executePlayerAction(battleState.pendingAction, index);
         };
+
         async function executePlayerAction(action, targetIndex) {
-            // UIロック
+            battleState.isActing = true;
+
             const btns = document.querySelectorAll('.battle-cmd-btn');
             btns.forEach(b => { b.style.pointerEvents = 'none'; b.style.opacity = '0.6'; });
 
@@ -3661,7 +3900,6 @@ function processBattle(node) {
             const target = (targetIndex !== null) ? battleState.enemies[targetIndex] : null;
             const pData = gameData.player || {};
 
-            // --- スタミナ消費チェック ---
             const costs = {
                 attack: Number(resolveValue(pData.attackCost)) || 20,
                 guard: Number(resolveValue(pData.guardCost)) || 10,
@@ -3674,15 +3912,14 @@ function processBattle(node) {
             if (action !== 'item' && playerState.$stamina < cost) {
                 battleLog("スタミナが足りない！");
                 btns.forEach(b => { b.style.pointerEvents = 'auto'; b.style.opacity = '1.0'; });
+                battleState.isActing = false;
                 return;
             }
             if (action !== 'item') playerState.$stamina -= cost;
             updateBattleStatus();
 
-            // --- アクション分岐 ---
-
             if (action === 'attack') {
-                battleLog(\`\${pName} の攻撃！ -> \${target.name}\`);
+                battleLog(pName + " の攻撃！ -> " + target.name);
                 await wait(400);
 
                 let hitChance = 95;
@@ -3699,9 +3936,7 @@ function processBattle(node) {
                 if (Math.random() * 100 > hitChance) {
                     battleLog("ミス！ 攻撃が当たらない！");
                 } else {
-                    // ダメージ計算
                     let atk = playerState.$atk || 1;
-                    
                     let isCrit = (Math.random() * 100 < (playerState.criticalRate || 5));
                     let mult = playerState.criticalMultiplier || 2.0;
                     
@@ -3724,9 +3959,9 @@ function processBattle(node) {
                     if (target.stamina <= 0 && pData.exhaustionDmgDouble) dmg *= 2;
 
                     target.hp -= dmg;
-                    battleLog(\`\${target.name} に \${dmg} のダメージ！\`);
+                    battleLog(target.name + " に " + dmg + " のダメージ！");
                     
-                    const img = document.getElementById(\`enemy-img-\${targetIndex}\`);
+                    const img = document.getElementById('enemy-img-' + targetIndex);
                     if(img) {
                         img.classList.add('dmg-shake');
                         setTimeout(() => img.classList.remove('dmg-shake'), 400);
@@ -3740,10 +3975,10 @@ function processBattle(node) {
                 target.isLockedOn = true;
                 playerState.$isLockedOn = 1;
                 
-                battleLog(\`\${target.name} に ロックオン！\`);
+                battleLog(target.name + " に ロックオン！");
                 
                 const marker = document.getElementById('battle-lock-marker');
-                const tgtContainer = document.getElementById(\`enemy-cnt-\${targetIndex}\`);
+                const tgtContainer = document.getElementById('enemy-cnt-' + targetIndex);
                 if (marker && tgtContainer) {
                     marker.style.display = 'block';
                     const rect = tgtContainer.getBoundingClientRect();
@@ -3754,29 +3989,41 @@ function processBattle(node) {
             }
             else if (action === 'guard') {
                 battleState.isGuard = true;
-                battleLog(\`\${pName} は 身を固めた！\`);
+                battleLog(pName + " は 身を固めた！");
                 await wait(500);
             }
             else if (action === 'dash') {
                 battleState.isDash = true;
-                battleLog(\`\${pName} は 高速で移動した！\`);
+                battleLog(pName + " は 高速で移動した！");
                 await wait(500);
             }
             else if (action === 'jump') {
                 battleState.isJump = true;
-                battleLog(\`\${pName} は 高く飛び上がった！\`);
+                battleLog(pName + " は 高く飛び上がった！");
                 await wait(500);
             }
             else if (action === 'wait') {
-                battleLog(\`\${pName} は 様子をうかがっている...\`);
+                battleLog(pName + " は 様子をうかがっている...");
                 const regen = Number(resolveValue(pData.staminaRegen)) || 20;
                 playerState.$stamina = Math.min(playerState.$maxStamina, playerState.$stamina + regen * 2);
                 await wait(500);
             }
             else if (action === 'run') {
-                battleLog(\`\${pName} は 逃げ出した！\`);
+                battleLog(pName + " は 逃げ出した！");
                 await wait(800);
-                if (Math.random() < 0.5 || battleState.node.nextRunNodeId) {
+                
+                let avgEnemySpd = 1;
+                let aliveCount = 0;
+                battleState.enemies.forEach(e => {
+                    if (!e.isDead) { avgEnemySpd += e.spd; aliveCount++; }
+                });
+                avgEnemySpd /= Math.max(1, aliveCount);
+                
+                const mySpd = Number(playerState.$spd) || 4;
+                let escapeChance = 50 + (mySpd - avgEnemySpd) * 10;
+                escapeChance = Math.max(20, Math.min(95, escapeChance));
+
+                if ((Math.random() * 100) < escapeChance) {
                     battleLog("うまく逃げ切れた！");
                     await wait(1000);
                     endBattle('run');
@@ -3789,17 +4036,17 @@ function processBattle(node) {
                 toggleInventory();
                 const invWin = document.getElementById('inventory-window');
                 if(invWin) invWin.style.zIndex = "3000";
-                return; // ターンは消費しない（アイテム使用関数に任せる）
+                battleState.isActing = false;
+                return; 
             }
 
-            // --- 撃破判定 ---
             if (target && target.hp <= 0 && !target.isDead) {
                 target.hp = 0;
                 target.isDead = true;
                 await wait(500);
-                battleLog(\`\${target.name} を 倒した！\`);
+                battleLog(target.name + " を 倒した！");
                 
-                const cnt = document.getElementById(\`enemy-cnt-\${targetIndex}\`);
+                const cnt = document.getElementById('enemy-cnt-' + targetIndex);
                 if(cnt) cnt.classList.add('dead');
                 
                 if (target.isLockedOn) {
@@ -3808,23 +4055,20 @@ function processBattle(node) {
                     playerState.$isLockedOn = 0;
                 }
                 
-                // EXP獲得
                 if (target.exp > 0) gainExp(target.exp);
                 
-                // ドロップ判定
                 if (target.dropItemId && gameData.items[target.dropItemId]) {
                     if (Math.random() * 100 < (target.dropRate || 100)) {
                         const itemDef = gameData.items[target.dropItemId];
                         if (!playerState.inventory) playerState.inventory = {};
                         playerState.inventory[target.dropItemId] = (playerState.inventory[target.dropItemId] || 0) + 1;
-                        battleLog(\`\${itemDef.name} を手に入れた！\`);
+                        battleLog(itemDef.name + " を手に入れた！");
                     }
                 }
             }
 
             updateBattleStatus();
 
-            // --- 勝利判定 ---
             const allDead = battleState.enemies.every(e => e.isDead);
             if (allDead) {
                 await wait(1000);
@@ -3834,24 +4078,24 @@ function processBattle(node) {
                 return;
             }
 
-            // 次のターンへ
-            setTimeout(() => processTurnQueue(), 500);
+            setTimeout(() => {
+                battleState.isActing = false;
+                processTurnQueue();
+            }, 500);
         }
-            function startBattleRound() {
+
+        function startBattleRound() {
             if (!battleState || battleState.isOver) return;
             battleState.turnCount++;
 
-            // 行動順キューを作成
             let queue = [];
 
-            // プレイヤー
             queue.push({ 
                 type: 'player', 
                 name: battleState.node.playerNameOverride || playerState.$name || "YOU",
                 spd: Number(playerState.$spd) || 4 
             });
 
-            // 生存している敵
             battleState.enemies.forEach((e, index) => {
                 if (!e.isDead) {
                     queue.push({ 
@@ -3863,9 +4107,7 @@ function processBattle(node) {
                 }
             });
 
-            // 素早さ順にソート (降順)
             queue.sort((a, b) => b.spd - a.spd);
-            
             battleState.turnQueue = queue;
             processTurnQueue();
         }
@@ -3873,7 +4115,6 @@ function processBattle(node) {
         function processTurnQueue() {
             if (!battleState || battleState.isOver) return;
 
-            // キューが空ならラウンド終了
             if (battleState.turnQueue.length === 0) {
                 startBattleRound();
                 return;
@@ -3881,25 +4122,20 @@ function processBattle(node) {
 
             const actor = battleState.turnQueue.shift();
 
-            // 行動不能チェック
             if (actor.type === 'enemy' && battleState.enemies[actor.index].isDead) {
                 processTurnQueue();
                 return;
             }
 
             if (actor.type === 'player') {
-                // プレイヤーのターン
-                // 状態リセット
                 battleState.isGuard = false;
                 battleState.isJump = false;
                 
-                // スタミナ自然回復
                 const pData = gameData.player || {};
                 const regen = Number(resolveValue(pData.staminaRegen)) || 20;
                 playerState.$stamina = Math.min(playerState.$maxStamina, playerState.$stamina + regen);
                 updateBattleStatus();
 
-                // UIロック解除 (入力待ち)
                 const btns = document.querySelectorAll('.battle-cmd-btn');
                 btns.forEach(b => { 
                     b.style.pointerEvents = 'auto'; 
@@ -3907,31 +4143,32 @@ function processBattle(node) {
                 });
             } 
             else {
-                // 敵のターン
                 const btns = document.querySelectorAll('.battle-cmd-btn');
                 btns.forEach(b => { 
                     b.style.pointerEvents = 'none'; 
                     b.style.opacity = '0.6'; 
                 });
 
-                // AI実行
                 executeEnemyAI(actor.index);
             }
         }
-            async function executeEnemyAI(index) {
+
+        async function executeEnemyAI(index) {
+            battleState.isActing = true;
+
             const enemy = battleState.enemies[index];
             const pName = battleState.node.playerNameOverride || playerState.$name || "YOU";
 
-            // 1. スタミナ回復
             enemy.stamina = Math.min(enemy.maxStamina, enemy.stamina + enemy.staminaRegen);
             updateBattleStatus();
 
-            // 2. 行動決定 (スタミナがあれば攻撃)
             const atkCost = 20;
             if (enemy.stamina < atkCost) {
-                battleLog(\`\${enemy.name} は 様子を見ている。\`);
+                battleLog(enemy.name + " は 様子を見ている。");
                 enemy.stamina += enemy.staminaRegen * 2; 
                 await wait(1000);
+                
+                battleState.isActing = false;
                 processTurnQueue();
                 return;
             }
@@ -3939,10 +4176,9 @@ function processBattle(node) {
             enemy.stamina -= atkCost;
             updateBattleStatus();
 
-            battleLog(\`\${enemy.name} の攻撃！\`);
+            battleLog(enemy.name + " の攻撃！");
             
-            // 攻撃アニメーション
-            const img = document.getElementById(\`enemy-img-\${index}\`);
+            const img = document.getElementById('enemy-img-' + index);
             if(img) {
                 img.classList.add('enemy-attack'); 
                 setTimeout(() => img.classList.remove('enemy-attack'), 300);
@@ -3950,15 +4186,13 @@ function processBattle(node) {
             
             await wait(500);
 
-            // 命中判定
             let hitChance = 90;
             if (battleState.isDash) hitChance -= 40;
             if (battleState.isJump) hitChance -= 20;
 
             if (Math.random() * 100 > hitChance) {
-                battleLog(\`\${pName} は 攻撃をかわした！\`);
+                battleLog(pName + " は 攻撃をかわした！");
             } else {
-                // ダメージ計算
                 let atk = enemy.atk;
                 let def = playerState.$def || 0;
                 if (battleState.isGuard) def *= 2; 
@@ -3971,7 +4205,7 @@ function processBattle(node) {
                 }
 
                 playerState.$hp -= dmg;
-                battleLog(\`\${pName} は \${dmg} のダメージを受けた！\`);
+                battleLog(pName + " は " + dmg + " のダメージを受けた！");
                 
                 if (gameData.settings.autoShakeOnDamage) {
                     ui.container.classList.add('fx-shake-small');
@@ -3981,35 +4215,36 @@ function processBattle(node) {
 
             updateBattleStatus();
 
-            // 敗北判定
             if (playerState.$hp <= 0) {
                 playerState.$hp = 0;
                 await wait(1000);
                 battleLog("全滅してしまった……");
                 await wait(1000);
+                
+                battleState.isActing = false;
                 endBattle('lose');
                 return;
             }
 
             await wait(500);
+            
+            battleState.isActing = false;
             processTurnQueue();
         }
+
         function updateBattleStatus() {
-            // プレイヤー側
             const php = document.getElementById('battle-player-hp');
             const psp = document.getElementById('battle-player-sp');
             if(php) php.textContent = Math.floor(playerState.$hp);
             if(psp) psp.textContent = Math.floor(playerState.$stamina);
             
-            // 敵側 (全員分更新)
             if (battleState && battleState.enemies) {
                 battleState.enemies.forEach((e, i) => {
-                    const bar = document.getElementById(\`enemy-hp-bar-\${i}\`);
+                    const bar = document.getElementById('enemy-hp-bar-' + i);
                     if (bar) {
                         const pct = Math.max(0, (e.hp / e.maxHp) * 100);
-                        bar.style.width = \`\${pct}%\`;
+                        bar.style.width = pct + '%';
                         
-                        // 色変化
                         if (pct < 20) bar.style.background = '#ff4d4f';
                         else if (pct < 50) bar.style.background = '#faad14';
                         else bar.style.background = '#f00';
@@ -4018,6 +4253,7 @@ function processBattle(node) {
             }
         }
 
+// (ここから下は既存の function battleLog(msg) {...} に続きます)
 
 
 
@@ -4039,6 +4275,13 @@ function processBattle(node) {
         function endBattle(result) {
             battleState.isOver = true;
             document.getElementById('battle-overlay').style.display = 'none';
+            
+            // ★最適化: バトル前のBGMに自動的に戻す（マップや会話での鳴りっぱなしを防ぐ）
+            if (battleState.previousBgmId) {
+                AudioManager.playBgm(battleState.previousBgmId, masterVolBgm);
+            } else {
+                AudioManager.stopBgm(); // 元々無音だったなら止める
+            }
             
             let nextId = null;
             if (result === 'win') nextId = battleState.node.nextWinNodeId;
@@ -4165,21 +4408,23 @@ function createChoiceButtonStyle(node) {
 function processNode(nodeId) { 
             if (isProcessingNode || !nodeId) return; 
             
-            // ★追加: 履歴への記録
             nodeHistory.push(nodeId);
             if (nodeHistory.length > MAX_HISTORY) {
-                nodeHistory.shift(); // 古いものを削除
+                nodeHistory.shift(); 
             }
             
             executionCounter++; 
             if (executionCounter > 100) { 
                 console.error("Infinite loop detected!");
-                alert("エラー: シナリオの無限ループを検知しました。\\n(Waitなしでノードが100回以上連続実行されました)");
+                alert("エラー: シナリオの無限ループを検知しました。\\n(ノードが100回以上連続で呼び出されました)");
                 executionCounter = 0;
                 return;
             }
-            // 処理がスタックしないよう次フレームでカウンターをリセット
-            setTimeout(() => { executionCounter = 0; }, 0);
+            
+            // ★修正: setTimeoutでリセットするとループ検知が漏れるため、
+            // 「1フレーム(約16ms)経過したらリセットする」確実な方式に変更
+            if (window._loopResetTimer) clearTimeout(window._loopResetTimer);
+            window._loopResetTimer = setTimeout(() => { executionCounter = 0; }, 16);
 
     try {
         const node = findNode(nodeId); 
@@ -4196,6 +4441,13 @@ function processNode(nodeId) {
         if (node.type === 'text') {
             processText(node);
         } 
+        else if (node.type === 'input') {
+            processInputNode(node); 
+        }
+        // ★追加: Waitノードの実行
+        else if (node.type === 'wait') {
+            processWaitNode(node); 
+        }
         else if (node.type === 'choice') {
             processChoice(node);
         }
@@ -4248,10 +4500,23 @@ function processText(node) {
                     target.appendChild(vid); target.style.backgroundImage = 'none';
                     animState.bg = { id: null, element: null, timer: 0, frame: 0 }; 
                 } else { 
-                    target.innerHTML = ''; target.style.backgroundImage = 'url(' + asset.data + ')'; 
+                    target.innerHTML = ''; target.style.backgroundImage = \`url('\${asset.data}')\`; 
                     animState.bg = { id: node.backgroundId, element: target, timer: 0, frame: 0 }; 
                 }
-                old.style.opacity = 0; target.style.opacity = 1; setTimeout(() => { old.innerHTML = ''; old.style.backgroundImage = 'none'; }, 500); 
+                
+                target.style.display = 'block';
+                old.style.opacity = 0; target.style.opacity = 1; 
+                setTimeout(() => {
+                    const oldVid = old.querySelector('video');
+                    if (oldVid) {
+                        oldVid.pause();
+                        oldVid.removeAttribute('src'); // ソースを空にする
+                        oldVid.load(); // メモリを強制解放
+                    }
+                    old.innerHTML = ''; 
+                    old.style.backgroundImage = 'none'; 
+                }, 500); 
+                
                 activeBg = activeBg===1 ? 2 : 1; 
             }
 
@@ -4265,10 +4530,9 @@ function processText(node) {
                 let d; const s = (c.scale||100)/100; const posX = c.x || 0; const posY = c.y || 0;
                 
                 if ((asset.cols||1) > 1 || (asset.rows||1) > 1) {
-                    d = document.createElement('div'); d.className = 'sprite-char-div pos-'+(c.position||'bottom-center'); d.style.backgroundImage = 'url(' + asset.data + ')';
+                    d = document.createElement('div'); d.className = 'sprite-char-div pos-'+(c.position||'bottom-center'); d.style.backgroundImage = \`url('\${asset.data}')\`;
                     const frameW = asset.width / asset.cols; const frameH = asset.height / asset.rows; 
-                    d.style.width = frameW+'px'; d.style.height = frameH+'px'; 
-                    d.style.backgroundSize = asset.width+'px '+asset.height+'px'; d.style.backgroundPosition = '0 0';
+                    d = document.createElement('div'); d.className = 'sprite-char-div pos-'+(c.position||'bottom-center'); d.style.backgroundImage = \`url('\${asset.data}')\`;backgroundPosition = '0 0';
                     
                     const isLoop = (c.loop !== undefined) ? c.loop : true;
                     animState.characters.push({ id: c.characterId, element: d, timer: 0, frame: 0, loop: isLoop }); 
@@ -4306,13 +4570,85 @@ function processText(node) {
             }
             
             // UI更新
+// UI更新
             ui.name.style.display = node.customName?'block':'none'; 
             ui.name.textContent = node.customName ? replaceVariablesInText(node.customName) : '';
             applyNodeUIStyle(node, 'text'); 
-            ui.msg.innerHTML = replaceVariablesInText(node.message || ''); 
             ui.textBox.style.display = node.message?'block':'none'; 
             ui.choices.innerHTML=''; 
             ui.overlay.style.display='block';
+            
+            // ★新機能: タイプライター演出（一文字ずつ表示）
+            const fullHtml = replaceVariablesInText(node.message || '');
+            
+            if (isSkip || isAuto || fullHtml === '') {
+                // スキップ中やオート中は一瞬で出す
+                ui.msg.innerHTML = fullHtml;
+                isWaitingForInput = true;
+                checkAuto();
+            } else {
+                // 通常時は一文字ずつ表示
+                ui.msg.innerHTML = '';
+                isWaitingForInput = false; // 表示が終わるまで進行不可
+                
+                // HTMLタグを壊さずに一文字ずつパースする
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = fullHtml;
+                
+                let nodesToType = [];
+                const extractNodes = (el) => {
+                    for (let child of el.childNodes) {
+                        if (child.nodeType === 3) { // テキストノード
+                            const text = child.textContent;
+                            for (let i = 0; i < text.length; i++) {
+                                nodesToType.push({ type: 'char', char: text[i] });
+                            }
+                        } else {
+                            // 要素ノード（<br>や<span>など）
+                            nodesToType.push({ type: 'open', node: child.cloneNode(false) });
+                            extractNodes(child);
+                            nodesToType.push({ type: 'close' });
+                        }
+                    }
+                };
+                extractNodes(tempDiv);
+                
+                let currentIndex = 0;
+                let currentContainer = ui.msg;
+                const parentStack = [ui.msg];
+                
+                // ★クリックで全表示（スキップ）するための関数
+                window._skipTypewriter = () => {
+                    if (window._typewriterTimer) clearInterval(window._typewriterTimer);
+                    ui.msg.innerHTML = fullHtml; // 全開
+                    isWaitingForInput = true;
+                    window._skipTypewriter = null; // 使い終わったら消す
+                };
+                
+                window._typewriterTimer = setInterval(() => {
+                    if (currentIndex >= nodesToType.length) {
+                        clearInterval(window._typewriterTimer);
+                        isWaitingForInput = true;
+                        window._skipTypewriter = null;
+                        checkAuto();
+                        return;
+                    }
+                    
+                    const n = nodesToType[currentIndex];
+                    if (n.type === 'char') {
+                        currentContainer.appendChild(document.createTextNode(n.char));
+                    } else if (n.type === 'open') {
+                        currentContainer.appendChild(n.node);
+                        parentStack.push(n.node);
+                        currentContainer = n.node;
+                    } else if (n.type === 'close') {
+                        parentStack.pop();
+                        currentContainer = parentStack[parentStack.length - 1];
+                    }
+                    currentIndex++;
+                    
+                }, 30); // 30ミリ秒ごとに1文字（スピードはお好みで）
+            }
             
             if(node.message) {
                 backLog.push({name:node.customName, text:node.message, type:'text'});
@@ -4433,6 +4769,233 @@ function processText(node) {
             isWaitingForInput = true; 
             checkAuto();
         }
+// ★新機能: 待機(Wait)ノード処理
+        window.processWaitNode = function(node) {
+            ui.textBox.style.display = 'none'; 
+            ui.choices.innerHTML = ''; 
+            ui.overlay.style.display = 'none';
+            
+            // ★最適化: スキップ中は待機時間をほぼゼロ（10ms）にする
+            const waitTime = isSkip ? 10 : (node.waitTime || 1.0) * 1000;
+            
+            // ★最適化: 待機中に連打されても進行しないようにロックをかける
+            isWaitingForInput = false;
+            
+            // 待機中のセーブは安全性を考慮して一時的に防ぐか、そのままにするか（今回はそのまま進行）
+            setTimeout(() => {
+                // 万が一別のノードに強制ジャンプさせられていた場合は実行しない
+                if (currentPlayingNodeId !== node.id && currentPlayingNodeId !== undefined) return;
+                
+                isProcessingNode = false;
+                processNode(node.nextNodeId);
+            }, waitTime);
+        };
+
+        // ★新機能: テキスト入力ノード処理 (初期値・キャンセル対応)
+        window.processInputNode = function(node) {
+            // 1. 背景の描画 (テキストノードと同じ処理)
+            if (node.backgroundId && gameData.assets.backgrounds && gameData.assets.backgrounds[node.backgroundId]) { 
+                const asset = gameData.assets.backgrounds[node.backgroundId]; 
+                const target = activeBg===1 ? layers.bg2 : layers.bg1; 
+                const old = activeBg===1 ? layers.bg1 : layers.bg2;
+                target.style.display = 'block';
+                if (asset.data.startsWith('data:video')) {
+                    target.innerHTML = ''; 
+                    const vid = document.createElement('video'); 
+                    vid.src = asset.data; vid.autoplay = true; vid.loop = true; vid.muted = false; vid.playsInline = true; vid.className = 'bg-video';
+                    target.appendChild(vid); target.style.backgroundImage = 'none';
+                    animState.bg = { id: null, element: null, timer: 0, frame: 0 }; 
+                } else { 
+                    target.innerHTML = ''; target.style.backgroundImage = \`url('\${asset.data}')\`;
+                    animState.bg = { id: node.backgroundId, element: target, timer: 0, frame: 0 }; 
+                }
+                old.style.opacity = 0; target.style.opacity = 1; 
+                setTimeout(() => { 
+                    const oldVid = old.querySelector('video');
+                    if (oldVid) { oldVid.pause(); oldVid.removeAttribute('src'); oldVid.load(); }
+                    old.innerHTML = ''; old.style.backgroundImage = 'none'; 
+                }, 500); 
+                activeBg = activeBg===1 ? 2 : 1; 
+            }
+
+            // 2. 2Dキャラ / 3. 3Dキャラ / 4. BGM の処理 (既存のまま維持...)
+            layers.charaContainer.innerHTML=''; 
+            animState.characters = []; 
+            (node.characters||[]).forEach(c=>{ 
+                if(!gameData.assets.characters || !gameData.assets.characters[c.characterId]) return; 
+                const asset = gameData.assets.characters[c.characterId];
+                let d; const s = (c.scale||100)/100; const posX = c.x || 0; const posY = c.y || 0;
+                if ((asset.cols||1) > 1 || (asset.rows||1) > 1) {
+                    d = document.createElement('div'); d.className = 'sprite-char-div pos-'+(c.position||'bottom-center'); d.style.backgroundImage = \`url('\${asset.data}')\`;
+                    const frameW = asset.width / asset.cols; const frameH = asset.height / asset.rows; 
+                    d.style.width = frameW+'px'; d.style.height = frameH+'px'; 
+                    d.style.backgroundSize = asset.width+'px '+asset.height+'px'; d.style.backgroundPosition = '0 0';
+                    const isLoop = (c.loop !== undefined) ? c.loop : true;
+                    animState.characters.push({ id: c.characterId, element: d, timer: 0, frame: 0, loop: isLoop }); 
+                } else { 
+                    d = document.createElement('img'); d.className = 'sprite-char-img pos-'+(c.position||'bottom-center'); 
+                    d.src = asset.data;
+                }
+                d.style.transform='translateX(calc(-50% + '+posX+'px)) translateY('+posY+'px) scale('+s+')'; 
+                setTimeout(()=>d.classList.add('loaded'),10); layers.charaContainer.appendChild(d);
+            });
+            if (threeHandler && threeHandler.hideAll) threeHandler.hideAll();
+            if (node.characters3d && window.threeHandler) { 
+                node.characters3d.forEach(c => { if(c.modelId) threeHandler.showModel(c.modelId, { posX:c.posX, posY:c.posY, posZ:c.posZ, rotX:c.rotX, rotY:c.rotY, rotZ:c.rotZ, scale:c.scale, animationId:c.animationId, expression: c.expression, loop: (c.loop !== undefined) ? c.loop : true }); }); 
+            }
+            if (node.bgmId) AudioManager.playBgm(node.bgmId, masterVolBgm);
+
+            // --- 5. UIの初期化と配置 ---
+            ui.textBox.style.display = 'none'; 
+            ui.overlay.style.display = 'none';
+            ui.choices.innerHTML = ''; 
+            
+            ui.choices.style.display = 'flex';
+            ui.choices.style.flexDirection = 'column';
+            ui.choices.style.alignItems = 'center';
+            ui.choices.style.justifyContent = 'center';
+            ui.choices.style.position = 'absolute';
+            ui.choices.style.top = '50%';
+            ui.choices.style.left = '50%';
+            ui.choices.style.transform = 'translate(-50%, -50%)';
+            ui.choices.style.width = '80%';
+            ui.choices.style.maxWidth = '400px';
+            ui.choices.style.height = 'auto';
+            ui.choices.style.padding = '30px';
+            ui.choices.style.background = 'rgba(0,0,0,0.85)';
+            ui.choices.style.border = '2px solid #fff';
+            ui.choices.style.borderRadius = '15px';
+            ui.choices.style.boxShadow = '0 0 20px rgba(0,0,0,0.5)';
+            ui.choices.style.zIndex = '150';
+            ui.choices.style.pointerEvents = 'auto';
+
+            const conf = node.inputConfig || {};
+            if (node._failCount === undefined) node._failCount = 0;
+            
+            // メッセージ表示
+            const msg = document.createElement('div');
+            msg.style.color = '#fff';
+            msg.style.marginBottom = '20px';
+            msg.style.fontSize = '1.2em';
+            msg.style.fontWeight = 'bold';
+            
+            let promptText = node.message ? replaceVariablesInText(node.message).replace(/<[^>]*>?/gm, '') : "入力してください";
+            if (conf.retryLimit > 0 && node._failCount > 0) {
+                msg.innerHTML = '<span style="color:#ff4d4f;">不正解です。残り ' + (conf.retryLimit - node._failCount) + ' 回</span>';
+            } else {
+                msg.textContent = promptText;
+            }
+            
+            // 入力フィールド
+            const inputField = document.createElement('input');
+            inputField.type = (conf.typeLimit === 'number') ? 'number' : 'text';
+            inputField.maxLength = conf.maxLength || 10;
+            inputField.style.width = '100%';
+            inputField.style.padding = '12px';
+            inputField.style.fontSize = '1.3em';
+            inputField.style.borderRadius = '8px';
+            inputField.style.border = 'none';
+            inputField.style.textAlign = 'center';
+            inputField.style.marginBottom = '20px';
+            inputField.style.backgroundColor = '#fff';
+            inputField.style.color = '#000';
+            
+            // ★追加: エディタで指定された「初期値」を解決してセットする
+            if (conf.initialValue) {
+                inputField.value = String(resolveValue(conf.initialValue));
+            }
+            
+            // 決定ボタン
+            const submitBtn = document.createElement('button');
+            submitBtn.textContent = conf.btnText || "決定";
+            submitBtn.className = "choice-button"; 
+            submitBtn.style.width = '100%';
+            
+            ui.choices.append(msg, inputField, submitBtn); 
+            
+            // ★追加: キャンセルボタン（設定されている場合のみ表示）
+            if (conf.cancelText) {
+                const cancelBtn = document.createElement('button');
+                cancelBtn.textContent = conf.cancelText;
+                cancelBtn.className = "choice-button"; 
+                cancelBtn.style.width = '100%';
+                cancelBtn.style.marginTop = '10px';
+                cancelBtn.style.backgroundColor = 'transparent';
+                cancelBtn.style.border = '1px solid #aaa';
+                cancelBtn.style.color = '#aaa';
+                cancelBtn.onclick = () => {
+                    if (submitBtn.disabled) return;
+                    submitBtn.disabled = true;
+                    inputField.disabled = true;
+                    ui.choices.innerHTML = '';
+                    ui.choices.style.display = 'none';
+                    node._failCount = 0;
+                    processNode(conf.nextCancelId); // キャンセル先へ
+                };
+                ui.choices.appendChild(cancelBtn);
+            }
+            
+            // 確定処理
+            const submitAction = () => {
+                if (submitBtn.disabled) return;
+                
+                let val = inputField.value.trim();
+                
+                // ★最適化: 空欄の禁止判定
+                if (!val && !conf.allowEmpty) {
+                    inputField.style.border = "2px solid #ff4d4f"; // エラーを視覚的に伝える
+                    inputField.placeholder = "入力必須です";
+                    inputField.style.transform = "translateX(5px)";
+                    setTimeout(() => inputField.style.transform = "translateX(-5px)", 50);
+                    setTimeout(() => inputField.style.transform = "translateX(0)", 100);
+                    return; 
+                }
+                
+                submitBtn.disabled = true;
+                inputField.disabled = true;
+                
+                backLog.push({name: 'システム', text: '入力結果: 「' + (val || '(空欄)') + '」', type: 'text'});
+                if (backLog.length > 100) backLog.shift();
+
+                const targetVar = conf.targetVar || '$name';
+                let finalVal = val;
+                if (conf.typeLimit === 'number') {
+                    finalVal = Number(val);
+                    if (isNaN(finalVal)) finalVal = 0;
+                }
+
+                if (targetVar.startsWith('$')) { playerState[targetVar] = finalVal; }
+                else { gameState[targetVar] = finalVal; }
+                
+                if (typeof updateHUD === 'function') updateHUD();
+                if (targetVar === '$level' || targetVar === '$exp') {
+                    if (typeof recalculatePlayerStats === 'function') recalculatePlayerStats();
+                }
+                
+                const correctAns = conf.correctAnswer ? String(resolveValue(conf.correctAnswer)).trim() : "";
+                
+                if (correctAns === "" || val === correctAns) {
+                    ui.choices.innerHTML = '';
+                    ui.choices.style.display = 'none'; 
+                    node._failCount = 0; 
+                    processNode(conf.nextSuccessId);
+                } else {
+                    node._failCount++;
+                    if (conf.retryLimit > 0 && node._failCount >= conf.retryLimit) {
+                        ui.choices.innerHTML = '';
+                        ui.choices.style.display = 'none';
+                        node._failCount = 0;
+                        processNode(conf.nextFailId);
+                    } else {
+                        processInputNode(node); // 再試行
+                    }
+                }
+            };
+            
+            submitBtn.onclick = submitAction;
+            inputField.onkeydown = (e) => { if (e.key === 'Enter') submitAction(); };
+            setTimeout(() => inputField.focus(), 150);
+        };
 // 選択肢表示処理 (修正: 横スクロール対応 + シンタックスエラー防止のためコメント削除)
         window.processChoice = function(node) {
             ui.textBox.style.display = 'none'; 
@@ -4487,10 +5050,10 @@ function processText(node) {
                     userInteraction(); 
                     
                     if (c.action === 'load') {
-                        if (typeof loadGame === 'function') loadGame();
+                        if (typeof openLoadMenu === 'function') openLoadMenu('load');
                     } else if (c.action === 'save') {
-                        if (typeof saveGame === 'function') {
-                            saveGame();
+                        if (typeof openSaveLoadModal === 'function') {
+                            openSaveLoadModal('save');
                         }
                         backLog.push({text: c.text, type: 'choice'});
                         if (backLog.length > 100) backLog.shift();
@@ -4733,6 +5296,7 @@ function processShop(node) {
             }
             
             // --- 2. BGM変更 ---
+    let prevBgm = AudioManager._bgmId;
     if (node.bgmId) {
         AudioManager.playBgm(node.bgmId, masterVolBgm);
     }
@@ -4871,10 +5435,8 @@ function processShop(node) {
                         priceBtn.innerHTML = '購入<br>💰' + price + '<br><span style="font-size:0.8em">所持: ' + (nowStock + 1) + '</span>';
                         
                         // SE再生
-                        if (item.effects && item.effects.sound && gameData.assets.sounds && gameData.assets.sounds[item.effects.sound]) {
-                             const se = new Audio(gameData.assets.sounds[item.effects.sound].data);
-                             se.volume = masterVolSe;
-                             se.play().catch(function(e){});
+                        if (item.effects && item.effects.sound) {
+                             AudioManager.playSe(item.effects.sound, masterVolSe);
                         }
                     } else {
                         const originalText = priceBtn.innerHTML;
@@ -4906,8 +5468,18 @@ function processShop(node) {
             leaveBtn.onclick = function() {
                 overlay.style.display = 'none';
                 
-                // ★修正3: ショップを閉じたらシステムメニューを再表示
                 if (sysMenu) sysMenu.style.display = 'flex';
+                
+                // ★追加: BGMを元に戻す
+                if (node.bgmId) {
+                    if (isMapMode && mapEngine.data && mapEngine.data.bgmId) {
+                        AudioManager.playBgm(mapEngine.data.bgmId, masterVolBgm);
+                    } else if (prevBgm) {
+                        AudioManager.playBgm(prevBgm, masterVolBgm);
+                    } else {
+                        AudioManager.stopBgm();
+                    }
+                }
                 
                 processNode(node.nextNodeId);
             };
@@ -4991,11 +5563,24 @@ function checkMapEvents(p, isActionPressed) {
                 
                 if (targetNodeId) { 
                     gameState[counterKey]++; 
-                    mapEngine.eventCooldown = 60; 
+                    mapEngine.eventCooldown = 60; // 1秒間イベント再発火禁止
+                    
+                    // ★最適化: 会話無限ループ防止（接触イベントの場合、一瞬だけプレイヤーを押し戻して重なりを解除する）
+                    if (hitObj.eventTrigger === 'touch') {
+                        // プレイヤーの向いている方向と逆（あるいは中心からのベクトル）へ弾く
+                        const pushBack = grid / 4;
+                        if (mapEngine.data.type === 'side') {
+                            p.x += (p.vx > 0) ? -pushBack : pushBack;
+                        } else {
+                            p.x -= Math.cos(p.dir) * pushBack;
+                            p.y -= Math.sin(p.dir) * pushBack;
+                        }
+                    }
+                    
                     p.vx = 0; p.vy = 0;
                     processNode(targetNodeId); 
                 } 
-            } 
+            }
         }
 
        function isCrushWall(x, y, map) {
@@ -5316,6 +5901,97 @@ function updateObjectMovement(obj, dt, timeScale) {
         }
     }
 }
+// ★最適化: アニメーション画像の描画ロジックを共通化（DRY原則）
+function drawSpriteAnimation(ctx, obj, drawX, drawY, drawW, drawH, zoom, isFlip = false) {
+    let useCharId = obj.charId;
+    
+    // プレイヤーの画像切り替え判定
+    if (obj.isPlayer) {
+        const pData = gameData.player || {};
+        const p = mapEngine.player;
+        useCharId = playerState.imageId || pData.imageId;
+        if (p.invincible > 40) useCharId = playerState.imageIdDamage || pData.imageIdDamage || useCharId;
+        else if (p.attackCooldown > 5) useCharId = playerState.imageIdAttack || pData.imageIdAttack || useCharId;
+        else if ((Math.abs(p.vx) > 0.1 || Math.abs(p.vy) > 0.1)) useCharId = playerState.imageIdMove || pData.imageIdMove || useCharId;
+    } 
+    // 敵やオブジェクトの画像切り替え判定
+    else {
+        if (obj._dmgVisualTimer > 0 && obj.charIdDamage) useCharId = obj.charIdDamage;
+        else if (obj._atkVisualTimer > 0 && obj.charIdAttack) useCharId = obj.charIdAttack;
+        else if ((Math.abs(obj.currentX - obj._prevX) > 0.1 || Math.abs(obj.currentY - obj._prevY) > 0.1) && obj.charIdMove) useCharId = obj.charIdMove;
+    }
+
+    // 画像が設定されていない、または存在しない場合は false を返す
+    if (!useCharId || !gameData.assets.characters[useCharId]) return false;
+
+    // 画像キャッシュ
+    if (!mapEngine.imgCache[useCharId]) { 
+        const img = new Image(); 
+        img.src = gameData.assets.characters[useCharId].data; 
+        mapEngine.imgCache[useCharId] = img; 
+    }
+    const img = mapEngine.imgCache[useCharId];
+
+    if (img.complete && img.naturalWidth !== 0) {
+        const asset = gameData.assets.characters[useCharId];
+        const cols = asset.cols || 1; 
+        const rows = asset.rows || 1;
+        const sw = img.width / cols;
+        const sh = img.height / rows;
+        
+        // アニメーションフレーム計算
+        let frame = 0;
+        if (cols > 1 || rows > 1) {
+            frame = Math.floor(performance.now() / (1000 / (asset.fps || 12))) % (cols * rows);
+        }
+        const col = frame % cols; 
+        const row = Math.floor(frame / cols);
+        
+        // 向き(反転)の判定 (引数で指定がなければオブジェクトのdirから計算)
+        let flip = isFlip;
+        if (!isFlip && obj.dir !== undefined) {
+            if (Math.cos(obj.dir) < -0.1) flip = true;
+        }
+
+        // 被弾フラッシュ
+        if (obj._dmgVisualTimer > 20) ctx.filter = 'brightness(500%)';
+
+        if (flip) {
+            ctx.save();
+            ctx.translate(drawX + drawW, drawY);
+            ctx.scale(-1, 1);
+            // x, y を 0, 0 にして反転描画
+            ctx.drawImage(img, col * sw, row * sh, sw, sh, 0, 0, drawW, drawH);
+            ctx.restore();
+        } else {
+            ctx.drawImage(img, col * sw, row * sh, sw, sh, drawX, drawY, drawW, drawH);
+        }
+        
+        ctx.filter = 'none'; // リセット
+        return true; // 描画成功
+    }
+    return false; // ロード中またはサイズ不正
+}
+
+function drawObjectShadow(ctx, obj, drawX, drawY, drawW, drawH, zOffset) {
+    // 空中のオブジェクトか、プレイヤー自身であれば影を描画する
+    if ((obj.z || 0) > 0 || obj.isPlayer) {
+        ctx.save();
+        ctx.fillStyle = 'rgba(0,0,0,0.3)';
+        ctx.beginPath();
+        // 基準位置(足元)を中心に、楕円を描く
+        // zOffset はマップタイプ(3D, Quarter等)ごとの高さ補正値
+        ctx.ellipse(
+            drawX + drawW / 2, 
+            drawY + drawH + zOffset, 
+            drawW / 2.5, 
+            drawH / 5, 
+            0, 0, Math.PI * 2
+        );
+        ctx.fill();
+        ctx.restore();
+    }
+}
 
         // --- Render Functions ---
 function renderMapGame() { 
@@ -5524,65 +6200,17 @@ function renderMapGame() {
         ctx.save();
         ctx.globalAlpha = obj.opacity !== undefined ? obj.opacity : 1.0;
         
-        // 影
-        if ((obj.z || 0) > 0 && obj.z !== undefined) {
-            ctx.fillStyle = 'rgba(0,0,0,0.2)';
-            ctx.beginPath();
-            ctx.ellipse(drawX + objW/2, drawY + objH + (obj.z*zoom), objW/2.5, objH/5, 0, 0, Math.PI*2);
-            ctx.fill();
-        }
+        // ★最適化: 影の描画を共通化
+        drawObjectShadow(ctx, obj, drawX, drawY, objW, objH, (obj.z || 0) * zoom);
 
-        let useCharId = obj.charId;
-        if (obj.isPlayer) {
-            const pData = gameData.player || {};
-            useCharId = playerState.imageId || pData.imageId;
-            if (p.invincible > 40) useCharId = playerState.imageIdDamage || pData.imageIdDamage || useCharId;
-            else if (p.attackCooldown > 5) useCharId = playerState.imageIdAttack || pData.imageIdAttack || useCharId;
-            else if ((Math.abs(p.vx) > 0.1 || Math.abs(p.vy) > 0.1)) useCharId = playerState.imageIdMove || pData.imageIdMove || useCharId;
-        } else {
-            if (obj._dmgVisualTimer > 0 && obj.charIdDamage) useCharId = obj.charIdDamage;
-            else if (obj._atkVisualTimer > 0 && obj.charIdAttack) useCharId = obj.charIdAttack;
-            else if ((Math.abs(obj.currentX - obj._prevX) > 0.1 || Math.abs(obj.currentY - obj._prevY) > 0.1) && obj.charIdMove) useCharId = obj.charIdMove;
-        }
+        // ★最適化: 共通関数呼び出しに置き換え
+        let flip = false;
+        if (map.type === 'side' && obj.vx < 0) flip = true;
 
         let drawn = false;
-        if (obj.visualType === 'image' && useCharId && gameData.assets.characters[useCharId]) {
-            if (!mapEngine.imgCache[useCharId]) { 
-                const img = new Image(); img.src = gameData.assets.characters[useCharId].data; mapEngine.imgCache[useCharId] = img; 
-            }
-            const img = mapEngine.imgCache[useCharId];
-            if (img.complete && img.naturalWidth !== 0) {
-                const asset = gameData.assets.characters[useCharId];
-                const cols = asset.cols || 1; const rows = asset.rows || 1;
-                const frame = Math.floor(performance.now() / (1000 / (asset.fps || 12))) % (cols * rows);
-                const sw = img.width/cols, sh = img.height/rows;
-                
-                let flip = false;
-                if (obj.dir !== undefined) {
-                    if (Math.cos(obj.dir) < -0.1) flip = true;
-                }
-                if (map.type === 'side' && obj.vx < 0) flip = true;
-                                if (obj._dmgVisualTimer > 20) {
-                    // 明るさを5倍にして白飛びさせる（＝白く光る）
-                    ctx.filter = 'brightness(500%)'; 
-                    
-                    // ※赤く光らせたい場合はこちら:
-                    // ctx.filter = 'sepia(1) hue-rotate(-50deg) saturate(5)';
-                }
-
-                if (flip) {
-                    ctx.save();
-                    ctx.translate(drawX + objW, drawY);
-                    ctx.scale(-1, 1);
-                    ctx.drawImage(img, (frame%cols)*sw, Math.floor(frame/cols)*sh, sw, sh, 0, 0, objW, objH);
-                    ctx.restore();
-                } else {
-                    ctx.drawImage(img, (frame%cols)*sw, Math.floor(frame/cols)*sh, sw, sh, drawX, drawY, objW, objH);
-                }
-                    ctx.filter = 'none';
-                drawn = true;
-            }
-        } 
+        if (obj.visualType === 'image') {
+            drawn = drawSpriteAnimation(ctx, obj, drawX, drawY, objW, objH, zoom, flip);
+        }
         
         if (!drawn) {
             if (obj.roleType === 'item' || (obj.itemId && gameData.items[obj.itemId])) {
@@ -5724,7 +6352,16 @@ function renderQuarterViewGame() {
                 if (screenX < -200 || screenX > w + 200 || screenY < -200 || screenY > h + 200) return;
                 renderList.push({ obj, screenX, screenY, z: (obj.z || 0) });
             });
-            renderList.sort((a, b) => a.screenY - b.screenY);
+            
+            // ★最適化: Z座標(高さ)も考慮した精密な描画ソート
+            renderList.sort((a, b) => {
+                const ay = a.screenY - a.z;
+                const by = b.screenY - b.z;
+                if (ay === by) {
+                    return (a.obj.id > b.obj.id) ? 1 : -1;
+                }
+                return ay - by;
+            });
 
             renderList.forEach(item => {
                 const { obj, screenX, screenY, z } = item;
@@ -5741,8 +6378,8 @@ function renderQuarterViewGame() {
 
                 if (obj.isPlayer) {
                     if (!map.stageModelId && !map.playerModelId) { 
-                        ctx.fillStyle = 'rgba(0,0,0,0.3)';
-                        ctx.beginPath(); ctx.ellipse(screenX, drawBaseY - zHeight, hitboxW/2, hitboxW/4, 0, 0, Math.PI*2); ctx.fill();
+                        // ★最適化: 影の描画を共通化 (Quarter用の座標補正)
+                        drawObjectShadow(ctx, obj, screenX - hitboxW/2, drawBaseY - zHeight - hitboxH, hitboxW, hitboxH, 0);
                         
                         // 画像描画
                         const pData = gameData.player || {};
@@ -5787,31 +6424,29 @@ function renderQuarterViewGame() {
                     else if (obj._atkVisualTimer > 0 && obj.charIdAttack) useCharId = obj.charIdAttack;
                     else if ((Math.abs(obj.currentX - obj._prevX) > 0.1 || Math.abs(obj.currentY - obj._prevY) > 0.1) && obj.charIdMove) useCharId = obj.charIdMove;
 
-                    if (z > 0) {
-                        ctx.fillStyle = 'rgba(0,0,0,0.2)';
-                        ctx.beginPath(); ctx.ellipse(screenX, drawBaseY, hitboxW/2, hitboxW/4, 0, 0, Math.PI*2); ctx.fill();
-                    }
+                    drawObjectShadow(ctx, obj, screenX - hitboxW/2, drawBaseY - zHeight - hitboxH, hitboxW, hitboxH, zHeight);
 
+                    let drawn = false;
                     if (obj.visualType === 'image' && useCharId && gameData.assets.characters[useCharId]) {
-                        const img = mapEngine.imgCache[useCharId] || new Image();
-                        if (!mapEngine.imgCache[useCharId]) { img.src = gameData.assets.characters[useCharId].data; mapEngine.imgCache[useCharId] = img; }
+                        const asset = gameData.assets.characters[useCharId];
                         
-                        if (img.complete) {
-                            const asset = gameData.assets.characters[useCharId];
-                            const cols = asset.cols || 1; const rows = asset.rows || 1;
-                            let frame = 0; if(cols > 1 || rows > 1) frame = Math.floor(performance.now() / (1000/(asset.fps||12))) % (cols*rows);
-                            const col = frame % cols; const row = Math.floor(frame / cols);
-                            const sw = img.width/cols, sh = img.height/rows;
-
-                            // アスペクト比維持
-                            const spriteDrawW = sw * zoom;
-                            const spriteDrawH = sh * zoom;
-                            const spriteX = hitboxX + (hitboxW - spriteDrawW) / 2;
-                            const spriteY = drawBaseY - zHeight - spriteDrawH;
-
-                            ctx.drawImage(img, col*img.width/cols, row*img.height/rows, img.width/cols, img.height/rows, spriteX, spriteY, spriteDrawW, spriteDrawH);
+                        // 画像サイズ取得(キャッシュから)
+                        let imgW = grid, imgH = grid;
+                        if (mapEngine.imgCache[useCharId]) {
+                            imgW = mapEngine.imgCache[useCharId].width / (asset.cols||1);
+                            imgH = mapEngine.imgCache[useCharId].height / (asset.rows||1);
                         }
-                    } else if (obj.itemId && gameData.items[obj.itemId]) {
+                        
+                        // アスペクト比維持のためのサイズ計算
+                        const spriteDrawW = imgW * zoom;
+                        const spriteDrawH = imgH * zoom;
+                        const spriteX = hitboxX + (hitboxW - spriteDrawW) / 2;
+                        const spriteY = drawBaseY - zHeight - spriteDrawH;
+
+                        drawn = drawSpriteAnimation(ctx, obj, spriteX, spriteY, spriteDrawW, spriteDrawH, zoom, false);
+                    }
+                    
+                    if (!drawn && obj.itemId && gameData.items[obj.itemId]) {
     const itemData = gameData.items[obj.itemId];
     ctx.fillStyle = '#fff';
     // ボックスの幅に合わせてフォントサイズを調整
@@ -6047,28 +6682,13 @@ function renderRaycastGame() {
                     else if (sprite._atkVisualTimer > 0 && sprite.charIdAttack) useCharId = sprite.charIdAttack;
                     else if ((Math.abs(sprite.currentX - sprite._prevX) > 0.1 || Math.abs(sprite.currentY - sprite._prevY) > 0.1) && sprite.charIdMove) useCharId = sprite.charIdMove;
 
-                    if (sprite.visualType === 'image' && useCharId && gameData.assets.characters[useCharId]) {
-                        if (!mapEngine.imgCache[useCharId]) { 
-                            mapEngine.imgCache[useCharId] = new Image(); 
-                            mapEngine.imgCache[useCharId].src = gameData.assets.characters[useCharId].data; 
-                        }
-                        const img = mapEngine.imgCache[useCharId];
-                        
-if (img.complete && img.naturalWidth > 0) {
-                            const asset = gameData.assets.characters[useCharId];
-                            const cols = asset.cols || 1; const rows = asset.rows || 1;
-                            let frame = 0; if(cols > 1 || rows > 1) frame = Math.floor(performance.now() / (1000/(asset.fps||12))) % (cols * rows);
-                            const col = frame % cols; const row = Math.floor(frame / cols);
-                            
-                            // ★★★ ここが追加部分：ピカッと光らせる (変数は sprite) ★★★
-                            if (sprite._dmgVisualTimer > 20) ctx.filter = 'brightness(500%)';
-
-                            ctx.drawImage(img, col * img.width/cols, row * img.height/rows, img.width/cols, img.height/rows, destX, destY, spriteW, drawHeight);
-
-                            // ★★★ ここが追加部分：元に戻す ★★★
-                            ctx.filter = 'none';
-                        }
-                    } else if (sprite.itemId && gameData.items[sprite.itemId]) {
+let drawn = false;
+                    if (sprite.visualType === 'image') {
+                        // Raycastの時は sprite 変数に obj の情報が入っている
+                        drawn = drawSpriteAnimation(ctx, sprite, destX, destY, spriteW, drawHeight, scale, false);
+                    } 
+                    
+                    if (!drawn && sprite.itemId && gameData.items[sprite.itemId]) {
                         const itemData = gameData.items[sprite.itemId];
                         ctx.fillStyle = '#fff';
                         ctx.font = Math.floor(spriteW * 0.8) + 'px serif';
@@ -6376,40 +6996,30 @@ function renderMode7Game() {
         const baseSize = obj.isPlayer ? p.w : (obj.w || grid);
         const scaledBase = baseSize * scale;
 
-        // 画像描画
-        if (img && img.complete && img.naturalWidth > 0) {
+let drawn = false;
+        if (useCharId && gameData.assets.characters[useCharId]) {
             const asset = gameData.assets.characters[useCharId];
-            if (asset) {
-                const cols = asset.cols || 1; const rows = asset.rows || 1;
-                const sw = img.width / cols; const sh = img.height / rows;
-                const aspect = sw / sh;
-                renderH = scaledBase * (sh / grid);
-                renderW = renderH * aspect;
-
-                if (obj.isPlayer) {
-                    renderH = sh * scale;
-                    renderW = renderH * aspect;
-                }
-
-                const drawX = screenX - renderW / 2;
-                const drawY = screenY - renderH - zHeight;
-
-                let frame = 0; 
-                if (cols > 1 || rows > 1) { frame = Math.floor(performance.now() / (1000 / (asset.fps || 12))) % (cols * rows); }
-                const col = frame % cols; const row = Math.floor(frame / cols);
-                
-                // ▼▼▼ 追加: フラッシュ ▼▼▼
-                if (obj._dmgVisualTimer > 20) ctx.filter = 'brightness(500%)';
-                // ▲▲▲ 追加 ▲▲▲
-
-                ctx.drawImage(img, col * sw, row * sh, sw, sh, drawX, drawY, renderW, renderH);
-                
-                // ▼▼▼ 追加: 解除 ▼▼▼
-                ctx.filter = 'none';
-                // ▲▲▲ 追加 ▲▲▲
+            let sw = grid, sh = grid;
+            if (mapEngine.imgCache[useCharId]) {
+                sw = mapEngine.imgCache[useCharId].width / (asset.cols||1);
+                sh = mapEngine.imgCache[useCharId].height / (asset.rows||1);
             }
+            const aspect = sw / sh;
+            renderH = scaledBase * (sh / grid);
+            renderW = renderH * aspect;
+
+            if (obj.isPlayer) {
+                renderH = sh * scale;
+                renderW = renderH * aspect;
+            }
+
+            const drawX = screenX - renderW / 2;
+            const drawY = screenY - renderH - zHeight;
+
+            drawn = drawSpriteAnimation(ctx, obj, drawX, drawY, renderW, renderH, scale, false);
         }
-        else if (obj.itemId && gameData.items[obj.itemId]) {
+        
+        if (!drawn && obj.itemId && gameData.items[obj.itemId]) {
             const itemData = gameData.items[obj.itemId];
             ctx.fillStyle = '#fff';
             const fontSize = scaledBase * 0.8;
@@ -6733,22 +7343,34 @@ function renderTrapezoidGame() {
         });
     }
 
-    // 奥(Y小)から手前(Y大)へソート
+    // ★最適化: Zファイティング防止の精密なソート（これ1つだけでOK！）
     allObjects.sort((a, b) => {
-        const ay = a.isPlayer ? a.y : (a.currentY !== undefined ? a.currentY : a.y * grid);
-        const by = b.isPlayer ? b.y : (b.currentY !== undefined ? b.currentY : b.y * grid);
+        const ay = (a.isPlayer ? a.y : (a.currentY !== undefined ? a.currentY : a.y * grid)) + (a.z || 0);
+        const by = (b.isPlayer ? b.y : (b.currentY !== undefined ? b.currentY : b.y * grid)) + (b.z || 0);
+        if (ay === by) {
+            // IDが存在しない(ダミーのプレイヤー等)場合のエラーを回避
+            const idA = a.id || '';
+            const idB = b.id || '';
+            return (idA > idB) ? 1 : -1;
+        }
         return ay - by; 
     });
 
+    // 描画ループ
     allObjects.forEach(obj => {
         let cx, cy;
-        if (obj.isPlayer) { cx = obj.x + obj.w / 2; cy = obj.y + obj.h / 2; } 
-        else { cx = (obj.currentX !== undefined ? obj.currentX : obj.x * grid) + (obj.w||grid)/2; cy = (obj.currentY !== undefined ? obj.currentY : obj.y * grid) + (obj.h||grid)/2; }
+        if (obj.isPlayer) { 
+            cx = obj.x + obj.w / 2; 
+            cy = obj.y + obj.h / 2; 
+        } else { 
+            cx = (obj.currentX !== undefined ? obj.currentX : obj.x * grid) + (obj.w||grid)/2; 
+            cy = (obj.currentY !== undefined ? obj.currentY : obj.y * grid) + (obj.h||grid)/2; 
+        }
 
         let mapX = cx;
         let mapY = cy;
 
-        // ループ時の座標補正 (プレイヤーに近い位置を選ぶ)
+        // ループ時の座標補正
         if (loopX) {
             if (mapX - pX < -mapPixelW/2) mapX += mapPixelW;
             else if (mapX - pX > mapPixelW/2) mapX -= mapPixelW;
@@ -6780,47 +7402,11 @@ function renderTrapezoidGame() {
         ctx.save();
         ctx.globalAlpha = obj.opacity !== undefined ? obj.opacity : 1.0;
 
-        if ((obj.z||0) > 0 || obj.isPlayer) {
-            ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath();
-            ctx.ellipse(screenX, screenY, drawW/2, drawW/6, 0, 0, Math.PI*2); ctx.fill();
-        }
+        // 影の描画
+        drawObjectShadow(ctx, obj, drawX, drawY, drawW, drawH, zOffset);
 
-        let useCharId = obj.charId;
-        if (obj.isPlayer) {
-            const pData = gameData.player || {}; useCharId = playerState.imageId || pData.imageId;
-            if (p.invincible > 40) useCharId = playerState.imageIdDamage || pData.imageIdDamage || useCharId;
-            else if (p.attackCooldown > 5) useCharId = playerState.imageIdAttack || pData.imageIdAttack || useCharId;
-            else if ((Math.abs(p.vx) > 0.1 || Math.abs(p.vy) > 0.1)) useCharId = playerState.imageIdMove || pData.imageIdMove || useCharId;
-        } else {
-            if (obj._dmgVisualTimer > 0 && obj.charIdDamage) useCharId = obj.charIdDamage;
-            else if (obj._atkVisualTimer > 0 && obj.charIdAttack) useCharId = obj.charIdAttack;
-            else if ((Math.abs(obj.currentX - obj._prevX) > 0.1 || Math.abs(obj.currentY - obj._prevY) > 0.1) && obj.charIdMove) useCharId = obj.charIdMove;
-        }
-
-        let drawn = false;
-        if (useCharId && gameData.assets.characters[useCharId]) {
-            if (!mapEngine.imgCache[useCharId]) { const img = new Image(); img.src = gameData.assets.characters[useCharId].data; mapEngine.imgCache[useCharId] = img; }
-            const img = mapEngine.imgCache[useCharId];
-            if (img.complete && img.naturalWidth > 0) {
-                const asset = gameData.assets.characters[useCharId];
-                const cols = asset.cols || 1; const rows = asset.rows || 1;
-                const frame = Math.floor(performance.now() / (1000 / (asset.fps || 12))) % (cols * rows);
-                const sw = img.width/cols, sh = img.height/rows;
-                
-                let flip = false;
-                if (obj.dir !== undefined) { if (Math.cos(obj.dir) < -0.1) flip = true; }
-                if (obj.isPlayer && obj.vx < 0) flip = true;
-
-                if (flip) {
-                    ctx.save(); ctx.translate(drawX + drawW, drawY); ctx.scale(-1, 1);
-                    ctx.drawImage(img, (frame%cols)*sw, Math.floor(frame/cols)*sh, sw, sh, 0, 0, drawW, drawH);
-                    ctx.restore();
-                } else {
-                    ctx.drawImage(img, (frame%cols)*sw, Math.floor(frame/cols)*sh, sw, sh, drawX, drawY, drawW, drawH);
-                }
-                drawn = true;
-            }
-        } 
+        let flip = (obj.isPlayer && obj.vx < 0);
+        let drawn = drawSpriteAnimation(ctx, obj, drawX, drawY, drawW, drawH, scale, flip);
         
         if (!drawn) {
             if (obj.itemId && gameData.items[obj.itemId]) {
@@ -6848,6 +7434,7 @@ function renderTrapezoidGame() {
         ctx.restore();
     });
 }
+
 function renderBeltGame() {
     const ctx = mapEngine.ctx; 
     const map = mapEngine.data; 
@@ -7048,6 +7635,7 @@ function renderBeltGame() {
     }
 
     // --- オブジェクト描画 ---
+    // --- オブジェクト描画 ---
     let allObjects = [...mapEngine.activeObjects];
     if (!map.stageModelId && !map.playerModelId) {
         allObjects.push({ 
@@ -7057,9 +7645,25 @@ function renderBeltGame() {
         });
     }
 
+    // ★最適化: Zファイティング防止の精密なソート
     allObjects.sort((a, b) => {
-        const ay = a.isPlayer ? a.y : (a.currentY !== undefined ? a.currentY : a.y * grid);
-        const by = b.isPlayer ? b.y : (b.currentY !== undefined ? b.currentY : b.y * grid);
+        const ay = (a.isPlayer ? a.y : (a.currentY !== undefined ? a.currentY : a.y * grid)) + (a.z || 0);
+        const by = (b.isPlayer ? b.y : (b.currentY !== undefined ? b.currentY : b.y * grid)) + (b.z || 0);
+        if (ay === by) {
+            return (a.id > b.id) ? 1 : -1;
+        }
+        return ay - by;
+    });
+
+     allObjects.sort((a, b) => {
+        const ay = (a.isPlayer ? a.y : (a.currentY !== undefined ? a.currentY : a.y * grid)) + (a.z || 0);
+        const by = (b.isPlayer ? b.y : (b.currentY !== undefined ? b.currentY : b.y * grid)) + (b.z || 0);
+        if (ay === by) {
+            // IDが存在しない(ダミーのプレイヤー等)場合のエラーを回避
+            const idA = a.id || '';
+            const idB = b.id || '';
+            return (idA > idB) ? 1 : -1;
+        }
         return ay - by;
     });
 
@@ -7089,14 +7693,7 @@ function renderBeltGame() {
 
         if (drawX > w || drawX + drawW < 0 || drawY > h || drawY + drawH < 0) return;
 
-        if ((obj.z || 0) > 0 || obj.isPlayer) {
-            ctx.save();
-            ctx.fillStyle = 'rgba(0,0,0,0.3)';
-            ctx.beginPath();
-            ctx.ellipse(screenX, screenY, drawW / 2, drawW / 6, 0, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.restore();
-        }
+        drawObjectShadow(ctx, obj, drawX, drawY, drawW, drawH, zOffset);
 
         ctx.save();
         ctx.globalAlpha = obj.opacity !== undefined ? obj.opacity : 1.0;
@@ -7114,51 +7711,20 @@ function renderBeltGame() {
             else if ((Math.abs(obj.currentX - obj._prevX) > 0.1 || Math.abs(obj.currentY - obj._prevY) > 0.1) && obj.charIdMove) useCharId = obj.charIdMove;
         }
 
-        // ★★★ 修正箇所: ここを書き換えました ★★★
-        let drawn = false;
+let drawn = false;
         if (useCharId && gameData.assets.characters[useCharId]) {
-            if (!mapEngine.imgCache[useCharId]) { 
-                mapEngine.imgCache[useCharId] = new Image(); 
-                mapEngine.imgCache[useCharId].src = gameData.assets.characters[useCharId].data; 
+            const asset = gameData.assets.characters[useCharId];
+            let sw = grid, sh = grid;
+            if (mapEngine.imgCache[useCharId]) {
+                sw = mapEngine.imgCache[useCharId].width / (asset.cols||1);
+                sh = mapEngine.imgCache[useCharId].height / (asset.rows||1);
             }
-            const img = mapEngine.imgCache[useCharId];
+            const spriteH = drawH;
+            const spriteW = spriteH * (sw / sh);
+            const spriteX = screenX - spriteW / 2;
 
-            if (img.complete && img.naturalWidth > 0) {
-                const asset = gameData.assets.characters[useCharId];
-                const cols = asset.cols || 1; const rows = asset.rows || 1;
-                const frame = Math.floor(performance.now() / (1000 / (asset.fps || 12))) % (cols * rows);
-                
-                let flip = false;
-                if (obj.dir !== undefined) {
-                    if (Math.cos(obj.dir) < -0.1) flip = true;
-                }
-
-                const sw = img.width/cols, sh = img.height/rows;
-                const spriteH = drawH;
-                const spriteW = spriteH * (sw / sh);
-                const spriteX = screenX - spriteW / 2;
-
-                // 被弾フラッシュ
-                if (obj._dmgVisualTimer > 20) ctx.filter = 'brightness(500%)';
-
-                if (flip) {
-                    ctx.save();
-                    ctx.translate(screenX, 0); 
-                    ctx.scale(-1, 1);          
-                    ctx.translate(-screenX, 0); 
-                    ctx.drawImage(img, (frame % cols) * sw, Math.floor(frame/cols) * sh, sw, sh, spriteX, drawY, spriteW, spriteH);
-                    ctx.restore();
-                } else {
-                    ctx.drawImage(img, (frame % cols) * sw, Math.floor(frame/cols) * sh, sw, sh, spriteX, drawY, spriteW, spriteH);
-                }
-                
-                // フィルタ解除
-                ctx.filter = 'none';
-                
-                drawn = true;
-            }
+            drawn = drawSpriteAnimation(ctx, obj, spriteX, drawY, spriteW, spriteH, scale, false);
         }
-        // ★★★★★★★★★★★★★★★★★★★★★★★
         
         if (!drawn) {
             if (obj.itemId && gameData.items[obj.itemId]) {
@@ -7296,41 +7862,15 @@ function renderInvestigationGame() {
         ctx.save();
         ctx.globalAlpha = obj.opacity !== undefined ? obj.opacity : 1.0;
 
-        // 影 (3D的な浮きがある場合)
-        if (oz > 0) {
-            const shadowY = (oy - camY) * zoom + drawH - (5*zoom); // 足元付近
-            ctx.fillStyle = 'rgba(0,0,0,0.3)';
-            ctx.beginPath();
-            ctx.ellipse(drawX + drawW/2, shadowY, drawW/2, drawH/6, 0, 0, Math.PI*2);
-            ctx.fill();
+        // ★最適化: 影の描画を共通化 (Z軸オフセット込み)
+        drawObjectShadow(ctx, obj, drawX, drawY, drawW, drawH, oz * zoom - (5*zoom));
+
+        let drawn = false;
+        if (obj.visualType === 'image') {
+            drawn = drawSpriteAnimation(ctx, obj, drawX, drawY, drawW, drawH, zoom, false);
         }
-
-        let useCharId = obj.charId;
-        if (obj.visualType === 'image' && useCharId && gameData.assets.characters[useCharId]) {
-            if (!mapEngine.imgCache[useCharId]) { 
-                const img = new Image(); img.src = gameData.assets.characters[useCharId].data; mapEngine.imgCache[useCharId] = img; 
-            }
-            const img = mapEngine.imgCache[useCharId];
-            
-            // ★★★ 修正箇所: ここを書き換えました ★★★
-            if (img.complete && img.naturalWidth > 0) {
-                const asset = gameData.assets.characters[useCharId];
-                const cols = asset.cols || 1; const rows = asset.rows || 1;
-                const frame = Math.floor(performance.now() / (1000 / (asset.fps || 12))) % (cols * rows);
-                const sw = img.width/cols, sh = img.height/rows;
-                const col = frame % cols; const row = Math.floor(frame / cols);
-                
-                // 被弾フラッシュ
-                if (obj._dmgVisualTimer > 20) ctx.filter = 'brightness(500%)';
-
-                ctx.drawImage(img, col*sw, row*sh, sw, sh, drawX, drawY, drawW, drawH);
-                
-                // フィルタ解除
-                ctx.filter = 'none';
-            }
-            // ★★★★★★★★★★★★★★★★★★★★★★★
-        } 
-        else if (obj.itemId && gameData.items[obj.itemId] && obj.visualType !== 'image') {
+        
+        if (!drawn && obj.itemId && gameData.items[obj.itemId] && obj.visualType !== 'image') {
             const itemData = gameData.items[obj.itemId];
             
             // アイテム背景 (選択しやすくするためのボックス)
@@ -8461,6 +9001,20 @@ function startMapMode(node) {
         // 処理再開
         return;
     }
+    
+    // ★最適化: マップが完全に切り替わる時は、前のマップの天候エフェクトをすべて消去する
+    // （これにより、雨と雪が重なって重くなるバグを防ぎます）
+    if (mapEngine.currentMapId !== node.mapId) {
+        activeEmitters = [];
+        // 画面にかかっているフィルター等も念のためリセット
+        if (ui.effect) {
+            ui.effect.style.background = "none";
+            ui.effect.style.opacity = 0;
+        }
+        if (ui.container) ui.container.style.filter = "none";
+        document.querySelectorAll('.world-layer').forEach(el => el.style.filter = "none");
+    }
+
     isMapMode = true; 
     particles = []; 
     if (window.threeHandler && window.threeHandler.clearAll) {
@@ -8847,7 +9401,13 @@ function startMapMode(node) {
     if (layers.bg1) layers.bg1.style.display = 'block';
     if (layers.bg2) layers.bg2.style.display = 'block';
 
-    if (mapEngine.isVideo && mapEngine.bgImage) { mapEngine.bgImage.pause(); mapEngine.bgImage = null; }
+    // ★修正: マップの動画背景も、一時停止だけでなく完全にソースを破棄する
+    if (mapEngine.isVideo && mapEngine.bgImage) { 
+        mapEngine.bgImage.pause(); 
+        mapEngine.bgImage.removeAttribute('src');
+        mapEngine.bgImage.load();
+        mapEngine.bgImage = null; 
+    }
 }
 
 function showDamagePopup(target, text, type) {
@@ -9013,13 +9573,16 @@ function showDamagePopup(target, text, type) {
     const container = document.getElementById('game-container');
     if (container) {
         container.appendChild(popup);
+        
+        // ★最適化: 生成したポップアップを配列に登録する
+        // (これにより、updateMapGameでquerySelectorAllを使わずに済む)
+        activePopups.push(popup);
     }
 
-    setTimeout(function() {
-        if (popup && popup.parentNode) popup.remove();
-    }, 800);
+    // ★最適化: setTimeoutでの削除は、要素が多いとズレるため廃止し、
+    // updateMapGameの中でタイマー(life)が切れた時に一括で削除する方式に統一します。
+    // (この部分は削除しました)
 }
-
 
 function updateMapGame(dt) {
     const safeDt = Math.min(dt, 100);
@@ -9079,12 +9642,13 @@ function updateMapGame(dt) {
         }
     } else {
         if (playerState.$stamina < maxSt) {
-            playerState.$stamina += (stRegen / 60) * timeScale;
+            // ★修正: 1秒間に stRegen 分回復する、FPSに依存しない絶対時間計算に変更
+            playerState.$stamina += stRegen * (safeDt / 1000);
             if (playerState.$stamina > maxSt) playerState.$stamina = maxSt;
         }
     }
 
-    if (playerState.isReloading) {
+if (playerState.isReloading) {
         playerState.reloadTimer -= safeDt / 1000;
         if (playerState.reloadTimer <= 0) {
             playerState.isReloading = false;
@@ -9092,18 +9656,35 @@ function updateMapGame(dt) {
         }
     }
     
-    // ポップアップ更新
-    const damagePopups = document.querySelectorAll('.damage-popup');
-    damagePopups.forEach(function(popup) {
-        const life = parseFloat(popup.dataset.life) - safeDt;
-        if (life <= 0) popup.remove();
-        else {
-            popup.dataset.life = life;
-            const y = parseFloat(popup.dataset.y) - (1 * timeScale);
-            popup.dataset.y = y;
-            popup.style.transform = 'translate(-50%, -50%) translateY(' + y + 'px)';
+    // ★最適化: DOM検索(querySelectorAll)を廃止し、キャッシュした配列を処理する
+    if (activePopups.length > 0) {
+        for (let i = activePopups.length - 1; i >= 0; i--) { // ★ let を追加
+            const popup = activePopups[i];
+            
+            // データセットから寿命とY座標を取得 (初期値設定もここで行う)
+            let life = popup.dataset.life ? parseFloat(popup.dataset.life) : 800; // 800ms
+            let y = popup.dataset.y ? parseFloat(popup.dataset.y) : 0;
+
+            life -= safeDt;
+            
+            if (life <= 0) {
+                // 寿命が切れたら画面から消し、配列からも削除
+                popup.remove();
+                activePopups.splice(i, 1);
+            } else {
+                // 更新
+                popup.dataset.life = life;
+                y -= 1 * timeScale; // 上へ移動
+                popup.dataset.y = y;
+                // 透明度も徐々に下げる（フェードアウト演出の追加）
+                const alpha = Math.max(0, life / 800);
+                popup.style.opacity = alpha;
+                // 元のtransform(位置のバラつき等)を維持したままY移動を重ねる
+                // ※生成時の位置(left, top)に jitter が含まれているため、translateY だけ足せばOK
+                popup.style.transform = 'translate(-50%, calc(-50% + ' + y + 'px))';
+            }
         }
-    });
+    }
 
     // --- 2. 移動・入力処理 ---
     const baseZoom = map.zoom || 1.0;
@@ -9706,11 +10287,11 @@ p.z += p.vz * timeScale;
             p.x += p.vx * timeScale;
             checkWallCollision(p, map, 'x');
             
-            // 挟まれチェック (X軸)
             if (map.crushEventNodeId && !playerState._isDeadTriggered) {
                 if (isCrushWall(p.x, p.y, map)) {
                     playerState._isDeadTriggered = true;
                     if (typeof showDamagePopup === 'function') showDamagePopup(mapEngine.player, "CRUSHED!", 'damage');
+                    endMapMode(); // マップを閉じる
                     processNode(map.crushEventNodeId);
                     return;
                 }
@@ -9725,6 +10306,7 @@ p.z += p.vz * timeScale;
                 if (isCrushWall(p.x, p.y, map)) {
                     playerState._isDeadTriggered = true;
                     if (typeof showDamagePopup === 'function') showDamagePopup(mapEngine.player, "CRUSHED!", 'damage');
+                    endMapMode(); // マップを閉じる
                     processNode(map.crushEventNodeId);
                     return;
                 }
@@ -10033,9 +10615,9 @@ const eAtk = {
             if (obj.isPlayerAttack && playerState.$isLockedOn && playerState.$lockonTargetId) {
                 const target = mapEngine.activeObjects.find(o => o.id === playerState.$lockonTargetId);
                 if (target && !target._isDead) {
-                    // ターゲットの中心座標
-                    const tx = (target.currentX || target.x * grid) + (target.w || grid) / 2;
-                    const ty = (target.currentY || target.y * grid) + (target.h || grid) / 2;
+                    // ターゲットの中心座標 (XやYが0の時のバグを回避)
+                    const tx = (target.currentX !== undefined ? target.currentX : target.x * grid) + (target.w || grid) / 2;
+                    const ty = (target.currentY !== undefined ? target.currentY : target.y * grid) + (target.h || grid) / 2;
                     // 弾の現在座標
                     const ox = obj.currentX + (obj.w || 0) / 2;
                     const oy = obj.currentY + (obj.h || 0) / 2;
@@ -10057,8 +10639,11 @@ const eAtk = {
 
                     // 新しい速度ベクトルを計算
                     const speed = Math.sqrt(obj.vx**2 + obj.vy**2);
-                    obj.vx = Math.cos(currentAngle) * speed;
-                    obj.vy = Math.sin(currentAngle) * speed;
+                    // ★修正: 速度が0(近接)の場合は誘導計算をスキップしてNaNを防ぐ
+                    if (speed > 0) {
+                        obj.vx = Math.cos(currentAngle) * speed;
+                        obj.vy = Math.sin(currentAngle) * speed;
+                    }
                 }
             }else if (obj.isEnemyAttack && obj.homingStrength > 0) {
                 // ターゲットはもちろんプレイヤー
@@ -10190,76 +10775,71 @@ const oTop = oz + (obj.h || grid); // 敵の頭
 // 「自分の足が敵の頭より下」かつ「自分の頭が敵の足より上」ならZ軸接触
 if (pRect.l < oRect.r && pRect.r > oRect.l && pRect.t < oRect.b && pRect.b > oRect.t && 
     pz < oTop && pTop > oz) { 
-                            let isStompSuccess = false;
                 
-                // 1. 設定チェック: 敵が「踏みつけ可能」か？
-                if (obj.canStomp) {
-                    if (map.type === 'side') {
-                        // サイドビュー: 落下中(vy > 0) かつ 足元が敵の中心より上
-                        const enemyCenterY = oy + objH / 2;
-                        if (p.vy > 0 && (p.y + p.h) < enemyCenterY + (grid/4)) {
-                            isStompSuccess = true;
-                            // プレイヤーを跳ねさせる
-                            p.vy = -8; // ジャンプ力 (小ジャンプ)
-                            if (mapEngine.keys['ArrowUp'] || mapEngine.keys['KeyW']) {
-                                p.vy = -12; // ボタン押しっぱなしで大ジャンプ
-                            }
-                        }
-                    } else {
-                        // トップダウン/3D: 落下中(vz < 0) かつ 高さ(z)が敵より上
-                        if (p.vz < 0 && p.z > oz + objH * 0.8){
-                            isStompSuccess = true;
-                            // プレイヤーを跳ねさせる
-                            p.vz = 8;
-                            if (mapEngine.keys['ArrowUp'] || mapEngine.keys['KeyW']) {
-                                p.vz = 12;
-                            }
-                        }
-                    }
-                }
+    let isStompSuccess = false;
+    
+    // ★修正: マリオ方式（落下中なら深くめり込んでも無条件でプレイヤー絶対有利）
+    if (obj.canStomp) {
+        if (map.type === 'side') {
+            // サイドビュー: プレイヤーが落下中(vy > 0)なら無条件で踏みつけ成功
+            if (p.vy > 0) {
+                isStompSuccess = true;
+                p.vy = -8; // ジャンプ力 (小ジャンプ)
+                if (mapEngine.keys['ArrowUp'] || mapEngine.keys['KeyW']) p.vy = -12; // 大ジャンプ
+            }
+        } else {
+            // トップダウン/3D: プレイヤーが落下中(vz < 0)なら無条件で踏みつけ成功
+            if (p.vz < 0) {
+                isStompSuccess = true;
+                p.vz = 8;
+                if (mapEngine.keys['ArrowUp'] || mapEngine.keys['KeyW']) p.vz = 12;
+            }
+        }
+    }
 
-                if (isStompSuccess) {
-                    // 踏みつけ成功時の処理
-                    if (typeof showDamagePopup === 'function') {
-                        showDamagePopup(p, "STOMP!", 'critical');
-                    }
-                    // 敵にダメージを与える
-                    if (obj._runtimeHp === undefined) obj._runtimeHp = Number(resolveValue(obj.hp || 10));
-                    
-                    // 踏みつけダメージ (固定10、あるいはプレイヤー攻撃力依存など)
-                    const stompDmg = Math.max(1, (playerState.$atk || 1));
-                    obj._runtimeHp -= stompDmg;
+    if (isStompSuccess) {
+        // 踏みつけ成功時の処理
+        if (typeof showDamagePopup === 'function') {
+            showDamagePopup(p, "STOMP!", 'critical');
+        }
+        
+        // 敵にダメージを与える
+        if (obj._runtimeHp === undefined) obj._runtimeHp = Number(resolveValue(obj.hp || 10));
+        
+        // 踏みつけダメージ (プレイヤーの攻撃力そのまま)
+        const stompDmg = Math.max(1, (playerState.$atk || 1));
+        obj._runtimeHp -= stompDmg;
 
-                    // 1. 連続踏みつけ防止用 (約0.5秒)
-                    obj._stompCooldown = 30; 
-                    
-                    // 2. 点滅演出用 (既存の仕組みを流用)
-                    // これを設定することで、自動的に白く光ります
-                    obj._dmgVisualTimer = 30; 
-                    
-                    if (gameState.showDamageText === 'on') showDamagePopup(obj, stompDmg, 'damage');
+        // 1. 連続踏みつけ防止用 (約0.5秒)
+        obj._stompCooldown = 30; 
+        
+        // 2. 点滅演出用
+        obj._dmgVisualTimer = 30; 
+        
+        if (gameState.showDamageText === 'on') showDamagePopup(obj, stompDmg, 'damage');
 
-                    // 死亡判定
-                    if (obj._runtimeHp <= 0 && obj.destructible !== false) {
-                        obj._isDead = true;
-                        // EXP, ドロップ等の処理は既存の死亡処理と同じなので、
-                        // 必要なら関数化して呼ぶか、ここではフラグだけ立てて下流に任せる
-                        // (今回は簡易的にフラグのみ)
-                        if (obj.roleType === 'enemy' && typeof gainExp === 'function') gainExp(getVal(obj.exp, 10));
-                    }
-                    
-                    // 効果音
-const hitSound = obj.hitSoundId || 'damage'; // 敵ごとの設定があればそれ、なければデフォルト
-if (gameData.assets.sounds[hitSound]) {
-    AudioManager.playSe(hitSound, masterVolSe);
-}
-obj._stompCooldown = 30; // 30フレーム(約0.5秒)
-                    // ★重要: プレイヤーへのダメージ処理をスキップして終了
-                    return; 
-                }
-                if (obj._stompCooldown > 0) return;
-                let isHit = true;
-                let damageAmount = 0;
+        // 死亡判定
+        if (obj._runtimeHp <= 0 && obj.destructible !== false) {
+            obj._isDead = true;
+            if (obj.roleType === 'enemy' && typeof gainExp === 'function') {
+                gainExp(getVal(obj.exp, 10));
+            }
+        }
+        
+        // 効果音
+        const hitSound = obj.hitSoundId || 'damage'; 
+        if (gameData.assets.sounds[hitSound]) {
+            AudioManager.playSe(hitSound, masterVolSe);
+        }
+        
+        // ★重要: プレイヤーへのダメージ処理をスキップして終了
+        return; 
+    }
+
+    if (obj._stompCooldown > 0) return;
+
+    let isHit = true;
+    let damageAmount = 0;
                 let isParry = false;
 
                 // 1. パリィ判定 (ガード中 かつ 受付時間内)
@@ -10312,7 +10892,28 @@ obj._stompCooldown = 30; // 30フレーム(約0.5秒)
                 if (isHit) {
                     playerState.$hp -= damageAmount;
                      hitStopTimer = 100; 
-                                        spawnParticle('blood', p.x + p.w/2, p.y + p.h/2, { 
+                     
+                    // ★最適化: ノックバック（のけぞり）の追加
+                    // 敵からプレイヤーへの角度を計算し、逆方向に弾き飛ばす
+                    const pCx = p.x + p.w / 2;
+                    const pCy = p.y + p.h / 2;
+                    const oCx = (obj.currentX !== undefined ? obj.currentX : obj.x * grid) + (obj.w || grid) / 2;
+                    const oCy = (obj.currentY !== undefined ? obj.currentY : obj.y * grid) + (obj.h || grid) / 2;
+                    
+                    const knockbackAngle = Math.atan2(pCy - oCy, pCx - oCx);
+                    const knockbackForce = 15; // 弾き飛ばされる強さ
+                    
+                    if (map.type === 'side') {
+                        // 横スクロールの場合は上方向にも少し跳ねる
+                        p.vx = Math.cos(knockbackAngle) * knockbackForce;
+                        p.vy = -6; 
+                        p.onGround = false;
+                    } else {
+                        p.vx = Math.cos(knockbackAngle) * knockbackForce;
+                        p.vy = Math.sin(knockbackAngle) * knockbackForce;
+                    }
+                     
+                    spawnParticle('blood', p.x + p.w/2, p.y + p.h/2, { 
                         color: '#ff0000', count: 8, speed: 6, z: p.z + p.h/2 
                     });
                     if (playerState.$hp < 0) playerState.$hp = 0; 
@@ -10591,11 +11192,11 @@ const defVal = getVal(t.defense, 0);
     if (playerState.$hp <= 0 && !playerState._isDeadTriggered) {
         const targetNodeId = map.gameoverEventNodeId || (gameData.settings && gameData.settings.globalGameoverNodeId);
         if (targetNodeId) {
-            // ★★★ 追加: ノードが存在するか確認してから遷移 ★★★
-            const targetNode = findNode(targetNodeId); // export.js内で定義されているヘルパー
+            const targetNode = findNode(targetNodeId);
             if (targetNode) {
                 playerState._isDeadTriggered = true; 
                 playerState.$hp = 0;
+                endMapMode(); // マップを閉じる
                 processNode(targetNodeId); 
                 return;
             } else {
@@ -10820,7 +11421,6 @@ function updateDungeonGame(dt) {
     
     if(mapEngine.eventCooldown > 0) mapEngine.eventCooldown -= timeScale;
     
-    // ★修正: 矢印キー OR WASDキー のどちらかが押されていれば有効にする
     // 回転 (Left/Right)
     if(mapEngine.keys['ArrowLeft'] || mapEngine.keys['KeyA']) p.dir -= rotSpeed; 
     if(mapEngine.keys['ArrowRight'] || mapEngine.keys['KeyD']) p.dir += rotSpeed;
@@ -10831,57 +11431,78 @@ function updateDungeonGame(dt) {
     if(mapEngine.keys['ArrowDown'] || mapEngine.keys['KeyS']) moveStep = -moveSpeed;
     
     if(moveStep !== 0) {
-        const nextX = p.x + Math.cos(p.dir) * moveStep; 
-        const nextY = p.y + Math.sin(p.dir) * moveStep;
+        const targetX = p.x + Math.cos(p.dir) * moveStep; 
+        const targetY = p.y + Math.sin(p.dir) * moveStep;
         
-        let gx = Math.floor(nextX / grid); 
-        let gy = Math.floor(nextY / grid);
-        
+        // ★最適化: 高速移動時の「壁抜け（すり抜け）」を防止するための連続衝突判定（Raycast的アプローチ）
         const isLoop = (map.edgeType === 'loop');
         const mapW = map.width;
         const mapH = map.height;
+        
+        // 移動距離を細かく分割（1/4マスずつチェック）
+        const dist = Math.abs(moveStep);
+        const steps = Math.max(1, Math.ceil(dist / (grid / 4)));
+        const stepX = (targetX - p.x) / steps;
+        const stepY = (targetY - p.y) / steps;
 
-        let targetGx = gx;
-        let targetGy = gy;
-
-        if (isLoop) {
-            targetGx = ((gx % mapW) + mapW) % mapW;
-            targetGy = ((gy % mapH) + mapH) % mapH;
-        }
-
-        const isWall = mapEngine.activeObjects.find(function(o) { 
-            return o.x === targetGx && o.y === targetGy && o.isWall; 
-        });
-
-        let canMove = false;
-        if (!isWall) {
-            if (isLoop) {
-                canMove = true;
-            } else {
-                if (gx >= 0 && gx < mapW && gy >= 0 && gy < mapH) canMove = true;
-            }
-        }
-
-        if (canMove) {
-            p.x = nextX; 
-            p.y = nextY;
+        let currentX = p.x;
+        let currentY = p.y;
+        
+        for (let i = 0; i < steps; i++) {
+            let nextX = currentX + stepX;
+            let nextY = currentY + stepY;
             
+            let gx = Math.floor(nextX / grid); 
+            let gy = Math.floor(nextY / grid);
+            
+            let targetGx = gx;
+            let targetGy = gy;
+
             if (isLoop) {
-                const pixelW = mapW * grid;
-                const pixelH = mapH * grid;
-                if (p.x < 0) p.x += pixelW;
-                else if (p.x >= pixelW) p.x -= pixelW;
-                
-                if (p.y < 0) p.y += pixelH;
-                else if (p.y >= pixelH) p.y -= pixelH;
+                targetGx = ((gx % mapW) + mapW) % mapW;
+                targetGy = ((gy % mapH) + mapH) % mapH;
             }
+
+            // 壁があるかチェック
+            const isWall = mapEngine.activeObjects.find(function(o) { 
+                return o.x === targetGx && o.y === targetGy && o.isWall; 
+            });
+
+            // 画面外（行き止まり）チェック
+            let isOut = false;
+            if (!isLoop && (gx < 0 || gx >= mapW || gy < 0 || gy >= mapH)) {
+                isOut = true;
+            }
+
+            if (isWall || isOut) {
+                // 壁にぶつかったらその時点で移動終了（これ以上進まない）
+                break;
+            }
+
+            // ぶつからなければ現在位置を更新
+            currentX = nextX;
+            currentY = nextY;
         }
-    }
+
+        // 最終的な座標を適用
+        p.x = currentX; 
+        p.y = currentY;
+            
+        // ループモード時の画面端ワープ処理
+        if (isLoop) {
+            const pixelW = mapW * grid;
+            const pixelH = mapH * grid;
+            if (p.x < 0) p.x += pixelW;
+            else if (p.x >= pixelW) p.x -= pixelW;
+            
+            if (p.y < 0) p.y += pixelH;
+            else if (p.y >= pixelH) p.y -= pixelH;
+        }
+    } // if (moveStep !== 0) の閉じカッコはここが正解
     
     checkMapEvents(p, isCheckTrigger);
 }
 
-// [export.js] mainLoop をこれに置き換え
 
 function mainLoop(timestamp) {
     if (isGamePaused) {
@@ -10892,47 +11513,47 @@ function mainLoop(timestamp) {
         
     const dt = timestamp - lastTime; 
     lastTime = timestamp;
-    if (hitStopTimer > 0) {
-        // ヒットストップ中は時間を進めず、更新処理をスキップする
-        hitStopTimer -= dt;
-        
-        // ただし、画面が止まっている間も「揺れ」だけは動かすと迫力が出るので
-        // 必要ならここでシェイク処理だけ呼ぶ等の工夫もできますが、
-        // まずはシンプルに「更新全停止」でOKです。
-    }     else {
-    updateTimers(dt); 
-    updateHUD();
-    updateParticles(dt);
 
-    // ★重要: パーティクル用キャンバス(overhead-canvas)の準備
-    const ohCanvas = document.getElementById('overhead-canvas');
+       let gameDt = dt;
+    if (hitStopTimer > 0) {
+        hitStopTimer -= dt;
+        gameDt = 0;
+    } 
+
+    updateTimers(gameDt); 
+    // ★最適化: 毎フレームHUDを更新する（これでタイマーによる変数の増減等もリアルタイムに反映される）
+    if (typeof updateHUD === 'function') updateHUD();
+    updateParticles(gameDt);
+
+    // ★最適化: DOMの取得をキャッシュ化し、毎フレームの検索をなくす
+    if (!ui.ohCanvas) {
+        ui.ohCanvas = document.getElementById('overhead-canvas');
+    }
+    const ohCanvas = ui.ohCanvas;
+    
     if (ohCanvas) {
-        // キャンバスの内部解像度を表示サイズ(CSS)に合わせる
-        // これがないと描画が拡大されたり、位置がズレたりする
+        // コンテナのサイズ取得もキャッシュできるとなお良いですが、画面リサイズ対応のため維持
         const rect = ui.container.getBoundingClientRect();
         if (ohCanvas.width !== rect.width || ohCanvas.height !== rect.height) {
             ohCanvas.width = rect.width;
             ohCanvas.height = rect.height;
         }
-        
-        // 毎フレームクリア (マップモードの renderOverheadBars でもクリアされるが、念のためここでも)
         const ctx = ohCanvas.getContext('2d');
         ctx.clearRect(0, 0, ohCanvas.width, ohCanvas.height);
     }    
-        }
 
     if (isMapMode && mapEngine.data) {
         // --- マップモードの処理 ---
         const mapType = mapEngine.data.type;
         
-        if (mapType === 'dungeon') { updateDungeonGame(dt); renderRaycastGame(); } 
-        else if (mapType === 'quarter') { updateMapGame(dt); renderQuarterViewGame(); } 
-        else if (mapType === 'mode7') { updateMapGame(dt); renderMode7Game(); } 
-        else if (mapType === 'belt') { updateMapGame(dt); renderBeltGame(); }
-        else if (mapType === 'trapezoid') { updateMapGame(dt); renderTrapezoidGame(); }
-        else if (mapType === 'adventure') { updateInvestigationGame(dt); renderInvestigationGame(); }
-        else if (mapType === 'panorama') { updatePanoramaGame(dt); renderPanoramaGame(); }
-        else { updateMapGame(dt); renderMapGame(); }
+        if (mapType === 'dungeon') { updateDungeonGame(gameDt); renderRaycastGame(); } 
+        else if (mapType === 'quarter') { updateMapGame(gameDt); renderQuarterViewGame(); } 
+        else if (mapType === 'mode7') { updateMapGame(gameDt); renderMode7Game(); } 
+        else if (mapType === 'belt') { updateMapGame(gameDt); renderBeltGame(); }
+        else if (mapType === 'trapezoid') { updateMapGame(gameDt); renderTrapezoidGame(); }
+        else if (mapType === 'adventure') { updateInvestigationGame(gameDt); renderInvestigationGame(); }
+        else if (mapType === 'panorama') { updatePanoramaGame(gameDt); renderPanoramaGame(); }
+        else { updateMapGame(gameDt); renderMapGame(); }
         
         // 3Dモデル更新
         const hasStage = !!mapEngine.data.stageModelId; 
@@ -11006,19 +11627,28 @@ const portraitSettings = ${JSON.stringify(m)};
             const container = document.getElementById('game-container');
             const w = container.clientWidth; 
             const h = container.clientHeight;
-                const dpr = window.devicePixelRatio || 1;
+            
+            // ★最適化: 設定で「低負荷モード」がONなら解像度を下げ、OFFならデバイス解像度にする
+            const s = gameData.settings || {};
+            // 低負荷モードなら dpr を 0.5 にしてピクセルを荒く（軽く）する。通常は 1.0 (またはRetinaならそれ以上)
+            const dpr = s.lowResMode ? 0.5 : (window.devicePixelRatio || 1.0);
     
     if (mapEngine.canvas) { 
-        // 内部解像度を上げる
-        mapEngine.canvas.width = w * dpr; 
-        mapEngine.canvas.height = h * dpr;
+        // 内部解像度を決定
+        mapEngine.canvas.width = Math.max(1, Math.floor(w * dpr)); 
+        mapEngine.canvas.height = Math.max(1, Math.floor(h * dpr));
         
-        // CSS上のサイズはそのまま
         mapEngine.canvas.style.width = w + 'px';
         mapEngine.canvas.style.height = h + 'px';
         
-        // コンテキストのスケールを合わせる
         mapEngine.ctx.scale(dpr, dpr);
+        mapEngine.ctx.imageSmoothingEnabled = false; 
+        
+        // ★最適化: Mode7などで使っている裏画面キャンバスもサイズ変更に合わせて破棄する。
+        // 次のフレームで正しいサイズで自動的に再生成され、画面が真っ暗になるバグを防ぎます。
+        if (mapEngine.bgCanvas) {
+            mapEngine.bgCanvas = null; 
+        }
     }
     
             if (threeHandler && threeHandler.resize) threeHandler.resize(w, h);
@@ -11086,17 +11716,18 @@ const portraitSettings = ${JSON.stringify(m)};
         }
 
 async function initializeGame() {
-            // Restore Settings
-            const savedBgm = localStorage.getItem('cfg_vol_bgm');
-            const savedSe = localStorage.getItem('cfg_vol_se');
-            if (savedBgm !== null) {
+            // ★最適化: 設定の読み込みも IndexedDB から行う
+            const savedBgm = await loadFromDB('cfg_vol_bgm');
+            const savedSe = await loadFromDB('cfg_vol_se');
+            
+            if (savedBgm !== undefined && savedBgm !== null) {
                 masterVolBgm = Number(savedBgm) / 100;
                 const slider = document.getElementById('vol-bgm');
                 const label = document.getElementById('vol-bgm-val');
                 if (slider) slider.value = savedBgm;
                 if (label) label.textContent = savedBgm + '%';
             }
-            if (savedSe !== null) {
+            if (savedSe !== undefined && savedSe !== null) {
                 masterVolSe = Number(savedSe) / 100;
                 const slider = document.getElementById('vol-se');
                 const label = document.getElementById('vol-se-val');
@@ -11261,9 +11892,11 @@ async function initializeGame() {
 
         // --- ウィンドウ非表示機能 ---
         window.addEventListener('contextmenu', (e) => {
+            // ★最適化: 画像の保存メニューなどが絶対に出ないようにデフォルト動作を殺す
+            e.preventDefault();
+            
             const s = gameData.settings || {};
             if (s.enableHideMsg !== false && !isMapMode) {
-                e.preventDefault();
                 toggleMessageWindow();
             }
         });
@@ -11275,14 +11908,53 @@ async function initializeGame() {
             if (menu) menu.classList.toggle('hidden-ui');
         };
 
+        // ★最適化: スマホの仮想キーボード出現時、画面が上に押し潰されて3Dカメラ等が壊れるのを防ぐ
+        // VisualViewport API を使って、画面全体(body)のサイズは固定したまま、表示位置だけを調整する
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', () => {
+                const container = document.getElementById('game-container');
+                if (!container) return;
+                
+                // キーボードが出た分だけ、画面が縮んだとブラウザは判定する
+                const vv = window.visualViewport;
+                const windowHeight = window.innerHeight;
+                
+                // 画面が縮んだ（キーボードが出た）場合
+                if (vv.height < windowHeight) {
+                    // コンテナの「見た目上の高さ」は元のまま維持し、上にスライドさせることで
+                    // 入力フォームをキーボードの上に逃がしつつ、背景や3Dのアスペクト比崩れを防ぐ
+                    container.style.height = windowHeight + 'px';
+                    container.style.transform = \`translateY(-\${windowHeight - vv.height}px)\`;
+                } else {
+                    // キーボードが閉じた場合、元に戻す
+                    container.style.height = '100%';
+                    container.style.transform = 'none';
+                    // 念のためウィンドウ全体をスクロール上部にリセット
+                    window.scrollTo(0, 0);
+                }
+            });
+        }
+
         // --- 操作イベントのセットアップ (元々initializeGameにあったものを移動) ---
         function setupInputEvents() {
             const adv = () => { 
+                // 処理中（ノード遷移中）の連打は完全に無視する
+                if (isProcessingNode) return;
+
                 // 非表示中の場合は戻すだけ
                 const box = document.getElementById('text-box');
                 if (box && box.classList.contains('hidden-ui')) {
                     toggleMessageWindow();
                     return;
+                }
+                
+                // ★最適化: タイプライター表示中なら、クリックで全表示（スキップ）する
+                if (typeof window._skipTypewriter === 'function') {
+                    window._skipTypewriter();
+                    // 全表示した直後は、次のクリックまで少し(100ms)待つ（連打による暴発防止）
+                    isProcessingNode = true;
+                    setTimeout(() => { isProcessingNode = false; }, 100);
+                    return; 
                 }
 
                 if(!isMapMode || isWaitingForInput) {
@@ -11325,16 +11997,22 @@ async function initializeGame() {
             document.querySelectorAll('.pad-btn').forEach(btn => {
                 const key = btn.dataset.key;
                 const startMove = (e) => { 
-                    if(e.cancelable) e.preventDefault(); mapEngine.keys[key] = true; btn.style.backgroundColor = 'rgba(255, 255, 255, 0.5)'; 
+                    if(e.cancelable) e.preventDefault(); 
+                    mapEngine.keys[key] = true; 
+                    btn.classList.add('pressed'); // ★修正: styleの直接変更からクラス制御へ
                 };
                 const endMove = (e) => { 
-                    if(e.cancelable) e.preventDefault(); mapEngine.keys[key] = false; btn.style.backgroundColor = ''; 
+                    if(e.cancelable) e.preventDefault(); 
+                    mapEngine.keys[key] = false; 
+                    btn.classList.remove('pressed'); 
                 };
                 btn.addEventListener('mousedown', startMove);
                 btn.addEventListener('touchstart', startMove, {passive: false});
                 btn.addEventListener('mouseup', endMove);
                 btn.addEventListener('touchend', endMove);
                 btn.addEventListener('mouseleave', endMove);
+                // ★追加: 電話の着信や、指が画面外に出た時のキャンセルイベントにも対応
+                btn.addEventListener('touchcancel', endMove);
             });
 
             // Keyboard & Mouse Events
@@ -11356,14 +12034,20 @@ async function initializeGame() {
                         if(visualBtn) visualBtn.classList.add('pressed');
                     }
                 } else {
-                    if ((e.code === 'Space' || e.code === 'Enter') && isWaitingForInput) {
+                    if (e.code === 'Space' || e.code === 'Enter') {
                         // 非表示解除チェック
                         const box = document.getElementById('text-box');
                         if (box && box.classList.contains('hidden-ui')) {
                             toggleMessageWindow();
-                        } else {
-                            processNode(currentNodeId);
+                            return;
                         }
+                        // ★最適化: キーボードでも文字送りをスキップ
+                        if (typeof window._skipTypewriter === 'function') {
+                            window._skipTypewriter();
+                            return;
+                        }
+                        
+                        if (isWaitingForInput) processNode(currentNodeId);
                     }
                 }
             });
@@ -11379,10 +12063,10 @@ async function initializeGame() {
             });
 
             window.addEventListener('blur', () => {
-                mapEngine.keys = {};
-                document.querySelectorAll('.map-act-btn').forEach(b => b.classList.remove('pressed'));
-                document.querySelectorAll('.pad-btn').forEach(b => b.style.backgroundColor = '');
-            });
+mapEngine.keys = {};
+// ★修正: クラス制御に変更したため、スタイルではなくクラスを剥がす
+document.querySelectorAll('.map-act-btn, .pad-btn').forEach(b => b.classList.remove('pressed'));
+})
 
             // Camera Drag
             let lastMouseX = 0, lastMouseY = 0, isDragging = false;
@@ -11427,12 +12111,15 @@ async function initializeGame() {
             };
             const endDrag = () => { isDragging = false; };
 
-            ui.container.addEventListener('mousedown', startDrag);
+             ui.container.addEventListener('mousedown', startDrag);
             ui.container.addEventListener('mousemove', doDrag);
             ui.container.addEventListener('mouseup', endDrag);
             ui.container.addEventListener('mouseleave', endDrag);
             ui.container.addEventListener('touchstart', startDrag, {passive: false});
-            ui.container.addEventListener('touchmove', doDrag, {passive: false});
+            ui.container.addEventListener('touchmove', (e) => {
+                if (isDragging) e.preventDefault(); // ドラッグ中はスクロールを阻止
+                doDrag(e);
+            }, {passive: false});
             ui.container.addEventListener('touchend', endDrag);
 
             // Mouse Tracker
@@ -11446,12 +12133,14 @@ async function initializeGame() {
                 mapEngine.mouseY = (cy - rect.top) * sy;
                 if (e.type === 'mousedown' || e.type === 'touchstart') mapEngine.isClicked = true;
             };
+            
             if (mapEngine.canvas) {
                 mapEngine.canvas.addEventListener('mousemove', trackMouse);
                 mapEngine.canvas.addEventListener('mousedown', trackMouse);
                 mapEngine.canvas.addEventListener('touchstart', trackMouse, {passive: false});
                 mapEngine.canvas.addEventListener('touchmove', (e) => { 
-                    if (isMapMode && mapEngine.data && mapEngine.data.type === 'adventure') e.preventDefault(); 
+                    // ★最適化: マップモード中は、キャンバス上でのスワイプによる画面スクロールを完全にブロックする
+                    if (isMapMode) e.preventDefault(); 
                     trackMouse(e); 
                 }, {passive: false});
             }
@@ -11463,6 +12152,24 @@ async function initializeGame() {
             lastTime = performance.now();
             requestAnimationFrame(mainLoop);
         }
+
+               document.addEventListener('touchmove', function(e) {
+            // スクロール可能な要素（テキストログ、インベントリなど）以外のタッチ操作は無効化する
+            const isScrollable = e.target.closest('#message, #choices-box, #backlog-content, #inventory-list, #shop-items-container, .modal-content, #debug-window .debug-body');
+            if (!isScrollable) {
+                e.preventDefault();
+            }
+        }, { passive: false });
+        
+        // ダブルタップズーム防止
+        let lastTouchEnd = 0;
+        document.addEventListener('touchend', function(e) {
+            const now = (new Date()).getTime();
+            if (now - lastTouchEnd <= 300) {
+                e.preventDefault();
+            }
+            lastTouchEnd = now;
+        }, { passive: false });
 
         window.onload = initializeGame;
     <\/script>
