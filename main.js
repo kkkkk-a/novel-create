@@ -101,6 +101,9 @@ async function main() {
         document.body.classList.add('mode-offline-no-3d');
     }
     // UI初期化
+    state.initQuill();
+
+    // UI初期化
     initUi();
     initUISettings();
     
