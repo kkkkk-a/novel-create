@@ -100,6 +100,41 @@ function deleteNode() {
             projectData.scenario.startNodeId = null;
         }
         
+        // ★追加: このノードを「次のノード」として指定している他のノードのリンクを解除する
+        for (const secId in projectData.scenario.sections) {
+            const sec = projectData.scenario.sections[secId];
+            for (const nId in sec.nodes) {
+                const node = sec.nodes[nId];
+                
+                // Text, Variable, UI Control, Shop, Map などの通常リンク
+                if (node.nextNodeId === activeNodeId) node.nextNodeId = '';
+                
+                // 条件分岐のリンク
+                if (node.type === 'conditional') {
+                    if (node.elseNextNodeId === activeNodeId) node.elseNextNodeId = '';
+                    if (node.conditions) {
+                        node.conditions.forEach(cond => {
+                            if (cond.nextNodeId === activeNodeId) cond.nextNodeId = '';
+                        });
+                    }
+                }
+                
+                // 選択肢のリンク
+                if (node.type === 'choice' && node.choices) {
+                    node.choices.forEach(choice => {
+                        if (choice.nextNodeId === activeNodeId) choice.nextNodeId = '';
+                    });
+                }
+                
+                // バトルのリンク
+                if (node.type === 'battle') {
+                    if (node.nextWinNodeId === activeNodeId) node.nextWinNodeId = '';
+                    if (node.nextRunNodeId === activeNodeId) node.nextRunNodeId = '';
+                    if (node.nextLoseNodeId === activeNodeId) node.nextLoseNodeId = '';
+                }
+            }
+        }
+        
         state.setActiveNodeId(null);
         ui.renderScenarioTree();
         ui.renderNodeEditor();
@@ -289,12 +324,39 @@ function applyBulkEdit(secId) {
             const node = section.nodes[nodeId];
 
             // 1. タイプ変更 (データ構造が変わるため注意)
-            if (newType && newType !== "") {
-                // タイプが変わる場合、最低限のプロパティ初期化を行う
+if (newType && newType !== "" && node.type !== newType) {
+                const oldType = node.type;
                 node.type = newType;
-                if (newType === 'text' && !node.characters) node.characters = [];
-                if (newType === 'choice' && !node.choices) node.choices = [];
-                // 他のタイプへの変換も必要に応じて...
+                
+                // ★追加: 古いタイプの不要なデータをクリーンアップ（必要なもの以外を消す）
+                // ※共通で保持すべきもの（nextNodeId, nodeLabel など）は残す
+                if (oldType === 'choice') delete node.choices;
+                if (oldType === 'variable') delete node.operations;
+                if (oldType === 'conditional') { delete node.conditions; delete node.elseNextNodeId; }
+                if (oldType === 'ui_control') delete node.uiOperations;
+                if (oldType === 'map') { delete node.mapId; delete node.spawnId; }
+                if (oldType === 'shop') { delete node.shopItems; delete node.currencyVar; }
+                if (oldType === 'battle') { delete node.enemyIds; delete node.nextWinNodeId; delete node.nextRunNodeId; delete node.nextLoseNodeId; }
+                
+                // 新しいタイプの必須プロパティを初期化
+                if (newType === 'text') {
+                    if (!node.characters) node.characters = [];
+                    if (!node.message) node.message = '';
+                } else if (newType === 'choice') {
+                    node.choices = [];
+                } else if (newType === 'variable') {
+                    node.operations = [{ type: 'variable', targetVariable: '', operator: '=', value: '' }];
+                } else if (newType === 'conditional') {
+                    node.conditions = [];
+                    node.elseNextNodeId = '';
+                } else if (newType === 'ui_control') {
+                    node.uiOperations = [];
+                } else if (newType === 'shop') {
+                    node.shopItems = [];
+                    node.currencyVar = 'money';
+                } else if (newType === 'battle') {
+                    node.enemyIds = [];
+                }
             }
 
             // 2. 名前変更 (テキストノードのみ)
