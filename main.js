@@ -85,15 +85,27 @@ async function main() {
     const is3DLoaded = await load3DModule();
 
     if (!is3DLoaded) {
-        // ダミーハンドラの設定（既存のコード）
+        // ダミーハンドラの設定（不足メソッドを補完）
         const dummyHandler = {
             init: () => {},
             resize: () => {},
             loadAssets: async () => {},
             showModel: () => {},
             hideAll: () => {},
-            ensureEditorAssetsAreLoaded: async () => {}, // エラー防止用ダミー
-            unloadModel: () => {}
+            ensureEditorAssetsAreLoaded: async () => {}, 
+            unloadModel: () => {},
+            hideStage: () => {},
+            hidePlayer: () => {},
+            clearAll: () => {},
+            stopRendering: () => {},
+            startRendering: () => {},
+            getScreenPosition: () => null,
+            syncCamera: () => {},
+            updatePlayerTransform: () => {},
+            changePlayerAnimation: () => {},
+            updateAndRender: () => {},
+            adjustTpsCameraZoom: () => {},
+            previewExpression: () => {}
         };
         state.setThreeHandler(dummyHandler);
         window.threeHandler = dummyHandler;
