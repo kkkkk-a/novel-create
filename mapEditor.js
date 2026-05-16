@@ -2,8 +2,6 @@
 
 import * as state from './state.js';
 import { createLinkedSelects, populateAssetSelect, updateAllNodeSelects, updateVariableSelects } from './ui.js';
-import * as threeHandler from './threeHandler.js'; 
-
 // エディタの状態
 let currentMapId = null;
 let currentTool = 'pointer'; 
@@ -58,8 +56,8 @@ export function initMapEditor() {
     if (!canvas) return;
     ctx = canvas.getContext('2d');
 
-    if (canvas3d) {
-        threeHandler.init(canvas3d);
+    if (canvas3d && window.threeHandler) {
+        window.threeHandler.init(canvas3d);
     }
 
     // マップ管理ボタン
@@ -332,7 +330,6 @@ export function resetMapEditor() {
     renderMapList(); 
     toggleEditorVisibility(false); 
 }
-
 export function toggleEditorVisibility(show) {
     const ui = document.getElementById('map-editor-ui'); 
     const canvasEl = document.getElementById('map-canvas'); 
@@ -352,9 +349,13 @@ export function toggleEditorVisibility(show) {
             threeHandler.hideStage();
             threeHandler.hidePlayer();
         }
+        // ★修正: タブを閉じた時に2D描画ループを停止し、ブラウザの負荷を下げる
+        if (mapEditorAnimId) {
+            cancelAnimationFrame(mapEditorAnimId);
+            mapEditorAnimId = null;
+        }
     }
 }
-
 function createNewMap() {
     const name = prompt("マップ名:", "新規マップ"); if (!name) return;
     const id = `map_${Date.now()}`;
@@ -448,6 +449,11 @@ function loadMap(id) {
     const edgeSelect = document.getElementById('map-edge-type');
     if (edgeSelect) edgeSelect.value = map.edgeType || 'clamp';
 
+    // ★ここに追加: 読み込み処理
+    const clampTopEl = document.getElementById('map-clamp-top');
+    if (clampTopEl) clampTopEl.checked = !!map.clampTop;
+    const fallDeathEl = document.getElementById('map-enable-fall-death');
+    if (fallDeathEl) fallDeathEl.checked = !!map.enableFallDeath;
         const rndMode = document.getElementById('map-random-mode');
     const rndWall = document.getElementById('map-random-wall-rate');
     const rndEnt = document.getElementById('map-random-entity-rate');
@@ -546,7 +552,10 @@ map.gravity = document.getElementById('map-gravity').value;
 
     const edgeSelect = document.getElementById('map-edge-type');
     if (edgeSelect) map.edgeType = edgeSelect.value;
-
+const clampTopEl = document.getElementById('map-clamp-top');
+    if (clampTopEl) map.clampTop = clampTopEl.checked;
+    const fallDeathEl = document.getElementById('map-enable-fall-death');
+    if (fallDeathEl) map.enableFallDeath = fallDeathEl.checked;
         const rndMode = document.getElementById('map-random-mode');
     if (rndMode) map.randomMode = rndMode.value;
     
@@ -687,113 +696,118 @@ function renderBattleEventList(list) {
         container.appendChild(row);
     });
 }
-
+// --- ▼ ここから書き換え ▼ ---
 function updateFormFromData(data) {
+    // 安全に値をセットするヘルパー関数
+    const setVal = (id, val) => {
+        const el = document.getElementById(id);
+        if (el) el.value = val;
+    };
+    const setCheck = (id, checked) => {
+        const el = document.getElementById(id);
+        if (el) el.checked = checked;
+    };
+
     // 1. 種別(Role)の反映
     const role = data.roleType || 'obstacle';
-    document.getElementById('obj-role-type').value = role;
+    setVal('obj-role-type', role);
 
     const gridW = (data.w || 32) / 32;
     const gridH = (data.h || 32) / 32;
-    
-    // フォームが存在する場合のみ値をセット
-    const elW = document.getElementById('obj-size-w');
-    const elH = document.getElementById('obj-size-h');
-    if (elW) elW.value = Math.max(1, Math.round(gridW));
-    if (elH) elH.value = Math.max(1, Math.round(gridH));
+    setVal('obj-size-w', Math.max(1, Math.round(gridW)));
+    setVal('obj-size-h', Math.max(1, Math.round(gridH)));
 
-
-    
-       updateEnemySelectOptions(); // リストを最新にする
-    document.getElementById('obj-enemy-id').value = data.enemyId || '';
+    // エネミー情報の反映
+    if (typeof updateEnemySelectOptions === 'function') updateEnemySelectOptions();
+    setVal('obj-enemy-id', data.enemyId || '');
     
     // 2. アイテム情報の反映
-    updateItemSelectOptions(data.itemId); 
-    document.getElementById('obj-item-id').value = data.itemId || '';
-    document.getElementById('obj-item-amount').value = data.itemAmount || 1;
-    document.getElementById('obj-item-pickup').value = data.itemPickup || 'touch';
+    if (typeof updateItemSelectOptions === 'function') updateItemSelectOptions(data.itemId);
+    setVal('obj-item-id', data.itemId || '');
+    setVal('obj-item-amount', data.itemAmount || 1);
+    setVal('obj-item-pickup', data.itemPickup || 'touch');
 
     // 3. 見た目・描画設定
-    document.getElementById('obj-visual-type').value = data.visualType || 'color';
-    document.getElementById('obj-render-type').value = data.renderType || 'billboard';
-    document.getElementById('obj-elevation').value = (data.z !== undefined) ? data.z : 0;
-    document.getElementById('obj-color').value = data.color || '#888888';
-    document.getElementById('obj-opacity').value = Math.round((data.opacity !== undefined ? data.opacity : 1.0) * 100);
+    setVal('obj-visual-type', data.visualType || 'color');
+    setVal('obj-render-type', data.renderType || 'billboard');
+    setVal('obj-elevation', (data.z !== undefined) ? data.z : 0);
+    setVal('obj-color', data.color || '#888888');
+    
+    const opVal = Math.round((data.opacity !== undefined ? data.opacity : 1.0) * 100);
+    setVal('obj-opacity', opVal);
+    setVal('obj-img-opacity', opVal);
     
     // 4. 画像アセット選択
     const charSelect = document.getElementById('obj-char-select'); 
-    populateAssetSelect(charSelect, 'characters', 'なし'); 
-    charSelect.value = data.charId || '';
+    if (charSelect) {
+        populateAssetSelect(charSelect, 'characters', 'なし'); 
+        charSelect.value = data.charId || '';
+    }
     
     const setupSubImg = (id, val) => {
         const el = document.getElementById(id);
-        populateAssetSelect(el, 'characters', '(基本画像と同じ)');
-        el.value = val || '';
+        if (el) {
+            populateAssetSelect(el, 'characters', '(基本画像と同じ)');
+            el.value = val || '';
+        }
     };
     setupSubImg('obj-char-move', data.charIdMove);
     setupSubImg('obj-char-attack', data.charIdAttack);
     setupSubImg('obj-char-damage', data.charIdDamage);
-    document.getElementById('obj-img-opacity').value = Math.round((data.opacity !== undefined ? data.opacity : 1.0) * 100);
     
     // 5. 出現条件
     const cond = data.condition || { variable: '', operator: '==', value: '' };
-    document.getElementById('obj-cond-var').value = cond.variable || ''; 
-    document.getElementById('obj-cond-op').value = cond.operator || '=='; 
-    document.getElementById('obj-cond-val').value = cond.value || '';
+    setVal('obj-cond-var', cond.variable || ''); 
+    setVal('obj-cond-op', cond.operator || '=='); 
+    setVal('obj-cond-val', cond.value || '');
     
     // 6. 自律移動
-    const moveType = data.moveType || 'fixed'; 
-    document.getElementById('obj-move-type').value = moveType;
-    document.getElementById('obj-spd').value = (data.spd !== undefined) ? data.spd : 2;
-    document.getElementById('obj-move-range').value = data.moveRange || 3;
-    document.getElementById('obj-move-chase-id').value = data.moveChaseId || '';
-        document.getElementById('obj-detection-range').value = (data.detectionRange !== undefined) ? data.detectionRange : 0;
-    document.getElementById('obj-territory-range').value = (data.territoryRange !== undefined) ? data.territoryRange : 0;
+    setVal('obj-move-type', data.moveType || 'fixed');
+    setVal('obj-spd', (data.spd !== undefined) ? data.spd : 2);
+    setVal('obj-move-range', data.moveRange || 3);
+    setVal('obj-move-chase-id', data.moveChaseId || '');
+    setVal('obj-detection-range', (data.detectionRange !== undefined) ? data.detectionRange : 0);
+    setVal('obj-territory-range', (data.territoryRange !== undefined) ? data.territoryRange : 0);
     
     // 7. 通常イベント
-    document.getElementById('obj-has-event').checked = !!data.hasEvent; 
-    document.getElementById('obj-event-trigger').value = data.eventTrigger || 'touch';
-    document.getElementById('obj-event-repeat').value = data.eventRepeat || 'once';
-    renderEventList(data.eventList || [{ nodeId: '' }]);
+    setCheck('obj-has-event', !!data.hasEvent); 
+    setVal('obj-event-trigger', data.eventTrigger || 'touch');
+    setVal('obj-event-repeat', data.eventRepeat || 'once');
+    if (typeof renderEventList === 'function') renderEventList(data.eventList || [{ nodeId: '' }]);
     
     // 8. バトルイベント (HPトリガー)
-    document.getElementById('obj-has-battle-event').checked = !!data.hasBattleEvent;
-    renderBattleEventList(data.battleEvents || []);
+    setCheck('obj-has-battle-event', !!data.hasBattleEvent);
+    if (typeof renderBattleEventList === 'function') renderBattleEventList(data.battleEvents || []);
 
     // 9. 出現点設定
-    document.getElementById('obj-is-spawn').checked = !!data.isSpawn; 
-    document.getElementById('obj-spawn-id').value = data.spawnId || '';
-    const keepEl = document.getElementById('obj-keep-destroyed');
-    if (keepEl) keepEl.checked = !!data.keepDestroyed;
+    setCheck('obj-is-spawn', !!data.isSpawn); 
+    setVal('obj-spawn-id', data.spawnId || '');
+    setCheck('obj-keep-destroyed', !!data.keepDestroyed);
     
     // 10. バトルステータス
-    document.getElementById('obj-battle-hp').value = (data.hp !== undefined) ? data.hp : '10';
-        document.getElementById('obj-battle-stamina').value = (data.stamina !== undefined) ? data.stamina : '';
-    document.getElementById('obj-battle-dmg').value = (data.damage !== undefined) ? data.damage : '1';
+    setVal('obj-battle-hp', (data.hp !== undefined) ? data.hp : '10');
+    setVal('obj-battle-dmg', (data.damage !== undefined) ? data.damage : '1');
+    setVal('obj-battle-exp', (data.exp !== undefined) ? data.exp : 10);
+    setCheck('obj-is-destructible', data.destructible !== false);
+    setCheck('obj-show-hp', !!data.showHpBar);
     
-    // ★追加: 経験値 (HTML側に追加したinput要素へ反映)
-    const expInput = document.getElementById('obj-battle-exp');
-    if (expInput) expInput.value = (data.exp !== undefined) ? data.exp : 10;
-
-    document.getElementById('obj-is-destructible').checked = data.destructible !== false;
-    document.getElementById('obj-show-hp').checked = !!data.showHpBar;
+    if (typeof updateItemSelectOptions === 'function') updateItemSelectOptions(data.dropItemId, 'obj-drop-item-id'); 
+    setVal('obj-drop-item-id', data.dropItemId || '');
+    setVal('obj-drop-rate', (data.dropRate !== undefined) ? data.dropRate : 100);
     
-    updateItemSelectOptions(data.dropItemId, 'obj-drop-item-id'); 
-    document.getElementById('obj-drop-item-id').value = data.dropItemId || '';
-    document.getElementById('obj-drop-rate').value = (data.dropRate !== undefined) ? data.dropRate : 100;
+    setVal('obj-battle-def', (data.defense !== undefined) ? data.defense : 0);
+    setVal('obj-battle-pen', (data.penetration !== undefined) ? data.penetration : 1);
+    setVal('obj-blast-radius', (data.blastRadius !== undefined) ? data.blastRadius : 0);
+    setVal('obj-blast-rate', (data.blastDamageRate !== undefined) ? data.blastDamageRate : 50);
     
-    document.getElementById('obj-battle-def').value = (data.defense !== undefined) ? data.defense : 0;
-    document.getElementById('obj-battle-pen').value = (data.penetration !== undefined) ? data.penetration : 1;
-    document.getElementById('obj-blast-radius').value = (data.blastRadius !== undefined) ? data.blastRadius : 0;
-    document.getElementById('obj-blast-rate').value = (data.blastDamageRate !== undefined) ? data.blastDamageRate : 50;
-    
-    document.getElementById('obj-atk-range').value = (data.attackRange !== undefined) ? data.attackRange : 32;
-    document.getElementById('obj-atk-cooldown').value = (data.attackCooldown !== undefined) ? data.attackCooldown : 60;
-    document.getElementById('obj-atk-speed').value = (data.projectileSpeed !== undefined) ? data.projectileSpeed : 0;
+    setVal('obj-atk-range', (data.attackRange !== undefined) ? data.attackRange : 32);
+    setVal('obj-atk-cooldown', (data.attackCooldown !== undefined) ? data.attackCooldown : 60);
+    setVal('obj-atk-speed', (data.projectileSpeed !== undefined) ? data.projectileSpeed : 0);
 
     // パネルの表示/非表示を役割に合わせて更新
-    updateUIVisibilityByRole(role);
+    if (typeof updateUIVisibilityByRole === 'function') updateUIVisibilityByRole(role);
 }
+// --- ▲ ここまで書き換え ▲ ---
 
 /**
  * フォームの値をオブジェクトデータに同期する（堅牢化バージョン）
@@ -870,7 +884,6 @@ function syncDataFromForm() {
         if (t.roleType && t.roleType !== role) {
             if (role !== 'enemy') {
                 delete t.enemyId;
-                delete t.stamina;
                 delete t.aiPattern;
                 delete t.detectionRange;
                 delete t.territoryRange;
@@ -1070,57 +1083,65 @@ function syncDataFromForm() {
             // ブロック(HP>0)なら破壊時に自分自身をドロップ、そうでなければドロップなし
             t.dropItemId = (t.hp > 0) ? t.itemId : ''; 
             t.dropRate = 100;
-
 } else {
             // アイテム以外の分岐
-            
-        if (role === 'enemy' || role === 'obstacle') {
-            
-            t.hp = safeGetStr('obj-battle-hp', '10');
-                       const stVal = safeGetStr('obj-battle-stamina', '');
-            if (stVal !== '') {
-                t.stamina = stVal; // 値があれば保存
-            } else {
-                delete t.stamina; // 空欄ならキーごと削除 (DB値を優先させるため)
+            if (role === 'enemy') {
+                // ★修正: エネミーの場合はマスターデータを直接参照するため、マップ上の個別ステータスは全て削除（初期化）する
+                delete t.hp;
+                delete t.stamina;
+                delete t.damage;
+                delete t.exp;
+                delete t.defense;
+                delete t.penetration;
+                delete t.blastRadius;
+                delete t.blastDamageRate;
+                delete t.destructible;
+                delete t.showHpBar;
+                delete t.dropItemId;
+                delete t.dropRate;
+                delete t.attackRange;
+                delete t.attackCooldown;
+                delete t.projectileSpeed;
+                
+                // ★追加: 個別のバトルイベント設定も削除（マスターのものを強制使用させるため）
+                delete t.hasBattleEvent;
+                delete t.battleEvents;
             }
-            
-            // 障害物は攻撃しないのでダメージは0でよいが、
-            // 「触れると痛いトゲ」を作れるように設定可能にしておくのもアリ
-            t.damage = safeGetStr('obj-battle-dmg', '0'); 
-
-            t.exp = safeGetStr('obj-battle-exp', '0'); 
-            t.defense = safeGetStr('obj-battle-def', '0');
-            t.penetration = safeGetStr('obj-battle-pen', '1');
-            
-            t.blastRadius = safeGetStr('obj-blast-radius', '0');
-            t.blastDamageRate = safeGetStr('obj-blast-rate', '50');
-            t.destructible = safeGetBool('obj-is-destructible', true);
-            t.showHpBar = safeGetBool('obj-show-hp', false);
-            
-            // ドロップ品の設定
-            t.dropItemId = safeGetStr('obj-drop-item-id', '');
-            t.dropRate = safeGetStr('obj-drop-rate', '100');
-            } else {
-                // ★障害物、装飾、ハシゴなどは戦闘パラメータを持たせない (安全のためリセット)
-                t.hp = 0;
-                t.damage = 0;
-                t.exp = 0;
-                t.defense = 0;
-                t.penetration = 1;
-                t.blastRadius = 0;
-                t.blastDamageRate = 0;
-                t.destructible = false;
-                t.showHpBar = false;
-                t.dropItemId = '';
-                t.dropRate = 0;
+            else if (role === 'obstacle') {
+                // ★修正: 障害物用の設定を保存
+                t.hp = safeGetStr('obj-battle-hp', '0');
+                t.damage = safeGetStr('obj-battle-dmg', '0'); 
+                t.defense = safeGetStr('obj-battle-def', '0');
+                t.blastRadius = safeGetStr('obj-blast-radius', '0');
+                t.blastDamageRate = safeGetStr('obj-blast-rate', '50');
+                t.destructible = safeGetBool('obj-is-destructible', true);
+                t.showHpBar = safeGetBool('obj-show-hp', false);
+                t.dropItemId = safeGetStr('obj-drop-item-id', '');
+                t.dropRate = safeGetStr('obj-drop-rate', '100');
+                
+                // 障害物に不要な戦闘パラメータは削除
+                delete t.stamina;
+                delete t.exp;
+                delete t.penetration;
+                delete t.attackRange;
+                delete t.attackCooldown;
+                delete t.projectileSpeed;
+            } 
+            else {
+                // ★装飾、ハシゴなどは戦闘パラメータを持たせない (安全のためリセット)
+                t.hp = 0; t.damage = 0; t.exp = 0; t.defense = 0; t.penetration = 1;
+                t.blastRadius = 0; t.blastDamageRate = 0; t.destructible = false;
+                t.showHpBar = false; t.dropItemId = ''; t.dropRate = 0;
             }
         }
-
-        // 攻撃アクション
-      t.attackRange = safeGetStr('obj-atk-range', '32');
-        t.attackCooldown = safeGetStr('obj-atk-cooldown', '60');
-        t.projectileSpeed = safeGetStr('obj-atk-speed', '0');
-    });
+        
+        // 攻撃アクションの保存（※上でエネミーは消去したので、残るのは実質的にはなし。将来的なギミック拡張用）
+        if (role !== 'enemy' && role !== 'obstacle') {
+            t.attackRange = safeGetStr('obj-atk-range', '32');
+            t.attackCooldown = safeGetStr('obj-atk-cooldown', '60');
+            t.projectileSpeed = safeGetStr('obj-atk-speed', '0');
+        }
+    }); // <- targets.forEach の閉じカッコ
 
     // 4. UIの表示状態を更新
     const isItem = (role === 'item');
@@ -1204,8 +1225,10 @@ function drawMap() {
         const assetOut = projectData.assets.backgrounds[map.bgOutsideId];
         if (!assetOut.data.startsWith('data:video')) {
             let imgOut = imageCache[map.bgOutsideId];
-            if (!imgOut) {
+            // ★修正: キャッシュの更新
+            if (!imgOut || imgOut.dataset_src !== assetOut.data) {
                 imgOut = new Image();
+                imgOut.dataset_src = assetOut.data;
                 imgOut.src = assetOut.data;
                 imageCache[map.bgOutsideId] = imgOut;
             }
@@ -1234,8 +1257,10 @@ function drawMap() {
                 ctx.fillText("🎬 動画背景", map.width * GRID_SIZE / 2, map.height * GRID_SIZE / 2);
             } else {
                 let img = imageCache[map.bgImageId];
-                if (!img) {
+                // ★修正: キャッシュの更新
+                if (!img || img.dataset_src !== asset.data) {
                     img = new Image();
+                    img.dataset_src = asset.data;
                     img.src = asset.data;
                     imageCache[map.bgImageId] = img;
                 }
@@ -1385,8 +1410,10 @@ function drawMap() {
         if (drawImageId && projectData.assets.characters[drawImageId]) {
             const asset = projectData.assets.characters[drawImageId];
             let img = imageCache[drawImageId];
-            if (!img) {
+            // ★修正: アセットのデータが更新されていたらキャッシュを作り直す
+            if (!img || img.dataset_src !== asset.data) {
                 img = new Image();
+                img.dataset_src = asset.data; // 元のURLを記録
                 img.src = asset.data;
                 imageCache[drawImageId] = img;
             }
@@ -1610,12 +1637,10 @@ function updateUIVisibilityByRole(role) {
     if (enemyGroup) {
         enemyGroup.style.display = (role === 'enemy') ? 'block' : 'none';
     }
-
-    // バトルステータス設定 (Enemyのみ)
+// バトルステータス設定 (障害物専用。Enemyはマスターデータ依存にするため非表示)
     if (battlePanel) {
- battlePanel.style.display = (role === 'enemy' || role === 'obstacle') ? 'block' : 'none';
+        battlePanel.style.display = (role === 'obstacle') ? 'block' : 'none';
     }
-    
     // バトルイベント(HPトリガー)設定 (Enemyのみ)
     const battleEvtCheck = document.getElementById('obj-has-battle-event');
     if (battleEvtCheck) {
@@ -1780,8 +1805,8 @@ function updateEnemySelectOptions() {
                 // マップエディタの入力欄に反映 (マス数)
                 const inputW = document.getElementById('obj-size-w');
                 const inputH = document.getElementById('obj-size-h');
-                if (inputW) inputW.value = Math.round(eW / 32);
-                if (inputH) inputH.value = Math.round(eH / 32);
+                if (inputW) inputW.value = Number(eW / 32).toFixed(2).replace(/\.00$/, '');
+                if (inputH) inputH.value = Number(eH / 32).toFixed(2).replace(/\.00$/, '');
 
                                 const eDetect = enemy.detectionRange || 0;
                 const eTerri = enemy.territoryRange || 0;
