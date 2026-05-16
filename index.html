@@ -811,6 +811,21 @@
                                     </select>
                                 </div>
 
+                                <!-- ★★★ここに追加★★★ -->
+                                <div class="form-group" style="margin-top:10px; padding:10px; background:#fff3e0; border:1px solid #ffb067; border-radius:4px;">
+                                    <label style="color:#d46b08; font-weight:bold;">▼ サイドビュー(2D横) 専用設定</label>
+                                    <div style="display:flex; flex-direction:column; gap:5px; margin-top:5px;">
+                                        <label class="checkbox-label" style="cursor:pointer;" title="マップの上端(y=0)を見えない天井にし、それ以上高く飛べなくします。">
+                                            <input type="checkbox" id="map-clamp-top">
+                                            <span>天井を閉じる (Clamp Top)</span>
+                                        </label>
+                                        <label class="checkbox-label" style="cursor:pointer;" title="マップの下端より下に落ちた場合、即座にHPを0にしてゲームオーバーにします。">
+                                            <input type="checkbox" id="map-enable-fall-death">
+                                            <span>落下死を有効にする (Fall Death)</span>
+                                        </label>
+                                    </div>
+                                </div>
+
                                 <div class="form-group"
                                     style="background:#f0fff4; padding:10px; border:1px solid #b7eb8f; border-radius:4px; margin-top:10px;">
                                     <label style="color:#389e0d; font-weight:bold;">🎲 ランダム生成モード (Roguelike)</label>
@@ -1085,137 +1100,52 @@
                                         <span>💾 取得/破壊状態を永続化 (復活しない)</span>
                                     </label>
                                 </div>
-
-
-                                <hr>
-                                <!-- ★ バトル設定全体をこのIDで囲む ★ -->
+<hr>
+                                <!-- ★ 障害物ギミック専用設定 ★ -->
                                 <div id="obj-battle-settings" style="display:none;">
-                                    <div class="form-group"
-                                        style="background:#fff7e6; padding:10px; border:1px solid #ffd591; border-radius:4px;">
-                                        <div
-                                            style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                                            <label style="color:#d46b08; font-weight:bold; margin:0;">⚔️ バトル設定</label>
-                                            <button type="button" id="open-battle-help-btn" class="secondary-button"
-                                                style="font-size:0.8em; padding:2px 8px; background:#fff; border-color:#ffd591; color:#d46b08;">❓
-                                                計算式</button>
+                                    <div class="form-group" style="background:#fff7e6; padding:10px; border:1px solid #ffd591; border-radius:4px;">
+                                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                                            <label style="color:#d46b08; font-weight:bold; margin:0;">🚧 障害物・ギミック耐久設定</label>
                                         </div>
 
-                                        <!-- 1段目: HP, スタミナ, 接触ダメ -->
-                                        <div style="display:flex; gap:5px; margin-bottom:5px;">
-                                            <div style="flex:1;">
-                                                <label style="font-size:0.8em;">HP (耐久値)</label>
-                                                <input type="text" id="obj-battle-hp" list="variable-list-options"
-                                                    placeholder="10 or $hp">
-                                            </div>
-
-                                            <!-- ★追加: スタミナ入力欄 (ツールチップ付き) -->
-                                            <div style="flex:1;">
-                                                <label
-                                                    style="font-size:0.8em; cursor:help; border-bottom:1px dotted #999;"
-                                                    title="ターン制バトル開始時の初期値です。マップ上のアクション戦闘では消費しません（無限扱い）。">
-                                                    スタミナ(※)
-                                                </label>
-                                                <input type="text" id="obj-battle-stamina" list="variable-list-options"
-                                                    placeholder="空欄=DB値">
-                                            </div>
-
-                                            <div style="flex:1;">
-                                                <label style="font-size:0.8em;">接触ダメ</label>
-                                                <input type="text" id="obj-battle-dmg" list="variable-list-options"
-                                                    placeholder="1 or $atk">
-                                            </div>
-                                        </div>
-
-                                        <!-- ★追加: ユーザーへの明示メッセージ -->
-                                        <p style="font-size:0.75em; color:#d46b08; margin:0 0 10px 0; line-height:1.3;">
-                                            ※スタミナ値は<strong>「ターン制バトル」</strong>に突入した時のみ使用されます。<br>
-                                            （マップ上のアクション戦闘では、敵はスタミナを消費しません）
-                                        </p>
-
-                                        <!-- 2段目: 防御, 貫通 (以下既存コード) -->
                                         <div style="display:flex; gap:5px; margin-bottom:10px;">
                                             <div style="flex:1;">
-                                                <label style="font-size:0.8em;">防御力</label>
-                                                <input type="text" id="obj-battle-def" placeholder="例: 0, $def"
-                                                    list="variable-list-options">
+                                                <label style="font-size:0.8em;">耐久値 (HP)</label>
+                                                <input type="text" id="obj-battle-hp" list="variable-list-options" placeholder="0で無敵">
                                             </div>
                                             <div style="flex:1;">
-                                                <label style="font-size:0.8em;">貫通力</label>
-                                                <input type="text" id="obj-battle-pen" placeholder="例: 1"
-                                                    list="variable-list-options">
+                                                <label style="font-size:0.8em;">接触ダメージ</label>
+                                                <input type="text" id="obj-battle-dmg" list="variable-list-options" placeholder="例: 1, $atk">
                                             </div>
-                                        </div>
-
-                                        <!-- 獲得EXP -->
-                                        <div style="display:flex; gap:5px; margin-bottom:5px;">
                                             <div style="flex:1;">
-                                                <label style="font-size:0.8em;">獲得EXP</label>
-                                                <!-- 修正: placeholderを追加 -->
-                                                <input type="text" id="obj-battle-exp" value="10" style="width:100%;"
-                                                    list="variable-list-options" placeholder="例: 10 + $level">
+                                                <label style="font-size:0.8em;">防御力 (DEF)</label>
+                                                <input type="text" id="obj-battle-def" placeholder="例: 0" list="variable-list-options">
                                             </div>
-                                            <div style="flex:1;"></div>
                                         </div>
 
                                         <!-- 爆発設定 -->
-                                        <div
-                                            style="display: flex; gap: 5px; margin-bottom:10px; background:#fff7e6; padding:5px; border-radius:4px; border:1px solid #ffe58f; box-sizing: border-box;">
+                                        <div style="display: flex; gap: 5px; margin-bottom:10px; background:#fff7e6; padding:5px; border-radius:4px; border:1px solid #ffe58f; box-sizing: border-box;">
                                             <div style="flex:1">
-                                                <label style="font-size:0.8em;">💥 爆発範囲 (px)</label>
-                                                <!-- 修正: placeholderを変更 (0=なし の説明を含める) -->
-                                                <input type="text" id="obj-blast-radius" value="0"
-                                                    placeholder="例: 64 (0=なし)"
-                                                    style="width:100%; box-sizing: border-box;"
-                                                    list="variable-list-options">
+                                                <label style="font-size:0.8em;">💥 破壊時 爆発範囲(px)</label>
+                                                <input type="text" id="obj-blast-radius" value="0" placeholder="0=なし" style="width:100%; box-sizing: border-box;" list="variable-list-options">
                                             </div>
                                             <div style="flex:1">
                                                 <label style="font-size:0.8em;">爆風倍率 (%)</label>
-                                                <!-- 修正: placeholderを追加 -->
-                                                <input type="text" id="obj-blast-rate" value="50" placeholder="例: 50"
-                                                    style="width:100%; box-sizing: border-box;"
-                                                    list="variable-list-options">
+                                                <input type="text" id="obj-blast-rate" value="50" placeholder="例: 50" style="width:100%; box-sizing: border-box;" list="variable-list-options">
                                             </div>
                                         </div>
 
                                         <div class="form-group">
-                                            <label class="checkbox-label"><input type="checkbox"
-                                                    id="obj-is-destructible"><span>💥 HP0で消滅</span></label>
-                                            <label class="checkbox-label" style="margin-top:5px;"><input type="checkbox"
-                                                    id="obj-show-hp"><span>📊 HPバーを表示</span></label>
+                                            <label class="checkbox-label"><input type="checkbox" id="obj-is-destructible"><span>💥 HP0で消滅</span></label>
+                                            <label class="checkbox-label" style="margin-top:5px;"><input type="checkbox" id="obj-show-hp"><span>📊 HPバーを表示</span></label>
                                         </div>
-                                        <div class="form-group"
-                                            style="margin-top:10px; border-top:1px dashed #ffd591; padding-top:5px;">
-                                            <label style="font-size:0.8em; color:#d46b08;">🎁 ドロップアイテム (死亡時)</label>
-                                            <select id="obj-drop-item-id" style="width:100%; margin-bottom:5px;">
-                                                <!-- JSでアイテムリストが挿入されます -->
-                                            </select>
+                                        
+                                        <div class="form-group" style="margin-top:10px; border-top:1px dashed #ffd591; padding-top:5px;">
+                                            <label style="font-size:0.8em; color:#d46b08;">🎁 破壊時のドロップアイテム</label>
+                                            <select id="obj-drop-item-id" style="width:100%; margin-bottom:5px;"></select>
                                             <div style="display:flex; align-items:center; gap:5px;">
                                                 <label style="font-size:0.8em;">確率(%)</label>
-                                                <input type="text" id="obj-drop-rate" value="100" style="width:60px;"
-                                                    list="variable-list-options" placeholder="例: 50">
-                                            </div>
-                                        </div>
-                                        <div style="margin-top:10px; padding-top:10px; border-top: 1px dashed #ffd591;">
-                                            <label style="font-size:0.9em; font-weight:bold;">攻撃アクション設定</label>
-                                            <div style="display:flex; gap:5px; margin-bottom:5px;">
-                                                <div style="flex:1;"><label style="font-size:0.7em;">射程</label>
-                                                    <!-- placeholder を変数例に変更 -->
-                                                    <input type="text" id="obj-atk-range" placeholder="例: 32"
-                                                        list="variable-list-options">
-                                                </div>
-                                                <div style="flex:1;"><label style="font-size:0.7em;">間隔</label>
-                                                    <!-- placeholder を変数例に変更 -->
-                                                    <input type="text" id="obj-atk-cooldown" placeholder="例: 60, $cool"
-                                                        list="variable-list-options">
-                                                </div>
-                                            </div>
-                                            <div style="display:flex; gap:5px;">
-                                                <div style="flex:1;"><label style="font-size:0.7em;">弾速 (1~で射撃)</label>
-                                                    <!-- placeholder を変数例に変更 -->
-                                                    <input type="text" id="obj-atk-speed" placeholder="例: 0 (近接)"
-                                                        list="variable-list-options">
-                                                </div>
-                                                <div style="flex:1;"></div>
+                                                <input type="text" id="obj-drop-rate" value="100" style="width:60px;" list="variable-list-options">
                                             </div>
                                         </div>
                                     </div>
@@ -1663,101 +1593,85 @@
                                 </div>
                             </div>
                         </div>
-
-                        <!-- ステータス設定 -->
-                        <div
-                            style="background:#fff0f6; padding:15px; border-radius:8px; border:1px solid #ffadd2; margin-bottom:20px;">
-                            <label
-                                style="font-weight:bold; color:#c41d7f; display:block; margin-bottom:10px; border-bottom:1px solid #ffadd2;">⚔️
-                                バトルステータス</label>
+<!-- ステータス設定 -->
+                        <div style="background:#fff0f6; padding:15px; border-radius:8px; border:1px solid #ffadd2; margin-bottom:20px;">
+                            <label style="font-weight:bold; color:#c41d7f; display:block; margin-bottom:10px; border-bottom:1px solid #ffadd2;">⚔️ バトルステータス</label>
+                            
                             <div class="form-group-row">
                                 <div style="flex:1"><label style="font-size:0.85em;">HP (耐久力)</label>
                                     <input type="text" id="enemy-hp" value="10" list="variable-list-options">
                                 </div>
-                                <div style="flex:1"><label style="font-size:0.85em;">攻撃力 (ATK)</label>
-                                    <input type="text" id="enemy-atk" value="1" list="variable-list-options"
-                                        placeholder="例: 5, difficulty">
+                                <div style="flex:1"><label style="font-size:0.85em;">最大スタミナ (ST)</label>
+                                    <input type="text" id="enemy-stamina" value="100" list="variable-list-options">
                                 </div>
-                                <div style="flex:1"><label style="font-size:0.85em;">防御力 (DEF)</label>
-                                    <input type="text" id="enemy-def" value="0" list="variable-list-options"
-                                        placeholder="例: 0">
+                                <div style="flex:1"><label style="font-size:0.85em;">ST回復 (毎秒/毎ターン)</label>
+                                    <input type="text" id="enemy-stamina-regen" value="10" list="variable-list-options">
                                 </div>
                             </div>
 
                             <div class="form-group-row" style="margin-top:10px;">
-                                <div style="flex:1"><label style="font-size:0.85em;">獲得EXP</label>
-                                    <input type="text" id="enemy-exp" value="10" list="variable-list-options"
-                                        placeholder="例: 10 + 1d5">
+                                <div style="flex:1"><label style="font-size:0.85em;">攻撃力 (ATK)</label>
+                                    <input type="text" id="enemy-atk" value="1" list="variable-list-options">
+                                </div>
+                                <div style="flex:1"><label style="font-size:0.85em;">防御力 (DEF)</label>
+                                    <input type="text" id="enemy-def" value="0" list="variable-list-options">
                                 </div>
                                 <div style="flex:1"><label style="font-size:0.85em;">貫通力</label>
-                                    <input type="text" id="enemy-pen" value="1" list="variable-list-options"
-                                        placeholder="例: 1">
+                                    <input type="text" id="enemy-pen" value="1" list="variable-list-options">
                                 </div>
-
                             </div>
 
-                            <!-- クリティカル設定 -->
-                            <div class="form-group-row"
-                                style="margin-top:10px; background:#fff; padding:5px; border-radius:4px; border:1px solid #ffadd2;">
+                            <!-- クリティカル・EXP設定 -->
+                            <div class="form-group-row" style="margin-top:10px; background:#fff; padding:5px; border-radius:4px; border:1px solid #ffadd2;">
                                 <div style="flex:1">
                                     <label style="font-size:0.85em;">クリティカル率 (%)</label>
-                                    <input type="text" id="enemy-crit-rate" value="5" list="variable-list-options"
-                                        placeholder="例: 5">
+                                    <input type="text" id="enemy-crit-rate" value="5" list="variable-list-options">
                                 </div>
                                 <div style="flex:1">
                                     <label style="font-size:0.85em;">クリティカル倍率</label>
-                                    <input type="text" id="enemy-crit-mult" value="1.5" list="variable-list-options"
-                                        placeholder="例: 1.5">
+                                    <input type="text" id="enemy-crit-mult" value="1.5" list="variable-list-options">
+                                </div>
+                                <div style="flex:1"><label style="font-size:0.85em;">獲得EXP</label>
+                                    <input type="text" id="enemy-exp" value="10" list="variable-list-options">
                                 </div>
                             </div>
 
-                            <div class="form-group-row"
-                                style="margin-top:10px; background:#fff; padding:5px; border-radius:4px; border:1px solid #ffadd2;">
-                                <!-- ▼▼▼ 追加ここから ▼▼▼ -->
-                                <div style="flex:1; display:flex; align-items:center;">
+                            <!-- 行動AIと踏みつけ -->
+                            <div class="form-group-row" style="margin-top:10px; background:#fff; padding:5px; border-radius:4px; border:1px solid #ffadd2;">
+                                <div style="flex:1">
+                                    <label style="font-size:0.85em;">行動AIパターン (マップ・バトル共通)</label>
+                                    <select id="enemy-ai-pattern" style="width:100%;">
+                                        <option value="tactical">⚖️ バランス (状況判断)</option>
+                                        <option value="aggressive">🔥 好戦的 (突撃・接近優先)</option>
+                                        <option value="kiting">🏹 ヒット＆アウェイ (射程ギリギリを保つ)</option>
+                                        <option value="defensive">🛡️ 慎重 (回避・逃走優先)</option>
+                                        <option value="power">💪 パワー (強攻撃多め)</option>
+                                        <option value="random">🎲 ランダム (運任せ)</option>
+                                    </select>
+                                </div>
+                                <div style="flex:1; display:flex; align-items:center; justify-content:center;">
                                     <label class="checkbox-label" style="cursor:pointer;">
                                         <input type="checkbox" id="enemy-can-stomp">
-                                        <span style="font-weight:bold; color:#d46b08;">🦶 踏みつけ可能 (2Dマップ全般で機能)</span>
+                                        <span style="font-weight:bold; color:#d46b08;">🦶 踏みつけ可能</span>
                                     </label>
                                 </div>
-                                <!-- ▲▲▲ 追加ここまで ▲▲▲ -->
+                            </div>
+<!-- ★追加: エネミー共通のバトルイベント -->
+                            <div class="form-group" style="margin-top:10px; border-top:1px dashed #ffadd2; padding-top:10px;">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="enemy-has-battle-event">
+                                    <span style="color:#cf1322; font-weight:bold;">⚡ 状態変化イベント (HPトリガー)</span>
+                                </label>
+                                <div id="enemy-battle-event-details" style="display:none; padding-left:10px; border-left:3px solid #dc3545; margin-top:5px;">
+                                    <p style="font-size:0.8em; color:#666; margin-bottom:5px;">HPが指定%以下になった瞬間、シナリオノードを呼び出します。（変身や行動パターンの変化に）</p>
+                                    <div id="enemy-battle-event-list-container"></div>
+                                    <button type="button" id="enemy-add-battle-event-btn" class="secondary-button" style="font-size:0.8em;">+ 条件を追加</button>
+                                </div>
                             </div>
 
-                            <!-- ターン制バトル専用設定（アコーディオン） -->
-                            <details class="advanced-settings-group" style="margin-top: 15px; border-color:#ffd591;">
-                                <summary style="color:#d46b08;">⚡ ターン制バトル専用設定 (スタミナ・AI)</summary>
-
-                                <div class="advanced-settings-content" style="background:#fff7e6;">
-                                    <div class="form-group-row">
-                                        <div style="flex:1">
-                                            <label style="font-size:0.85em;">最大スタミナ (ST)</label>
-                                            <input type="text" id="enemy-stamina" value="100"
-                                                list="variable-list-options" placeholder="例: 100">
-                                        </div>
-                                        <div style="flex:1">
-                                            <label style="font-size:0.85em;">ST回復 (毎ターン)</label>
-                                            <input type="text" id="enemy-stamina-regen" value="10"
-                                                list="variable-list-options" placeholder="例: 10">
-                                        </div>
-                                    </div>
-
-                                    <div class="form-group"
-                                        style="margin-top:10px; border-top:1px dashed #ffd591; padding-top:10px;">
-                                        <label style="font-size:0.85em; font-weight:bold;">行動AIパターン</label>
-                                        <select id="enemy-ai-pattern" style="width:100%; padding:5px; margin-top:3px;">
-                                            <option value="tactical">⚖️ バランス (状況判断)</option>
-                                            <option value="aggressive">🔥 好戦的 (攻撃優先)</option>
-                                            <option value="defensive">🛡️ 慎重 (回避優先)</option>
-                                            <option value="power">💪 パワー (強攻撃多め)</option>
-                                            <option value="random">🎲 ランダム (運任せ)</option>
-                                        </select>
-                                    </div>
-                                </div>
-                            </details>
-
                             <!-- 爆発・ドロップなど -->
-                            <div class="form-group-row"
-                                style="margin-top:10px; background:#fff7e6; padding:5px; border-radius:4px; border:1px solid #ffe58f;">
+                            <!-- 爆発・ドロップなど -->
+                            <div class="form-group-row" style="margin-top:10px; background:#fff7e6; padding:5px; border-radius:4px; border:1px solid #ffe58f;">
                                 <div style="flex:1">
                                     <label style="font-size:0.85em;">💥 爆発範囲 (px)</label>
                                     <input type="text" id="enemy-blast-radius" value="0" placeholder="0=なし">
@@ -1776,17 +1690,14 @@
                                     </div>
                                     <div style="flex:1">
                                         <label style="font-size:0.85em;">確率(%)</label>
-                                        <input type="text" id="enemy-drop-rate" value="50" style="width:100%;"
-                                            list="variable-list-options" placeholder="例: 50">
+                                        <input type="text" id="enemy-drop-rate" value="50" style="width:100%;" list="variable-list-options">
                                     </div>
                                 </div>
                             </div>
-
-                            <div class="form-group"
-                                style="margin-top:10px; border-top:1px dashed #ffadd2; padding-top:5px;">
+                            
+                            <div class="form-group" style="margin-top:10px; border-top:1px dashed #ffadd2; padding-top:5px;">
                                 <label style="font-size:0.85em;">🤕 被弾時エフェクト</label>
-                                <select id="enemy-hit-particle" style="width:100%;">
-                                </select>
+                                <select id="enemy-hit-particle" style="width:100%;"></select>
                             </div>
 
                         </div>
@@ -2282,6 +2193,7 @@
                                     id="ui-show-skip-btn"><span>⏩ SKIP</span></label></div>
                         <div style="flex:1; min-width:120px;"><label class="checkbox-label"><input type="checkbox"
                                     id="ui-show-pause-btn"><span>⏸️ PAUSE</span></label></div>
+                                    <div style="flex:1; min-width:120px;"><label class="checkbox-label"><input type="checkbox" id="ui-show-title-btn"><span>🏠 TITLE</span></label></div>
                     </div>
 
                     <div style="margin-top:10px; padding-top:10px; border-top:1px dashed #ddd;">
@@ -2573,216 +2485,15 @@
     </div>
 
 
-    <div id="player-settings-modal" class="modal hidden">
-        <div class="modal-content" style="max-width: 500px;"><span class="close-modal"
-                onclick="document.getElementById('player-settings-modal').classList.add('hidden')">&times;</span>
+<div id="player-settings-modal" class="modal hidden">
+        <div class="modal-content" style="max-width: 550px;">
+            <span class="close-modal" onclick="document.getElementById('player-settings-modal').classList.add('hidden')">&times;</span>
             <h3 style="border-bottom:1px solid #ddd; padding-bottom:10px;">👤 プレイヤー初期設定</h3>
-
-            <div style="max-height: 70vh; overflow-y: auto; padding-right: 5px;">
-
-                <!-- 1. 基本ステータス -->
-                <div class="form-group-row">
-                    <div style="flex:1"><label>最大HP</label><input type="text" id="player-init-hp" value="10"
-                            list="variable-list-options"></div>
-                    <div style="flex:1"><label>防御力</label><input type="text" id="player-init-def" value="0"
-                            list="variable-list-options"></div>
-                </div>
-                <div class="form-group-row">
-                    <div style="flex:1"><label>移動速度</label><input type="text" id="player-init-spd" value="1.0"
-                            list="variable-list-options"></div>
-                    <div style="flex:1"><label>ジャンプ力</label><input type="text" id="player-init-jump" value="8.0"
-                            list="variable-list-options"></div>
-                </div>
-
-                <div class="form-group-row" style="margin-top:10px; padding-top:10px; border-top:1px dashed #ccc;">
-                    <div style="flex:1">
-                        <label title="プレイヤーの衝突判定の幅 (px)">当たり判定 幅(px)</label>
-                        <input type="number" id="player-init-width" value="32" step="1" style="width:100%;">
-                    </div>
-                    <div style="flex:1">
-                        <label title="プレイヤーの衝突判定の高さ (px)">当たり判定 高さ(px)</label>
-                        <input type="number" id="player-init-height" value="32" step="1" style="width:100%;">
-                    </div>
-                </div>
-
-                <!-- 2. スタミナ設定 -->
-                <details class="help-details" style="margin-top:10px;">
-                    <summary>⚡ スタミナ設定</summary>
-                    <div class="help-content-inner" style="background:#fffbe6;">
-                        <div class="form-group-row">
-                            <div style="flex:1"><label>最大スタミナ</label><input type="text" id="player-init-max-stamina"
-                                    value="100" list="variable-list-options"></div>
-                            <div style="flex:1"><label>回復速度 (毎秒)</label><input type="text"
-                                    id="player-init-stamina-regen" value="20" list="variable-list-options"></div>
-                        </div>
-
-                        <!-- ★ここに追加: システム設定から持ってきたUI -->
-                        <div style="margin-top:10px; border-top:1px dashed #ccc; padding-top:10px;">
-                            <div class="form-group-row" style="align-items: center;">
-                                <label class="checkbox-label" style="flex:1;"><input type="checkbox"
-                                        id="player-dash-consume">ダッシュ消費</label>
-                                <input type="number" id="player-dash-cost" value="0.5" step="0.1" style="width:60px;">
-                                <span style="font-size:0.8em; color:#666;">/frame</span>
-                            </div>
-                            <div class="form-group-row" style="align-items: center; margin-top:5px;">
-                                <label class="checkbox-label" style="flex:1;"><input type="checkbox"
-                                        id="player-jump-consume">ジャンプ消費</label>
-                                <input type="number" id="player-jump-cost" value="10" style="width:60px;">
-                            </div>
-                            <div class="form-group-row" style="align-items: center; margin-top:5px;">
-                                <label class="checkbox-label" style="flex:1;"><input type="checkbox"
-                                        id="player-atk-consume">攻撃消費</label>
-                                <input type="number" id="player-atk-cost" value="20" style="width:60px;">
-                            </div>
-                            <div class="form-group-row"
-                                style="align-items: center; margin-top:5px; border-top:1px dashed #eee; padding-top:5px;">
-                                <label class="checkbox-label" style="flex:1;">
-                                    <input type="checkbox" id="player-invincible-consume">
-                                    <span>🌟 無敵ボタン消費</span>
-                                </label>
-                                <input type="number" id="player-invincible-cost" value="1.0" step="0.1"
-                                    style="width:60px;">
-                                <span style="font-size:0.8em; color:#666;">/frame</span>
-                            </div>
-                        </div>
-
-
-                        <div class="form-group-row"
-                            style="align-items: center; justify-content:space-between; margin-top:5px; border-top:1px dashed #ddd; padding-top:5px;">
-                            <label class="checkbox-label" style="font-weight:bold;">
-                                <input type="checkbox" id="player-guard-consume"> 🛡️ ガード消費
-                            </label>
-                            <div style="display:flex; align-items:center;">
-                                <input type="number" id="player-guard-cost" value="0.5" step="0.1"
-                                    style="width:70px; text-align:right;">
-                                <span style="font-size:0.8em; color:#666; margin-left:3px;">/F</span>
-                            </div>
-                        </div>
-
-
-
-                    </div>
-                </details>
-
-                <!-- 3. 攻撃アクション設定 -->
-                <details class="help-details" style="margin-top:5px;">
-                    <summary>⚔️ 攻撃アクション詳細</summary>
-                    <div class="help-content-inner" style="background:#fff0f6;">
-                        <div class="form-group-row">
-                            <div style="flex:1"><label>攻撃力</label><input type="text" id="player-init-atk" value="1"
-                                    list="variable-list-options"></div>
-                            <div style="flex:1"><label>貫通力</label><input type="text" id="player-init-pen" value="1"
-                                    list="variable-list-options"></div>
-                        </div>
-                        <div class="form-group-row" style="margin-top:5px;">
-                            <div style="flex:1"><label title="攻撃の間隔 (フレーム数)">硬直/連射間隔</label><input type="text"
-                                    id="player-init-cooldown" value="20" list="variable-list-options"></div>
-                            <div style="flex:1"><label title="0=近接攻撃, 1以上=弾を発射">弾速 (0=近接)</label><input type="text"
-                                    id="player-init-proj-speed" value="0" list="variable-list-options"></div>
-                        </div>
-                        <div class="form-group-row" style="margin-top:5px;">
-                            <div style="flex:1"><label>射程 / 飛距離</label><input type="text" id="player-init-range"
-                                    value="32" list="variable-list-options"></div>
-                            <div style="flex:1"><label>判定サイズ</label><input type="text" id="player-init-size" value="32"
-                                    list="variable-list-options"></div>
-                        </div>
-                        <div class="form-group-row" style="margin-top:5px;">
-                            <div style="flex:1"><label>クリティカル率(%)</label><input type="text" id="player-init-crit-rate"
-                                    value="5" list="variable-list-options"></div>
-                            <div style="flex:1"><label>クリティカル倍率</label><input type="text" id="player-init-crit-mult"
-                                    value="2.0" list="variable-list-options"></div>
-                        </div>
-
-
-                        <div class="form-group-row"
-                            style="margin-top:5px; background:#fff7e6; padding:5px; border-radius:4px; border:1px solid #ffe58f;">
-                            <div style="flex:1">
-                                <label title="0で爆発なし。32〜64くらいが目安">💥 爆発範囲 (px)</label>
-                                <input type="text" id="player-init-blast-radius" value="0" list="variable-list-options">
-                            </div>
-                            <div style="flex:1">
-                                <label title="直撃ダメージに対する％">爆風倍率 (%)</label>
-                                <input type="text" id="player-init-blast-rate" value="50" list="variable-list-options">
-                            </div>
-                        </div>
-                    </div>
-                </details>
-
-                <!-- 4. 弾薬・リロード設定 -->
-                <details class="help-details" style="margin-top:5px;">
-                    <summary>🔫 銃・弾薬システム</summary>
-                    <div class="help-content-inner" style="background:#e6f7ff;">
-                        <div class="form-group">
-                            <label class="checkbox-label">
-                                <input type="checkbox" id="player-use-magazine">
-                                <span>弾数制限 (リロード) を有効にする</span>
-                            </label>
-                        </div>
-                        <div class="form-group-row">
-                            <div style="flex:1"><label>装弾数 (マガジン)</label><input type="text" id="player-init-mag-size"
-                                    value="30" list="variable-list-options"></div>
-                            <div style="flex:1"><label>リロード時間(秒)</label><input type="text" id="player-init-reload-time"
-                                    value="2.0" list="variable-list-options"></div>
-                        </div>
-                    </div>
-                </details>
-
-                <!-- 5. グラフィック・表示 -->
-                <details class="help-details" open style="margin-top:5px;">
-                    <summary>🎨 グラフィック・表示</summary>
-                    <div class="help-content-inner">
-                        <div class="form-group">
-                            <label>頭上のバー表示</label>
-                            <select id="player-overhead-type">
-                                <option value="none">なし</option>
-                                <option value="hp">HPのみ</option>
-                                <option value="stamina">スタミナのみ</option>
-                                <option value="both">HPとスタミナ両方</option>
-                            </select>
-                        </div>
-                        <hr>
-                        <div class="form-group">
-                            <label>使用する3Dモデル</label>
-                            <select id="player-init-model-id" style="width:100%;"></select>
-                        </div>
-
-                        <div id="player-settings-2d-group">
-                            <h4 style="margin: 5px 0; font-size:0.9em;">2D画像設定</h4>
-                            <div class="form-group-row">
-                                <div style="flex:1"><label style="font-size:0.8em;">待機</label><select
-                                        id="player-img-idle"></select></div>
-                                <div style="flex:1"><label style="font-size:0.8em;">移動</label><select
-                                        id="player-img-move"></select></div>
-                            </div>
-                            <div class="form-group-row">
-                                <div style="flex:1"><label style="font-size:0.8em;">攻撃</label><select
-                                        id="player-img-attack"></select></div>
-                                <div style="flex:1"><label style="font-size:0.8em;">被弾</label><select
-                                        id="player-img-damage"></select></div>
-                            </div>
-                        </div>
-
-                        <div id="player-settings-3d-group" style="display:none;">
-                            <h4 style="margin: 5px 0; font-size:0.9em;">3Dアニメーション設定</h4>
-                            <div class="form-group-row">
-                                <div style="flex:1"><label style="font-size:0.8em;">待機</label><select
-                                        id="player-anim-idle"></select></div>
-                                <div style="flex:1"><label style="font-size:0.8em;">移動</label><select
-                                        id="player-anim-move"></select></div>
-                            </div>
-                            <div class="form-group-row">
-                                <div style="flex:1"><label style="font-size:0.8em;">攻撃</label><select
-                                        id="player-anim-attack"></select></div>
-                                <div style="flex:1"><label style="font-size:0.8em;">被弾</label><select
-                                        id="player-anim-damage"></select></div>
-                            </div>
-                        </div>
-                    </div>
-                </details>
-            </div>
-
-            <button id="save-player-settings-btn" class="export-button"
-                style="width:100%; margin-top:15px;">保存して閉じる</button>
+            
+            <!-- ここに ui.js によってタブや設定フォームが自動で生成・注入されます -->
+            <div id="player-settings-container" style="max-height: 70vh; overflow-y: auto; padding-right: 5px;"></div>
+            
+            <button id="save-player-settings-btn" class="export-button" style="width:100%; margin-top:15px; padding: 12px; font-weight: bold;">保存して閉じる</button>
         </div>
     </div>
 
@@ -2872,6 +2583,30 @@
             <button id="apply-bulk-edit-btn" class="export-button" style="width:100%; margin-top:15px; padding:12px;">
                 実行 (一括適用)
             </button>
+        </div>
+    </div>
+
+    <div id="project-load-modal" class="modal hidden">
+        <div class="modal-content" style="max-width: 400px; text-align: center;">
+            <span class="close-modal" onclick="document.getElementById('project-load-modal').classList.add('hidden')">&times;</span>
+            <h2 style="margin-bottom: 20px; color: #333; margin-top: 0;">📂 プロジェクト読込</h2>
+            <p style="margin-bottom: 20px; color: #666; font-size: 0.9em;">
+                読み込み方法を選択してください。<br>
+                (現在編集中のデータは上書きされます)
+            </p>
+            <div style="display: flex; flex-direction: column; gap: 15px;">
+                <button id="load-from-file-btn" class="export-button" style="padding: 15px; font-size: 1.1em;">
+                    📁 パソコン内のファイル(.json)から<br>
+                    <span style="font-size: 0.8em; font-weight: normal;">(ダウンロードしたプロジェクトを開く)</span>
+                </button>
+                <button id="load-from-backup-btn" class="secondary-button" style="padding: 15px; font-size: 1.1em; background: #e6f7ff; color: #1890ff; border-color: #1890ff;">
+                    💾 ブラウザの自動保存から復元<br>
+                    <span style="font-size: 0.8em; font-weight: normal;">(万が一のクラッシュ・フリーズ用)</span>
+                </button>
+                <button class="danger-button" onclick="document.getElementById('project-load-modal').classList.add('hidden')" style="padding: 10px; margin-top: 10px; background: transparent; color: #666; border-color: #ccc;">
+                    キャンセル
+                </button>
+            </div>
         </div>
     </div>
     <script src="https://kripken.github.io/ammo.js/builds/ammo.js"></script>
