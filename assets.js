@@ -141,9 +141,13 @@ async function processFiles(files, type, acceptString) {
                         alert(`アニメーションJSON「${file.name}」を合成して読み込みました！`);
                         
                     } else { 
-                        console.warn(`対応していないJSON形式です: ${file.name}`);
+                        // ★修正: コンソールから警告ダイアログに変更
+                        alert(`【読み込みエラー】\n${file.name}\n対応していないJSON形式です。（スプライトキャンバスV2形式が必要です）`);
                     }
-                } catch(err) { console.error(`JSON Load Error: ${file.name}`, err); }
+                } catch(err) { 
+                    console.error(`JSON Load Error: ${file.name}`, err);
+                    alert(`【解析エラー】\n${file.name}\nファイルが破損している可能性があります。`);
+                }
             };
             reader.readAsText(file);
             continue;
@@ -158,7 +162,10 @@ async function processFiles(files, type, acceptString) {
         const isAllowed = allowedExts.includes(fileExtension) || (isSoundType && soundExts.includes(fileExtension)) || isVideoBg || isVMD;
         
         if (!isAllowed) { 
-            if (type !== 'models') console.warn(`Skipped unsupported file: ${file.name}`);
+            if (type !== 'models') {
+                // ★修正: コンソールから警告ダイアログに変更
+                alert(`【読み込みスキップ】\n${file.name}\nこのタブに対応していないファイル形式です。`);
+            }
             continue; 
         }
 
