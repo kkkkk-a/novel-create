@@ -56,7 +56,6 @@ async function loadBackupFromDB(key) {
         request.onerror = () => reject(request.error);
     });
 }
-
 /**
  * 現在のプロジェクトデータをJSONファイルとして手動保存(ダウンロード)する
  */
@@ -65,14 +64,18 @@ function saveProject() {
         const now = new Date();
         const defaultName = `project_${now.getFullYear()}${String(now.getMonth()+1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
 
-        let fileName = prompt("保存するファイル名を入力してください（拡張子 .json は不要）", defaultName);
+        // ★ユーザーにファイル名を入力させる
+        let fileName = prompt("保存するファイル名を入力してください\n(※拡張子 .json は自動で付きます)", defaultName);
 
+        // キャンセルされた場合は処理を中断
         if (fileName === null) return; 
+        
+        // 空欄だった場合はデフォルトの名前を使う
         if (fileName.trim() === "") fileName = defaultName;
 
-        if (!fileName.endsWith('.json')) {
-            fileName += '.json';
-        }
+        // ユーザーが手動で .json と打ってしまった場合の二重拡張子防止
+        fileName = fileName.replace(/\.json$/i, '');
+        fileName += '.json';
 
         const projectData = state.getProjectData();
         const jsonString = JSON.stringify(projectData, null, 2);
@@ -94,7 +97,6 @@ function saveProject() {
         alert("プロジェクトの保存中にエラーが発生しました。\n" + error.message);
     }
 }
-
 /**
  * IndexedDB を使用してブラウザ内部に自動保存を開始する
  */
@@ -274,7 +276,6 @@ function loadProject(event) {
     };
     reader.readAsText(file);
 }
-
 export function initProjectHandlers() {
     const saveButton = document.getElementById('save-project-btn');
     const loadButton = document.getElementById('load-project-btn');
@@ -292,7 +293,6 @@ export function initProjectHandlers() {
             const val = parseInt(e.target.value, 10);
             if (!isNaN(val) && val > 0) {
                 localStorage.setItem('autosave_interval_minutes', val);
-                // 実行中なら再スタートして間隔を適用
                 if (autoSaveIntervalId) startAutoSave();
             }
         });
@@ -300,23 +300,30 @@ export function initProjectHandlers() {
 
     if(saveButton) saveButton.addEventListener('click', saveProject);
     
-    // ★最適化: 読込ボタンを押した時の動作を安全に（キャンセル＝中止）
+    // ★変更: promptを廃止し、専用モーダルを表示する
     if(loadButton && loadInput) {
-        loadButton.addEventListener('click', async () => {
-            // ダイアログではなく、専用の確認プロンプトを使って意図しない動作を防ぐ
-            const choice = prompt(
-                "📂 プロジェクトを読み込みます。\nどちらから読み込みますか？\n\n" +
-                "【1】パソコン内のファイル(.json)から読み込む\n" +
-                "【2】ブラウザの自動保存バックアップから復元する\n\n" +
-                "※半角数字の 1 または 2 を入力してください。\n(空白やキャンセルで中止します)",
-                "1"
-            );
-            
-            if (choice === "1") {
-                // ファイルから読み込む
+        const loadModal = document.getElementById('project-load-modal');
+        const btnFile = document.getElementById('load-from-file-btn');
+        const btnBackup = document.getElementById('load-from-backup-btn');
+
+        // 「読込」ボタンを押したらモーダルを開く
+        loadButton.addEventListener('click', () => {
+            if (loadModal) loadModal.classList.remove('hidden');
+        });
+
+        // モーダル内の「ファイルから」ボタン
+        if (btnFile) {
+            btnFile.addEventListener('click', () => {
+                if (loadModal) loadModal.classList.add('hidden');
                 loadInput.click();
-            } else if (choice === "2") {
-                // バックアップからの復元処理
+            });
+        }
+
+        // モーダル内の「バックアップから復元」ボタン
+        if (btnBackup) {
+            btnBackup.addEventListener('click', async () => {
+                if (loadModal) loadModal.classList.add('hidden');
+                
                 try {
                     const backupData = await loadBackupFromDB('latest_backup');
                     if (!backupData) {
@@ -338,11 +345,9 @@ export function initProjectHandlers() {
                     console.error(e);
                     alert("バックアップの復元に失敗しました。");
                 }
-            } else {
-                // キャンセル、または無効な入力
-                return;
-            }
-        });
+            });
+        }
+
         loadInput.addEventListener('change', loadProject);
     }
 
