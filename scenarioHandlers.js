@@ -83,7 +83,8 @@ const newId = state.generateId('node');
         projectData.scenario.startNodeId = newId; 
     }
     
-    ui.renderScenarioTree();
+ ui.renderScenarioTree();
+    ui.updateAllNodeSelects(); // ★追加: ノードが増えたことを他のプルダウンに知らせる
     await selectNode(newId);
 }
 
@@ -135,12 +136,12 @@ function deleteNode() {
             }
         }
         
-        state.setActiveNodeId(null);
+state.setActiveNodeId(null);
         ui.renderScenarioTree();
+        ui.updateAllNodeSelects(); // ★追加: ノードが減ったことを他のプルダウンに知らせる
         ui.renderNodeEditor();
     }
 }
-
 function updateNodeData(target) {
     const activeNodeId = state.getActiveNodeId();
     const activeSectionId = state.getActiveSectionId();
