@@ -40,92 +40,70 @@ let projectData = {
         characters: {}, backgrounds: {}, sounds: {}, models: {}, animations: {}
     },
     variables: {},
+    variableGroups: ["基本 (Default)"],
+    variableMeta: {},
     items: {},
     enemies: {},
     particles: {}, 
-player: {
+    player: {
         inventory: {},
-        // --- 変動ステータス ($が付くもの) ---
-         $name: "主人公",
-        $hp: 10,
-        $maxHp: 10,
-        $atk: 1,
-        $def: 0, // ★追加: 変動防御力も必要になります
-        $spd: 4,
-        $actMode: 0,
-        $isLockedOn: 0,
-        $lockonTargetId: null,
-        $stamina: 100, $maxStamina: 100,
-        $magazine: 30, $maxMagazine: 30,
-        
-        // ★★★ 追加: レベル・経験値システム用 ($変数) ★★★
-        $level: 1,
-        $exp: 0,
-        $nextExp: 100,
-
-        // --- 強制移動用 ---
+        equipment: [],
+        shortcuts: {},
+        $name: "主人公",
+        extraJumps: 0,
+        wallJump: false,
+        $hp: "10", $maxHp: "10", $atk: "1", $def: "0", $spd: "4",
+        $actMode: 0, $isLockedOn: 0, $lockonTargetId: null,
+        $stamina: "100", $maxStamina: "100",
+        $magazine: "30", $maxMagazine: "30",
+        $level: 1, $exp: 0, $nextExp: 100,
         $forceOn: 0, $forceX: 0, $forceY: 0, $forceSpd: 0,
 
-        // --- 固定設定 (初期値) ---
-        maxEquipSlots: 1,
-        initialLevel: 1,
-        maxLevel: 50,
-        growthType: 'normal', // 'fast', 'normal', 'slow'
+        width: 32, height: 32,
+        maxEquipSlots: 1, initialLevel: "1", maxLevel: "50", growthType: 'normal',
+        limitHp: "100", limitAtk: "10", limitDef: "10", limitSpd: "6", limitStamina: "150", limitStaminaRegen: "50", limitPenetration: "10",
+        defense: "0", penetration: "1",
+        attackRange: "32", attackSize: "32", attackCooldown: "20", projectileSpeed: "0",
+        maxStamina: "100", staminaRegen: "20",
+        jumpPower: "8.0", magazineSize: "30", reloadTime: "2.0",
+        criticalRate: "5", criticalMultiplier: "2.0", overheadType: 'none',
+        
+        dashConsume: false, dashCost: "0.5", jumpConsume: false, jumpCost: "10",
+        attackConsume: false, attackCost: "20", guardConsume: false, guardCost: "0.5",
+        invincibleConsume: false, invincibleCost: "1.0",
+        blastRadius: "0", blastDamageRate: "50",
 
-        // --- ★追加: カンスト時(最大レベル時)のステータス ---
-        // ※「limit」は最大レベル時の値。「init」はレベル1の値（既存の値を流用）
-        limitHp: 100,
-        limitAtk: 10,
-        limitDef: 5,
-        limitSpd: 6,
-        limitStamina: 100,
-
-        // (既存のパラメータ...)
-        defense: 0, // ← これが初期防御力(initDef)扱いになります
-        penetration: 1,
-
-        attackRange: 32,
-        attackSize: 32,
-        projectileSpeed: 0, // 0=近接, 1以上=射撃
-        maxStamina: 100,
-        staminaRegen: 20,
-        jumpPower: 8.0,
-        magazineSize: 30,
-        reloadTime: 2.0,
-        criticalRate: 5,
-        criticalMultiplier: 2.0,
-        overheadType: 'none', // 'none', 'hp', 'stamina', 'both'
-        modelId: '',
-        // --- ビジュアル設定 (画像・アニメーションID) ---
-        imageId: '',
-        imageIdMove: '',
-        imageIdAttack: '',
-        imageIdJump: '',
-        imageIdDamage: '',
-
-        animIdIdle: '',
-        animIdMove: '',
-        animIdAttack: '',
-        animIdJump: '',
-        animIdDamage: ''
+        exhaustionDuration: "3.0", exhaustionRecover: 'gradual', exhaustionMove: 'normal',
+        exhaustionNoAction: true, exhaustionNoItem: false, exhaustionAtkZero: false, exhaustionDefZero: false, exhaustionDmgDouble: false, exhaustionCrit: false,
+        
+        modelId: '', imageId: '', imageIdMove: '', imageIdAttack: '', imageIdJump: '', imageIdDamage: '',
+        animIdIdle: '', animIdMove: '', animIdAttack: '', animIdJump: '', animIdDamage: ''
     },
     scenario: { startNodeId: null, sections: {} },
     maps: {},
     settings: {
+        gameTitle: "", gameCopyright: "", gameGuideline: "",
         windowColor: '#000000', windowOpacity: 75, windowBgTransparent: false, windowImage: null,
         buttonColor: '#1990ff', buttonOpacity: 80, buttonBgTransparent: false, buttonImage: null, buttonTextColor: '#FFFFFF',
         borderRadius: 10, borderWidth: 2, borderColor: '#FFFFFF',
-               actionButtons: [
-            { id: "btn_1", label: "CHECK", key: "Space", type: "check", targetVar: "" },     // 会話・調べる
-            { id: "btn_2", label: "ATK",   key: "KeyZ",  type: "attack", targetVar: "" },    // 攻撃
-            { id: "btn_3", label: "JUMP",  key: "KeyX",  type: "jump", targetVar: "" },      // ジャンプ
-            { id: "btn_4", label: "DASH",  key: "ShiftLeft", type: "dash", targetVar: "" }, // ダッシュ
-            { id: "btn_5", label: "GUARD", key: "KeyC",  type: "guard", targetVar: "" }      // ガード
+        backgroundFit: 'cover',   // ★追加: 背景の表示モード
+        lowResMode: false,        // ★追加: 低負荷モード
+        enableHideMsg: true,      // ★追加: ウィンドウ非表示
+        showSaveMenu: true, showItemBtn: true, showLogBtn: true, showConfigBtn: true, showAutoBtn: true, showSkipBtn: true, showPauseBtn: true, // ★追加: システムメニュー
+        showTitleBtn: true, 
+        debugMode: false, shopDetailed: true, // ★追加: デバッグ等
+        autoShakeOnDamage: true, showPopups: true, flashOnItemUse: true, flashOnInvincible: true,
+        actionButtons: [
+            { id: "btn_1", label: "CHECK", key: "Space", type: "check", targetVar: "" },
+            { id: "btn_2", label: "ATK",   key: "KeyZ",  type: "attack", targetVar: "" },
+            { id: "btn_3", label: "JUMP",  key: "KeyX",  type: "jump", targetVar: "" },
+            { id: "btn_4", label: "DASH",  key: "ShiftLeft", type: "dash", targetVar: "" },
+            { id: "btn_5", label: "GUARD", key: "KeyC",  type: "guard", targetVar: "" }
         ],
-    },
-    portraitUI: {
-        windowVertical: 'bottom', windowHeight: 35,
-        choiceDirection: 'vertical', choiceAlign: 'center', characterOffsetY: 0
+        portraitUI: {
+            windowVertical: 'bottom', windowHeight: 35,
+            choiceLayout: 'center-v', choiceDirection: 'vertical', choiceAlign: 'center', characterOffsetY: 0
+        }
     }
 };
 
@@ -141,30 +119,28 @@ export function getActiveMode() { return activeMode; }
 export function getActiveSectionId() { return activeSectionId; }
 export function getActiveNodeId() { return activeNodeId; }
 
-// ★★★ ここを修正: 読み込み時にデフォルト値を完全に反映させる ★★★
 export function setProjectData(newData) {
     // 1. Settings (システム設定) の補完
     const defaultSettings = {
+        gameTitle: "", gameCopyright: "", gameGuideline: "",
         windowColor: '#000000', windowOpacity: 75, windowBgTransparent: false, windowImage: null,
         buttonColor: '#1990ff', buttonOpacity: 80, buttonBgTransparent: false, buttonImage: null, buttonTextColor: '#FFFFFF',
         borderRadius: 10, borderWidth: 2, borderColor: '#FFFFFF',
+        backgroundFit: 'cover',
+        lowResMode: false,
+        enableHideMsg: true,
+        showSaveMenu: true, showItemBtn: true, showLogBtn: true, showConfigBtn: true, showAutoBtn: true, showSkipBtn: true, showPauseBtn: true,
+        debugMode: false, shopDetailed: true,
+        autoShakeOnDamage: true, showPopups: true, flashOnItemUse: true, flashOnInvincible: true,
         actionButtons: [
-            { id: "btn_1", label: "CHECK", key: "Space", type: "check", targetVar: "" },
-            { id: "btn_2", label: "ATK",   key: "KeyZ",  type: "attack", targetVar: "" },
-            { id: "btn_3", label: "JUMP",  key: "KeyX",  type: "jump", targetVar: "" },
-            { id: "btn_4", label: "DASH",  key: "ShiftLeft", type: "dash", targetVar: "" }
-        ],
-        autoShakeOnDamage: true,
-        showPopups: true,
-        flashOnItemUse: true,
-        flashOnInvincible: true,
-                showConfigBtn: true, // 音量設定 (デフォルトON)
-        showPauseBtn: true,  // ポーズ (デフォルトON)
+            { id: "btn_1", label: "CHECK", key: "Space", padBtn: 0, type: "check", targetVar: "" },
+            { id: "btn_2", label: "ATK",   key: "KeyZ",  padBtn: 2, type: "attack", targetVar: "" },
+            { id: "btn_3", label: "JUMP",  key: "KeyX",  padBtn: 1, type: "jump", targetVar: "" },
+            { id: "btn_4", label: "DASH",  key: "ShiftLeft", padBtn: 4, type: "dash", targetVar: "" }
+        ]
     };
 
     newData.settings = { ...defaultSettings, ...(newData.settings || {}) };
-
-    // Portrait UI の補完
     const defaultPortrait = {
         windowVertical: 'bottom', windowHeight: 35,
         choiceDirection: 'vertical', choiceAlign: 'center', characterOffsetY: 0
@@ -172,18 +148,22 @@ export function setProjectData(newData) {
     newData.settings.portraitUI = { ...defaultPortrait, ...(newData.settings.portraitUI || {}) };
 
     // 2. Player (プレイヤー初期ステータス) の補完
-    // ★重要: 古いデータには $stamina や $forceOn が無いので、ここで強制的にマージします
     const defaultPlayer = {
         equipment: [],
         maxEquipSlots: 1,
         shortcuts: {},
         $name: "主人公", 
+        extraJumps: 0,
+        wallJump: false,
         $hp: 10, $maxHp: 10, $atk: 1, $spd: 1.0, $actMode: 0,
-              width: 32,
-        height: 32,
+        width: 32, height: 32,
         $isLockedOn: 0, $lockonTargetId: null,
-        $stamina: 100, $maxStamina: 100,$magazine: 30,
+        $stamina: 100, $maxStamina: 100, $magazine: 30,
         $forceOn: 0, $forceX: 0, $forceY: 0, $forceSpd: 0,
+        
+        limitHp: "100", limitAtk: "10", limitDef: "10", limitSpd: "6", 
+        limitStamina: "150", limitStaminaRegen: "50", limitPenetration: "10",
+        
         def: 0, penetration: 1,
         attackRange: 32, attackSize: 32, projectileSpeed: 0,
         maxStamina: 100, staminaRegen: 20,
@@ -198,6 +178,9 @@ export function setProjectData(newData) {
         blastDamageRate: 50,  // 爆発ダメージ倍率 (%)
         invincibleConsume: false, invincibleCost: 1.0, 
         guardConsume: false, guardCost: 0.5, 
+        
+        dodgeConsume: true, dodgeCost: 15, dodgeSpeed: 3.0, dodgeInvincible: 20,
+        guardStaminaMult: 2.0, // ガード時に受けるスタミナダメージ倍率
 
                exhaustionDuration: 3.0,   // 回復不能時間 (秒)
         exhaustionRecover: 'gradual', // 'gradual'(徐々に) or 'full'(一気に全快)
