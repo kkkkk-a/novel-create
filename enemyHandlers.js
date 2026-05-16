@@ -4,7 +4,50 @@
 
 import * as state from './state.js';
 import * as ui from './ui.js';
+// --- ★追加: バトルイベントリストの描画 ---
+function renderEnemyBattleEventList(list) {
+    const container = document.getElementById('enemy-battle-event-list-container'); 
+    if(!container) return;
+    container.innerHTML = '';
+    
+    list.forEach((item, index) => {
+        const row = document.createElement('div'); 
+        row.style.cssText = 'display:flex; align-items:center; margin-bottom:5px; gap:5px; background:#fff0f0; padding:3px; border-radius:4px;';
+        
+        const label = document.createElement('span'); label.textContent = 'HP'; label.style.fontSize = '0.8em';
+        
+        const input = document.createElement('input');
+        input.type = 'number'; input.className = 'battle-event-threshold'; input.dataset.index = index;
+        input.value = item.threshold !== undefined ? item.threshold : 0; input.style.width = '40px'; input.placeholder = '%'; input.title = '何%以下で発動するか (0=死亡時)';
+        input.onchange = (e) => { item.threshold = parseInt(e.target.value) || 0; syncEnemyData(); };
 
+        const percentLabel = document.createElement('span'); percentLabel.textContent = '%以下:'; percentLabel.style.fontSize = '0.8em';
+        
+        const selectDiv = document.createElement('div'); selectDiv.className = 'smart-select-mini'; selectDiv.style.flex = '1';
+        ui.createLinkedSelects(selectDiv, `temp-enemy-battle-evt-${index}`, item.nodeId);
+        selectDiv.addEventListener('change', () => { 
+            const nodeSelect = document.getElementById(`temp-enemy-battle-evt-${index}`); 
+            if (nodeSelect) { 
+                item.nodeId = nodeSelect.value; 
+                syncEnemyData();
+            } 
+        });
+
+        const delBtn = document.createElement('button'); 
+        delBtn.textContent = '×'; 
+        delBtn.className = 'danger-button'; 
+        delBtn.type = 'button'; 
+        delBtn.style.padding='2px 6px';
+        delBtn.onclick = () => {
+            list.splice(index, 1); 
+            renderEnemyBattleEventList(list); 
+            syncEnemyData();
+        };
+
+        row.append(label, input, percentLabel, selectDiv, delBtn); 
+        container.appendChild(row);
+    });
+}
 let currentEnemyId = null;
 let currentSearch = '';
 
@@ -52,14 +95,15 @@ export function initEnemyHandlers() {
         'enemy-hp', 'enemy-stamina','enemy-stamina-regen',  'enemy-atk', 'enemy-def', 'enemy-exp', 'enemy-pen',
         'enemy-crit-rate', 'enemy-crit-mult',
         'enemy-drop-item', 'enemy-drop-rate',
-        'enemy-move-type', 'enemy-move-spd', 'enemy-ai-pattern',
+        'enemy-move-type', 'enemy-move-spd', 'enemy-on-sight', 'enemy-ai-pattern',
         'enemy-detect-range', 'enemy-territory-range',
         'enemy-atk-range', 'enemy-atk-cool', 'enemy-atk-speed',
-        'enemy-blast-radius', 'enemy-blast-rate',
+        'enemy-blast-radius', 'enemy-blast-rate', 'enemy-homing-strength',
         'enemy-img-idle', 'enemy-img-move', 'enemy-img-attack', 'enemy-img-damage',
         'enemy-model-id', 'enemy-model-scale', 'enemy-model-y',
         'enemy-hit-particle','enemy-can-stomp'
     ];
+
 
     inputs.forEach(id => {
         const el = document.getElementById(id);
@@ -67,6 +111,25 @@ export function initEnemyHandlers() {
             el.addEventListener('change', syncEnemyData);
         }
     });
+   const evtCheck = document.getElementById('enemy-has-battle-event');
+    if (evtCheck) {
+        evtCheck.addEventListener('change', (e) => {
+            document.getElementById('enemy-battle-event-details').style.display = e.target.checked ? 'block' : 'none';
+            syncEnemyData();
+        });
+    }
+    const addEvtBtn = document.getElementById('enemy-add-battle-event-btn');
+    if (addEvtBtn) {
+        addEvtBtn.addEventListener('click', () => {
+            if (!currentEnemyId) return;
+            const projectData = state.getProjectData();
+            const enemy = projectData.enemies[currentEnemyId];
+            if (!enemy.battleEvents) enemy.battleEvents = [];
+            enemy.battleEvents.push({ threshold: 50, nodeId: '' });
+            renderEnemyBattleEventList(enemy.battleEvents);
+            syncEnemyData();
+        });
+    }
 }
 
 function createEnemy() {
@@ -167,8 +230,8 @@ function selectEnemy(id) {
     // 値の反映
     document.getElementById('enemy-id').value = id;
     document.getElementById('enemy-name').value = enemy.name || '';
-    document.getElementById('enemy-size-w').value = Math.max(1, Math.round((enemy.w || 32) / 32));
-    document.getElementById('enemy-size-h').value = Math.max(1, Math.round((enemy.h || 32) / 32));
+    document.getElementById('enemy-size-w').value = Number((enemy.w || 32) / 32).toFixed(2).replace(/\.00$/, '');
+    document.getElementById('enemy-size-h').value = Number((enemy.h || 32) / 32).toFixed(2).replace(/\.00$/, '');
     
     // 画像セレクトボックスの更新と選択
     const setupImg = (eid, val) => {
@@ -237,6 +300,12 @@ document.getElementById('enemy-on-sight').value = enemy.onSightBehavior || 'norm
     if (stompCheck) {
         stompCheck.checked = !!enemy.canStomp;
     }
+        const evtCheck = document.getElementById('enemy-has-battle-event');
+    if (evtCheck) {
+        evtCheck.checked = !!enemy.hasBattleEvent;
+        document.getElementById('enemy-battle-event-details').style.display = evtCheck.checked ? 'block' : 'none';
+        renderEnemyBattleEventList(enemy.battleEvents || []);
+    }
     renderEnemyList();
 }
 
@@ -257,8 +326,8 @@ function syncEnemyData() {
     const enemy = projectData.enemies[currentEnemyId];
 
     enemy.name = document.getElementById('enemy-name').value;
-    const sw = parseInt(document.getElementById('enemy-size-w').value) || 1;
-    const sh = parseInt(document.getElementById('enemy-size-h').value) || 1;
+    const sw = parseFloat(document.getElementById('enemy-size-w').value) || 1;
+    const sh = parseFloat(document.getElementById('enemy-size-h').value) || 1;
     enemy.w = sw * 32;
     enemy.h = sh * 32;
     enemy.imageId = document.getElementById('enemy-img-idle').value;
@@ -269,7 +338,8 @@ function syncEnemyData() {
     enemy.modelScale = parseFloat(document.getElementById('enemy-model-scale').value) || 1.0;
     enemy.modelY = parseFloat(document.getElementById('enemy-model-y').value) || 0;
     
-    enemy.opacity = parseInt(document.getElementById('enemy-opacity').value) || 100;
+    const op = parseInt(document.getElementById('enemy-opacity').value);
+enemy.opacity = isNaN(op) ? 100 : op;
     enemy.color = document.getElementById('enemy-color').value;
 
     enemy.hp = document.getElementById('enemy-hp').value;
@@ -299,6 +369,10 @@ enemy.onSightBehavior = document.getElementById('enemy-on-sight').value;
     enemy.blastRadius = document.getElementById('enemy-blast-radius').value;
     enemy.blastDamageRate = document.getElementById('enemy-blast-rate').value;
 enemy.homingStrength = document.getElementById('enemy-homing-strength').value; 
+ const evtCheck = document.getElementById('enemy-has-battle-event');
+    if (evtCheck) {
+        enemy.hasBattleEvent = evtCheck.checked;
+    }
     const stompCheck = document.getElementById('enemy-can-stomp');
     if (stompCheck) {
         enemy.canStomp = stompCheck.checked;
