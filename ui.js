@@ -455,89 +455,112 @@ function updateVariableSelectsFor(sel) {
     Object.keys(v).forEach(k => sel.add(new Option(k, k)));
 }
 
-
 function renderVariableOperationsEditor(operations) {
     const editor = document.getElementById('variable-operations-editor');
     if (!editor) return;
     editor.innerHTML = '';
 
     if (!operations || operations.length === 0) {
-        operations.push({ type: 'variable', targetVariable: '', operator: '=', value: '' });
+        operations.push({ type: 'variable', targetVariable: '', targetEnemyId: '', operator: '=', value: '' });
     }
 
     operations.forEach((op, index) => {
-        // 互換性維持のための初期化
-        if (!op.type) op.type = op.targetVariable && op.targetVariable.startsWith('$') ? 'player' : 'variable';
+        // 互換性維持
+        if (!op.type) op.type = (op.targetVariable && op.targetVariable.startsWith('$')) ? 'player' : 'variable';
 
         const item = document.createElement('div');
         item.className = 'variable-op-item';
-        // レイアウト: 変数名 | 演算子 | 値 | 削除
-        item.style.gridTemplateColumns = '2fr 80px 1fr auto'; 
+        // レイアウト: タイプ | エネミー選択(隠れる) | パラメータ | 演算子 | 値 | 削除
+        item.style.cssText = 'display:flex; flex-wrap:wrap; gap:5px; align-items:center; margin-bottom:10px; background:#f9f9f9; padding:10px; border-radius:4px; border:1px solid #eee;';
 
-        // 1. 変数選択
-        const targetSelect = document.createElement('select');
-        targetSelect.id = `var-op-select-${index}`; 
+        // 1. 対象タイプ (誰の変数をいじるか)
+        const typeSelect = document.createElement('select');
+        typeSelect.style.width = '120px';
+        typeSelect.add(new Option('🌐 ゲーム全体', 'variable'));
+        typeSelect.add(new Option('👤 プレイヤー', 'player'));
+        typeSelect.add(new Option('👹 エネミー', 'enemy'));
+        typeSelect.value = op.type;
+
+        // 2. エネミー対象選択 (typeがenemyの時だけ表示)
+        const enemySelect = document.createElement('select');
+        enemySelect.style.width = '140px';
+        const enemies = state.getProjectData().enemies || {};
+        enemySelect.add(new Option('-- 対象の敵 --', ''));
+        Object.keys(enemies).forEach(id => {
+            enemySelect.add(new Option(enemies[id].name, id));
+        });
+        enemySelect.value = op.targetEnemyId || '';
+
+        // 3. パラメータ(変数名)入力 / 選択
+        // 従来通り datalist で補完させるための input を使用
+        const targetInput = document.createElement('input');
+        targetInput.type = 'text';
+        targetInput.placeholder = '変数名/パラメータ';
+        targetInput.style.flex = '1';
+        targetInput.style.minWidth = '100px';
+        targetInput.value = op.targetVariable || '';
         
-        targetSelect.onchange = (e) => {
-            const val = e.target.value;
-            op.targetVariable = val;
-            if (val.startsWith('$')) {
-                op.type = 'player';
-            } else {
-                op.type = 'variable';
-            }
-        };
+        // 補完用リストの切り替え (CSSとDatalistを後で反映)
+        targetInput.setAttribute('list', 'variable-list-options');
 
-        // 2. 演算子
+        // 4. 演算子
         const opSelect = document.createElement('select');
+        opSelect.style.width = '60px';
         ['=', '+=', '-=', '*=', '/='].forEach(o => opSelect.add(new Option(o, o)));
-        
-        // 特殊演算子
-        opSelect.add(new Option('自動加算 (Auto+)', 'auto+'));
-        opSelect.add(new Option('自動減算 (Auto-)', 'auto-'));
-        opSelect.add(new Option('停止 (Stop)', 'stop'));
-
+        opSelect.add(new Option('Auto+', 'auto+'));
+        opSelect.add(new Option('Auto-', 'auto-'));
+        opSelect.add(new Option('Stop', 'stop'));
         opSelect.value = op.operator || '=';
         
-        // 3. 値入力
+        // 5. 値入力
         const valInput = document.createElement('input');
         valInput.type = 'text';
-        valInput.placeholder = '値 / 変数 / 1d6';
+        valInput.placeholder = '値 / 計算式 / 1d6';
+        valInput.style.flex = '1.5';
+        valInput.style.minWidth = '120px';
         valInput.setAttribute('list', 'variable-list-options');
         valInput.value = op.value || '';
-        valInput.onchange = (e) => op.value = e.target.value;
 
-        // ★追加: ヒント表示用のエリア
+        // ★ヒント表示用のエリア
         const hintDiv = document.createElement('div');
-        hintDiv.style.cssText = "grid-column: 1 / -1; font-size: 0.85em; color: #0050b3; background: #e6f7ff; padding: 5px; border-radius: 4px; margin-top: 5px; display: none; line-height: 1.4;";
+        hintDiv.style.cssText = "width:100%; font-size: 0.85em; color: #0050b3; background: #e6f7ff; padding: 5px; border-radius: 4px; display: none; line-height: 1.4;";
 
-        // ヒント更新関数
-        const updateHint = () => {
+        // 表示切り替えロジック
+        const updateUI = () => {
+            if (typeSelect.value === 'enemy') {
+                enemySelect.style.display = 'block';
+                typeSelect.style.borderColor = '#d46b08';
+                targetInput.placeholder = '例: hp, atk, def, spd';
+                targetInput.title = '操作するステータス名を入力してください';
+            } else {
+                enemySelect.style.display = 'none';
+                typeSelect.style.borderColor = '';
+                targetInput.placeholder = (typeSelect.value === 'player') ? '例: $hp' : '変数名';
+            }
+
+            // ヒントの更新
             const v = opSelect.value;
             const val = valInput.value || '(値)';
-            
             if (v === 'auto+' || v === 'auto-') {
                 hintDiv.style.display = 'block';
                 const action = (v === 'auto+') ? '増え' : '減り';
-                hintDiv.innerHTML = `⏱️ <b>タイマー設定:</b> 1秒間に <b>${val}</b> ずつ自動で${action}続けます。<br><span style="font-size:0.8em; color:#666;">※画面に表示するにはテキスト内で {{${op.targetVariable || '変数名'}}} と書いてください。</span>`;
+                hintDiv.innerHTML = `⏱️ <b>タイマー:</b> 1秒間に <b>${val}</b> ずつ自動で${action}続けます。`;
             } else if (v === 'stop') {
                 hintDiv.style.display = 'block';
-                hintDiv.innerHTML = `⏹️ <b>タイマー停止:</b> 変数 <b>${op.targetVariable || '変数名'}</b> の自動変動を止めます。`;
+                hintDiv.innerHTML = `⏹️ <b>タイマー停止:</b> <b>${op.targetVariable || '変数'}</b> の変動を止めます。`;
             } else {
                 hintDiv.style.display = 'none';
             }
         };
 
         // イベント登録
-        opSelect.onchange = (e) => {
-            op.operator = e.target.value;
-            updateHint();
-        };
-        // 値や変数名が変わった時もヒント文を更新する
-        valInput.addEventListener('input', updateHint);
-        targetSelect.addEventListener('change', updateHint);
+        typeSelect.onchange = (e) => { op.type = e.target.value; updateUI(); };
+        enemySelect.onchange = (e) => op.targetEnemyId = e.target.value;
+        targetInput.onchange = (e) => { op.targetVariable = e.target.value; updateUI(); };
+        opSelect.onchange = (e) => { op.operator = e.target.value; updateUI(); };
+        valInput.onchange = (e) => { op.value = e.target.value; updateUI(); };
 
-        // 4. 削除ボタン
+        // 6. 削除ボタン
         const delBtn = document.createElement('button');
         delBtn.textContent = '×';
         delBtn.className = 'danger-button';
@@ -548,17 +571,10 @@ function renderVariableOperationsEditor(operations) {
             }
         };
 
-        item.append(targetSelect, opSelect, valInput, delBtn, hintDiv);
+        item.append(typeSelect, enemySelect, targetInput, opSelect, valInput, delBtn, hintDiv);
         editor.appendChild(item);
         
-        // 値の復元
-        if (op.targetVariable) {
-            targetSelect.add(new Option(op.targetVariable, op.targetVariable));
-            targetSelect.value = op.targetVariable;
-        }
-        
-        // 初回ヒント表示
-        updateHint();
+        updateUI(); // 初回表示
     });
 
     setTimeout(() => {
@@ -648,6 +664,29 @@ const pStats = [
             sel.add(opt, 0);
         }
         sel.value = currentVal;
+    });
+    let enemyDatalist = document.getElementById('enemy-status-options');
+    if (!enemyDatalist) {
+        enemyDatalist = document.createElement('datalist');
+        enemyDatalist.id = 'enemy-status-options';
+        document.body.appendChild(enemyDatalist);
+    }
+    enemyDatalist.innerHTML = '';
+    ['hp', 'stamina', 'atk', 'def', 'spd', 'penetration', 'critRate', 'critMult', 'attackRange', 'attackCooldown', 'projectileSpeed', 'blastRadius', 'blastDamageRate'].forEach(st => {
+        enemyDatalist.appendChild(new Option(st));
+    });
+
+    // エネミーが選択されている Input の list 属性を切り替える
+    document.querySelectorAll('.variable-op-item').forEach(item => {
+        const typeSel = item.querySelector('select:first-child');
+        const targetInp = item.querySelector('input[type="text"]');
+        if (typeSel && targetInp) {
+            if (typeSel.value === 'enemy') {
+                targetInp.setAttribute('list', 'enemy-status-options');
+            } else {
+                targetInp.setAttribute('list', 'variable-list-options');
+            }
+        }
     });
 }
 
@@ -1750,19 +1789,28 @@ export function updatePreview(forceStart = false) {
     iframe.style.height = '100%'; 
     iframe.style.border = 'none';
     
-    // 開始ノードの決定ロジック
-    // forceStartが true なら、必ずプロジェクトの startNodeId を使う
-    // false (通常) なら、現在選択中のノードがあればそこから、なければスタート地点から
     let startNode = null;
-    
     if (forceStart) {
         startNode = projectData.scenario.startNodeId;
     } else {
         startNode = activeNodeId || projectData.scenario.startNodeId;
     }
 
+    // ★追加: それでも無ければ自動で探す
+    if (!startNode) {
+        for (const sId in projectData.scenario.sections) {
+            const sec = projectData.scenario.sections[sId];
+            const nodeIds = Object.keys(sec.nodes);
+            if (nodeIds.length > 0) {
+                startNode = nodeIds[0];
+                projectData.scenario.startNodeId = startNode; // プロジェクトにも設定しておく
+                break;
+            }
+        }
+    }
+
     if (!startNode) { 
-        elements.previewWindow.innerHTML = '<div style="color:white; padding:20px; text-align:center;">開始ノードが設定されていません。<br>シナリオエディタでノードを選択するか、START地点を設定してください。</div>'; 
+        elements.previewWindow.innerHTML = '<div style="color:white; padding:20px; text-align:center;">シナリオを作成してください。</div>'; 
         return; 
     }
     
@@ -1789,13 +1837,16 @@ export function renderScenarioTree() {
 
     const projectData = state.getProjectData();
     const activeId = state.getActiveNodeId();
+    const activeSecId = state.getActiveSectionId(); // ★追加: 現在の章を取得
 
     Object.keys(projectData.scenario.sections).forEach(secId => {
         const sec = projectData.scenario.sections[secId];
-        const nodeCount = Object.keys(sec.nodes).length; // ノード数をカウント
+        const nodeCount = Object.keys(sec.nodes).length; 
 
         const div = document.createElement('div');
         div.className = 'tree-section';
+        if (secId === activeSecId) div.classList.add('active'); // ★追加: 選択中の章にクラスを付与
+        
         
         // ヘッダー部分 (数字バッジを追加)
         const header = document.createElement('div');
@@ -2372,11 +2423,12 @@ export function renderAssetList(type) {
         } else if (a.data.startsWith('data:video')) {
             prev = '<video src="' + a.data + '" controls playsinline style="width:100%; height:140px; background:#000; object-fit:contain;"></video>';
         }
-
-        let settingsHtml = '';
+let settingsHtml = '';
         if (type === 'characters' || type === 'backgrounds') {
             const width = a.width || '?'; 
             const height = a.height || '?';
+            
+            // ★修正: アニメーションの範囲指定（開始コマ・終了コマ）の入力欄を追加
             settingsHtml = `
             <div class="anim-settings">
                 <div style="font-size:0.8em; color:#666; margin-bottom:5px;">Size: ${width} x ${height} px</div>
@@ -2387,6 +2439,12 @@ export function renderAssetList(type) {
                 <div class="anim-row">
                     <label>FPS:</label><input type="number" value="${a.fps || 12}" min="1" class="asset-setting" data-id="${id}" data-type="${type}" data-setting="fps">
                     <label><input type="checkbox" ${a.loop !== false ? 'checked' : ''} class="asset-setting" data-id="${id}" data-type="${type}" data-setting="loop">Loop</label>
+                </div>
+                <div class="anim-row" style="border-top:1px dashed #ccc; padding-top:5px; margin-top:5px;">
+                    <label title="0から始まるフレーム番号">開始コマ:</label>
+                    <input type="number" value="${a.startFrame || 0}" min="0" class="asset-setting" data-id="${id}" data-type="${type}" data-setting="startFrame">
+                    <label>終了コマ:</label>
+                    <input type="number" value="${a.endFrame !== undefined ? a.endFrame : ((a.cols||1)*(a.rows||1)-1)}" min="0" class="asset-setting" data-id="${id}" data-type="${type}" data-setting="endFrame">
                 </div>
             </div>`;
         }
@@ -2688,32 +2746,43 @@ if (copyInput) {
     bindCheck('ui-show-skip-btn', 'showSkipBtn');
     bindCheck('ui-show-config-btn', 'showConfigBtn');
     bindCheck('ui-show-pause-btn', 'showPauseBtn');
+    bindCheck('ui-show-title-btn', 'showTitleBtn'); 
 
     // --- 5. 演出・その他 ---
+    if (s.lowResMode === undefined) s.lowResMode = false;
+    bindCheck('ui-low-res-mode', 'lowResMode');
+    
     bindCheck('ui-auto-shake', 'autoShakeOnDamage');
     bindCheck('ui-show-popups', 'showPopups');
     bindCheck('ui-flash-item', 'flashOnItemUse');
     bindCheck('ui-flash-invincible', 'flashOnInvincible');
+    
+    // ★修正: backgroundFit が未定義なら cover をセット
+    if (!s.backgroundFit) s.backgroundFit = 'cover';
     bindSelect('ui-bg-fit', 'backgroundFit');
+    
     bindNum('ui-portrait-char-offset-y', 'characterOffsetY', s.portraitUI);
 
     // --- 6. デバッグ・ゲームオーバー ---
+    if (s.debugMode === undefined) s.debugMode = false;
+    if (s.shopDetailed === undefined) s.shopDetailed = true;
     bindCheck('ui-debug-mode', 'debugMode');
     bindCheck('ui-shop-detailed', 'shopDetailed');
     
     // 共通ゲームオーバー設定
-    const globalGOContainer = document.getElementById('global-gameover-select-container');
+        const globalGOContainer = document.getElementById('global-gameover-select-container');
     if (globalGOContainer) {
-        // createLinkedSelectsはui.js内で定義されている前提
-        createLinkedSelects(globalGOContainer, 'ui-global-gameover-node', s.globalGameoverNodeId || '');
-        globalGOContainer.addEventListener('change', (e) => {
+        // 常に最新のプロジェクトデータから読み込む
+        createLinkedSelects(globalGOContainer, 'ui-global-gameover-node', state.getProjectData().settings.globalGameoverNodeId || '');
+        
+        // イベントリスナーの重複を防ぐため onchange を使用し、常に最新のデータへ保存する
+        globalGOContainer.onchange = (e) => {
             const select = document.getElementById('ui-global-gameover-node');
             if (select) {
-                s.globalGameoverNodeId = select.value;
+                state.getProjectData().settings.globalGameoverNodeId = select.value;
             }
-        });
+        };
     }
-
     // --- 7. アクションボタン設定 ---
     const renderActionButtonsConfig = () => {
         const list = document.getElementById('action-buttons-list');
@@ -2728,8 +2797,9 @@ if (copyInput) {
             'attack': '⚔️ 攻撃',
             'jump': '🦘 ジャンプ',
             'dash': '💨 ダッシュ (押下中)',
+            'dodge': '💫 回避 / ステップ (短押し)', // ★追加
             'invincible': '🌟 無敵 (押下中)',
-            'guard': '🛡️ 防御 / パリィ',
+            'guard': '🛡️ ガード / パリィ',
             'lockon': '🎯 ロックオン (切替)',
             'toggle_view': '📷 視点切替 (FPS/TPS)',
             'use_item': '💊 アイテム使用 (固定)',
@@ -2756,6 +2826,24 @@ if (copyInput) {
             for (const k in keys) keySelect.add(new Option(keys[k], k));
             keySelect.value = btn.key;
             keySelect.onchange = (e) => btn.key = e.target.value;
+
+            // ★追加: ゲームパッド設定用のプルダウン
+            const padSelect = document.createElement('select');
+            padSelect.style.width = '100px';
+            padSelect.add(new Option('Pad:なし', ''));
+            padSelect.add(new Option('A/× (0)', 0));
+            padSelect.add(new Option('B/○ (1)', 1));
+            padSelect.add(new Option('X/□ (2)', 2));
+            padSelect.add(new Option('Y/△ (3)', 3));
+            padSelect.add(new Option('L1/LB (4)', 4));
+            padSelect.add(new Option('R1/RB (5)', 5));
+            padSelect.add(new Option('L2/LT (6)', 6));
+            padSelect.add(new Option('R2/RT (7)', 7));
+            padSelect.add(new Option('Select (8)', 8));
+            padSelect.add(new Option('Start (9)', 9));
+            // 初期値セット
+            padSelect.value = btn.padBtn !== undefined ? btn.padBtn : '';
+            padSelect.onchange = (e) => btn.padBtn = e.target.value !== '' ? parseInt(e.target.value) : '';
 
             const typeSelect = document.createElement('select');
             for (const t in types) typeSelect.add(new Option(types[t], t));
@@ -2802,7 +2890,7 @@ if (copyInput) {
             delBtn.className = 'danger-button'; delBtn.textContent = '×';
             delBtn.onclick = () => { s.actionButtons.splice(index, 1); renderActionButtonsConfig(); };
 
-            row.append(document.createTextNode(`#${index + 1}: `), labelInput, keySelect, typeSelect, varInput, itemSelect, delBtn);
+            row.append(document.createTextNode(`#${index + 1}: `), labelInput, keySelect, padSelect, typeSelect, varInput, itemSelect, delBtn);
             list.appendChild(row);
         });
 
@@ -2874,38 +2962,40 @@ export function initUi() {
 
         // マップオブジェクト設定 (個別上書き用)
         { id: 'obj-battle-hp', ph: '例: 10' },
-        { id: 'obj-battle-stamina', ph: '例: 100 (空欄=DB値)' },
+        // (obj-battle-stamina を削除)
         { id: 'obj-battle-dmg', ph: '例: 1' },
-        { id: 'obj-battle-exp', ph: '例: 10' },
+        // (obj-battle-exp もエネミー専用だったので削除)
         { id: 'obj-battle-def', ph: '例: 0' },
-        { id: 'obj-battle-pen', ph: '例: 1' },
-        { id: 'obj-atk-range', ph: '例: 32' },
-        { id: 'obj-atk-cooldown', ph: '例: 60' },
-        { id: 'obj-atk-speed', ph: '例: 0' },
-        { id: 'obj-blast-radius', ph: '0=なし' }
+        // (obj-battle-pen を削除)
+        // (obj-atk-range, cooldown, speed を削除)
+        { id: 'obj-blast-radius', ph: '0=なし' },
+        { id: 'obj-blast-rate', ph: '50' }
     ];
 
     flexibleInputs.forEach(conf => {
         const el = document.getElementById(conf.id);
         if (el) {
-            // 既存の type="number" を type="text" に強制変更
+            // 値がリセットされるのを防ぐため一時退避
+            const currentVal = el.value;
+            
+            // 既存の type="number" を type="text" に変更
             el.type = 'text';
-            // プレースホルダー（入力例）を設定
+            // スマホ等で計算式入力用に英数キーボードを出しやすくする
+            el.inputMode = 'text';
+            
+            // 値を復元し、プレースホルダーと補完リストを設定
+            el.value = currentVal;
             el.placeholder = conf.ph;
-            // 変数名の入力補完リストと紐付け
             el.setAttribute('list', 'variable-list-options');
         }
     });
 }
-
-// ui.js の initPlayerSettings 関数をこれに置き換えてください
-
-function initPlayerSettings() {
+export function initPlayerSettings() {
     const openBtn = document.getElementById('open-player-settings-btn');
     const saveBtn = document.getElementById('save-player-settings-btn');
     const modal = document.getElementById('player-settings-modal');
     
-    // タブ切り替え用の関数をウィンドウオブジェクトに登録
+    // タブ切り替え関数
     window.switchPlayerTab = (e, tabId) => {
         document.querySelectorAll('.player-tab-content').forEach(el => el.style.display = 'none');
         const target = document.getElementById(tabId);
@@ -2929,11 +3019,11 @@ function initPlayerSettings() {
 
     openBtn.addEventListener('click', () => {
         const p = state.getProjectData().player;
-        let modalContent = modal.querySelector('.modal-content > div[style*="overflow-y"]');
-        if (!modalContent) modalContent = modal.querySelector('.modal-content > div:nth-of-type(1)');
+        const container = document.getElementById('player-settings-container');
+        if (!container) return;
         
-        // レイアウトをGridベースに修正
-        modalContent.innerHTML = `
+        // 画面の設計図（HTML）を生成して流し込む
+        container.innerHTML = `
             <!-- タブボタン -->
             <div style="margin-bottom:15px; border-bottom:1px solid #ddd; display:flex; gap:5px; padding-left:5px;">
                 <button class="tab-btn active" onclick="switchPlayerTab(event, 'p-tab-basic')" style="padding:10px 15px; border:1px solid #ddd; border-bottom:none; background:#fff; cursor:pointer; border-radius:5px 5px 0 0; font-weight:bold; color:#1890ff;">📊 基本・成長</button>
@@ -2943,38 +3033,26 @@ function initPlayerSettings() {
 
             <!-- ▼▼▼ 基本・成長タブ ▼▼▼ -->
             <div id="p-tab-basic" class="player-tab-content" style="display:block;">
-
-                <div style="margin-bottom:15px; padding:10px; background:#f9f9f9; border-radius:4px; border:1px solid #ddd;">
+                <div style="background:#f9f9f9; padding:12px; border-radius:6px; border:1px solid #ddd; margin-bottom:15px;">
                     <label style="font-weight:bold; display:block; margin-bottom:5px;">プレイヤー名 (変数: $name)</label>
-                    <input type="text" id="p-name" value="${p.$name || '主人公'}" style="width:100%; padding:8px; font-size:1.1em;">
+                    <input type="text" id="p-name" value="${p.$name || '主人公'}" style="width:100%;">
                 </div>
                 
-                <!-- 当たり判定設定 -->
                 <div style="background:#f0f8ff; padding:12px; border-radius:6px; margin-bottom:15px; border:1px solid #adc6ff;">
-                    <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <label style="font-weight:bold; font-size:0.95em; color:#0050b3;">📐 当たり判定サイズ (px)</label>
-                        <span style="font-size:0.8em; color:#666;">※画像サイズに合わせて調整</span>
-                    </div>
-                    <div style="display:flex; gap:15px; margin-top:8px;">
-                        <div style="flex:1; display:flex; align-items:center; gap:8px;">
-                            <label style="font-size:0.9em; width:40px;">幅</label>
-                            <input type="number" id="p-width" value="${p.width||32}" step="1" style="flex:1; padding:6px; border:1px solid #ccc; border-radius:4px;">
-                        </div>
-                        <div style="flex:1; display:flex; align-items:center; gap:8px;">
-                            <label style="font-size:0.9em; width:40px;">高さ</label>
-                            <input type="number" id="p-height" value="${p.height||32}" step="1" style="flex:1; padding:6px; border:1px solid #ccc; border-radius:4px;">
-                        </div>
+                    <label style="font-weight:bold; color:#0050b3;">📐 当たり判定サイズ (px)</label>
+                    <div style="display:flex; gap:10px; margin-top:5px;">
+                        <div style="flex:1"><label style="font-size:0.85em;">幅</label><input type="number" id="p-width" value="${p.width||32}" style="width:100%;"></div>
+                        <div style="flex:1"><label style="font-size:0.85em;">高さ</label><input type="number" id="p-height" value="${p.height||32}" style="width:100%;"></div>
                     </div>
                 </div>
 
-                <!-- レベル設定 -->
                 <div style="background:#fff; padding:12px; border-radius:6px; margin-bottom:15px; border:1px solid #ddd;">
-                    <div style="font-weight:bold; border-bottom:1px solid #eee; padding-bottom:5px; margin-bottom:10px; font-size:0.95em;">レベル・成長タイプ</div>
-                    <div style="display:flex; gap:10px;">
-                        <div style="flex:1"><label style="font-size:0.8em; display:block; color:#555;">初期Lv</label><input type="number" id="p-init-level" value="${p.initialLevel||1}" min="1" style="width:100%; padding:5px;"></div>
-                        <div style="flex:1"><label style="font-size:0.8em; display:block; color:#555;">最大Lv</label><input type="number" id="p-max-level" value="${p.maxLevel||50}" min="1" style="width:100%; padding:5px;"></div>
-                        <div style="flex:1.5"><label style="font-size:0.8em; display:block; color:#555;">成長タイプ</label>
-                            <select id="p-growth-type" style="width:100%; padding:5px;">
+                    <label style="font-weight:bold; border-bottom:1px solid #eee; padding-bottom:5px; display:block;">レベル・成長タイプ</label>
+                    <div style="display:flex; gap:10px; margin-top:5px;">
+                        <div style="flex:1"><label style="font-size:0.85em;">初期Lv</label><input type="number" id="p-init-level" value="${p.initialLevel||1}" min="1" style="width:100%;"></div>
+                        <div style="flex:1"><label style="font-size:0.85em;">最大Lv</label><input type="number" id="p-max-level" value="${p.maxLevel||50}" min="1" style="width:100%;"></div>
+                        <div style="flex:1.5"><label style="font-size:0.85em;">成長タイプ</label>
+                            <select id="p-growth-type" style="width:100%;">
                                 <option value="fast" ${p.growthType==='fast'?'selected':''}>早熟 (序盤速い)</option>
                                 <option value="normal" ${p.growthType==='normal'?'selected':''}>普通 (平均的)</option>
                                 <option value="slow" ${p.growthType==='slow'?'selected':''}>晩成 (後半伸びる)</option>
@@ -2983,159 +3061,112 @@ function initPlayerSettings() {
                     </div>
                 </div>
 
-                <!-- ステータス成長 (Gridレイアウト化) -->
                 <div style="background:#fff; padding:12px; border-radius:6px; border:1px solid #ddd;">
-                    <div style="font-weight:bold; border-bottom:1px solid #eee; padding-bottom:5px; margin-bottom:10px; font-size:0.95em;">
-                        ステータス成長 (Lv1 ➜ LvMax)
+                    <label style="font-weight:bold; border-bottom:1px solid #eee; padding-bottom:5px; display:block; margin-bottom:10px;">ステータス成長 (Lv1 ➜ LvMax)</label>
+                    <div style="display:grid; grid-template-columns: 80px 1fr 20px 1fr; gap:8px; align-items:center;">
+                        <div style="color:#888; text-align:center; font-size:0.8em;">項目</div><div style="color:#888; text-align:center; font-size:0.8em;">初期値</div><div></div><div style="color:#888; text-align:center; font-size:0.8em;">最大値</div>
+                        
+                        <div>❤️ HP</div><input type="text" id="p-init-hp" value="${p.maxHp||10}" list="variable-list-options"><div style="text-align:center;">➜</div><input type="text" id="p-limit-hp" value="${p.limitHp||100}" list="variable-list-options">
+                        <div>⚡ STA</div><input type="text" id="p-init-stamina" value="${p.maxStamina||100}" list="variable-list-options"><div style="text-align:center;">➜</div><input type="text" id="p-limit-stamina" value="${p.limitStamina||150}" list="variable-list-options">
+                        <div>💧 ST回復</div><input type="text" id="p-init-stamina-regen" value="${p.staminaRegen||20}" list="variable-list-options"><div style="text-align:center;">➜</div><input type="text" id="p-limit-stamina-regen" value="${p.limitStaminaRegen||50}" list="variable-list-options">
+                        <div>⚔️ ATK</div><input type="text" id="p-init-atk" value="${p.atk||1}" list="variable-list-options"><div style="text-align:center;">➜</div><input type="text" id="p-limit-atk" value="${p.limitAtk||10}" list="variable-list-options">
+                        <div>🛡️ DEF</div><input type="text" id="p-init-def" value="${p.defense||0}" list="variable-list-options"><div style="text-align:center;">➜</div><input type="text" id="p-limit-def" value="${p.limitDef||10}" list="variable-list-options">
+                        <div>🗡️ 貫通力</div><input type="text" id="p-init-pen" value="${p.penetration||1}" list="variable-list-options"><div style="text-align:center;">➜</div><input type="text" id="p-limit-pen" value="${p.limitPenetration||10}" list="variable-list-options">
+                        <div>🦶 SPD</div><input type="text" id="p-init-spd" value="${p.spd||1.0}" list="variable-list-options"><div style="text-align:center;">➜</div><input type="text" id="p-limit-spd" value="${p.limitSpd||1.5}" list="variable-list-options">
                     </div>
-                    
-                    <div style="display:grid; grid-template-columns: 80px 1fr 20px 1fr; gap:10px; align-items:center; font-size:0.9em;">
-                        <!-- ヘッダー行 -->
-                        <div style="font-weight:bold; color:#888; text-align:center;">項目</div>
-                        <div style="font-weight:bold; color:#888; text-align:center;">初期値</div>
-                        <div></div>
-                        <div style="font-weight:bold; color:#888; text-align:center;">最大値(カンスト)</div>
-
-                        <!-- HP -->
-                        <div style="display:flex; align-items:center; gap:5px;"><span style="font-size:1.2em;">❤️</span> HP</div>
-                        <input type="text" id="p-init-hp" value="${p.maxHp||10}" list="variable-list-options" placeholder="初期値" style="padding:5px; border:1px solid #ccc; border-radius:3px;">
-                        <div style="text-align:center; color:#ccc;">➜</div>
-                        <input type="text" id="p-limit-hp" value="${p.limitHp||100}" list="variable-list-options" placeholder="最大値" style="padding:5px; border:1px solid #ccc; border-radius:3px;">
-
-                        <!-- ATK -->
-                        <div style="display:flex; align-items:center; gap:5px;"><span style="font-size:1.2em;">⚔️</span> ATK</div>
-                        <input type="text" id="p-init-atk" value="${p.atk||1}" list="variable-list-options" style="padding:5px; border:1px solid #ccc; border-radius:3px;">
-                        <div style="text-align:center; color:#ccc;">➜</div>
-                        <input type="text" id="p-limit-atk" value="${p.limitAtk||10}" list="variable-list-options" style="padding:5px; border:1px solid #ccc; border-radius:3px;">
-
-                        <!-- DEF -->
-                        <div style="display:flex; align-items:center; gap:5px;"><span style="font-size:1.2em;">🛡️</span> DEF</div>
-                        <input type="text" id="p-init-def" value="${p.defense||0}" list="variable-list-options" style="padding:5px; border:1px solid #ccc; border-radius:3px;">
-                        <div style="text-align:center; color:#ccc;">➜</div>
-                        <input type="text" id="p-limit-def" value="${p.limitDef||10}" list="variable-list-options" style="padding:5px; border:1px solid #ccc; border-radius:3px;">
-
-                        <!-- SPD -->
-                        <div style="display:flex; align-items:center; gap:5px;"><span style="font-size:1.2em;">🦶</span> SPD</div>
-                        <input type="text" id="p-init-spd" value="${p.spd||1.0}" list="variable-list-options" style="padding:5px; border:1px solid #ccc; border-radius:3px;">
-                        <div style="text-align:center; color:#ccc;">➜</div>
-                        <input type="text" id="p-limit-spd" value="${p.limitSpd||1.5}" list="variable-list-options" style="padding:5px; border:1px solid #ccc; border-radius:3px;">
-
-                        <!-- STAMINA -->
-                        <div style="display:flex; align-items:center; gap:5px;"><span style="font-size:1.2em;">⚡</span> STA</div>
-                        <input type="text" id="p-init-stamina" value="${p.maxStamina||100}" list="variable-list-options" style="padding:5px; border:1px solid #ccc; border-radius:3px;">
-                        <div style="text-align:center; color:#ccc;">➜</div>
-                        <input type="text" id="p-limit-stamina" value="${p.limitStamina||150}" list="variable-list-options" style="padding:5px; border:1px solid #ccc; border-radius:3px;">
-
-                                            <!-- STAMINA REGEN -->
-                    <div style="display:flex; align-items:center; gap:5px;"><span style="font-size:1.2em;">💧</span> ST回復</div>
-                    <input type="text" id="p-init-stamina-regen" value="${p.staminaRegen||20}" list="variable-list-options" style="padding:5px; border:1px solid #ccc; border-radius:3px;">
-                    <div style="text-align:center; color:#ccc;">➜</div>
-                    <input type="text" id="p-limit-stamina-regen" value="${p.limitStaminaRegen||50}" list="variable-list-options" style="padding:5px; border:1px solid #ccc; border-radius:3px;">
-
-                    <!-- PENETRATION -->
-                    <div style="display:flex; align-items:center; gap:5px;"><span style="font-size:1.2em;">🛡️</span> 貫通力</div>
-                    <input type="text" id="p-init-pen" value="${p.penetration||1}" list="variable-list-options" style="padding:5px; border:1px solid #ccc; border-radius:3px;">
-                    <div style="text-align:center; color:#ccc;">➜</div>
-                    <input type="text" id="p-limit-pen" value="${p.limitPenetration||10}" list="variable-list-options" style="padding:5px; border:1px solid #ccc; border-radius:3px;">
-                    </div>
-
-
                 </div>
             </div>
 
             <!-- ▼▼▼ アクションタブ ▼▼▼ -->
             <div id="p-tab-action" class="player-tab-content" style="display:none;">
                 
+                <!-- 移動・ジャンプ設定 -->
+                <div style="background:#f6ffed; padding:12px; border-radius:6px; border:1px solid #b7eb8f; margin-bottom:15px;">
+                    <label style="font-weight:bold; color:#389e0d; display:block; margin-bottom:10px;">🏃 移動・ジャンプ設定</label>
+                    <div style="display:flex; gap:10px; align-items:center;">
+                        <div style="flex:1"><label style="font-size:0.85em;">基本ジャンプ力</label><input type="text" id="p-jump-power" value="${p.jumpPower||8.0}" list="variable-list-options" style="width:100%;"></div>
+                        <div style="flex:1"><label style="font-size:0.85em;">追加ジャンプ回数(2段等)</label><input type="number" id="p-extra-jumps" value="${p.extraJumps||0}" min="0" style="width:100%;"></div>
+                    </div>
+                    <div style="margin-top:10px; padding-top:10px; border-top:1px dashed #b7eb8f;">
+                        <label class="checkbox-label" style="cursor:pointer;">
+                            <input type="checkbox" id="p-wall-jump" ${p.wallJump?'checked':''}> <span style="font-weight:bold; color:#389e0d;">🧗 壁蹴り(Wall Jump) を有効にする</span>
+                        </label>
+                    </div>
+                </div>
+
                 <!-- 攻撃パラメータ -->
                 <div style="background:#fff0f6; padding:12px; border-radius:6px; border:1px solid #ffadd2; margin-bottom:15px;">
-                    <div style="font-weight:bold; color:#c41d7f; margin-bottom:10px; font-size:0.95em;">⚔️ 攻撃アクション設定</div>
+                    <label style="font-weight:bold; color:#c41d7f; display:block; margin-bottom:10px;">⚔️ 攻撃アクション設定</label>
                     <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size:0.9em;">
-                        <div><label style="display:block; color:#555;">射程 (Range)</label><input type="text" id="p-range" value="${p.attackRange||32}" list="variable-list-options" style="width:100%; padding:5px;"></div>
-                        <div><label style="display:block; color:#555;">攻撃サイズ</label><input type="text" id="p-size" value="${p.attackSize||32}" list="variable-list-options" style="width:100%; padding:5px;"></div>
-                        <div><label style="display:block; color:#555;">硬直F (Cooldown)</label><input type="text" id="p-cooldown" value="${p.attackCooldown||20}" list="variable-list-options" style="width:100%; padding:5px;"></div>
-                        <div><label style="display:block; color:#555;">弾速 (0=近接)</label><input type="text" id="p-proj-speed" value="${p.projectileSpeed||0}" list="variable-list-options" style="width:100%; padding:5px;"></div>
-                        <div><label style="display:block; color:#555;">クリティカル率(%)</label><input type="text" id="p-crit-rate" value="${p.criticalRate||5}" list="variable-list-options" style="width:100%; padding:5px;"></div>
-                        <div><label style="display:block; color:#555;">クリティカル倍率</label><input type="text" id="p-crit-mult" value="${p.criticalMultiplier||2.0}" list="variable-list-options" style="width:100%; padding:5px;"></div>
-
-                    
-                    <div style="margin-top:10px; padding-top:10px; border-top:1px dashed #ffadd2; display:grid; grid-template-columns: 1fr 1fr; gap:10px; font-size:0.9em;">
-                        <div><label style="display:block; color:#c41d7f;">💥 爆発範囲 (px)</label><input type="text" id="player-init-blast-radius" value="${p.blastRadius||0}" list="variable-list-options" style="width:100%; padding:5px;"></div>
-                        <div><label style="display:block; color:#c41d7f;">爆風倍率 (%)</label><input type="text" id="player-init-blast-rate" value="${p.blastDamageRate||50}" list="variable-list-options" style="width:100%; padding:5px;"></div>
+                        <div><label>射程 (Range)</label><input type="text" id="p-range" value="${p.attackRange||32}" list="variable-list-options" style="width:100%;"></div>
+                        <div><label>攻撃サイズ</label><input type="text" id="p-size" value="${p.attackSize||32}" list="variable-list-options" style="width:100%;"></div>
+                        <div><label>硬直F (Cooldown)</label><input type="text" id="p-cooldown" value="${p.attackCooldown||20}" list="variable-list-options" style="width:100%;"></div>
+                        <div><label>弾速 (0=近接)</label><input type="text" id="p-proj-speed" value="${p.projectileSpeed||0}" list="variable-list-options" style="width:100%;"></div>
+                        <div><label>クリティカル率(%)</label><input type="text" id="p-crit-rate" value="${p.criticalRate||5}" list="variable-list-options" style="width:100%;"></div>
+                        <div><label>クリティカル倍率</label><input type="text" id="p-crit-mult" value="${p.criticalMultiplier||2.0}" list="variable-list-options" style="width:100%;"></div>
+                    </div>
+                    <div style="margin-top:10px; padding-top:10px; border-top:1px dashed #ffadd2; display:flex; gap:10px;">
+                        <div style="flex:1"><label style="color:#c41d7f;">💥 爆発範囲 (px)</label><input type="text" id="p-blast-radius" value="${p.blastRadius||0}" list="variable-list-options" style="width:100%;"></div>
+                        <div style="flex:1"><label style="color:#c41d7f;">爆風倍率 (%)</label><input type="text" id="p-blast-rate" value="${p.blastDamageRate||50}" list="variable-list-options" style="width:100%;"></div>
                     </div>
                 </div>
                 
                 <!-- 弾薬設定 -->
                 <div style="background:#e6f7ff; padding:12px; border-radius:6px; border:1px solid #91d5ff; margin-bottom:15px;">
-                    <label class="checkbox-label" style="font-weight:bold; color:#0050b3; margin-bottom:8px; display:flex; align-items:center;">
+                    <label class="checkbox-label" style="font-weight:bold; color:#0050b3; margin-bottom:10px;">
                         <input type="checkbox" id="p-use-magazine" ${p.useMagazine?'checked':''}> 弾数制限 (リロード) を有効化
                     </label>
                     <div style="display:flex; gap:10px; padding-left:20px;">
-                        <div style="flex:1"><label style="font-size:0.8em; display:block; color:#555;">装弾数</label><input type="text" id="p-mag-size" value="${p.magazineSize||30}" list="variable-list-options" style="width:100%; padding:5px;"></div>
-                        <div style="flex:1"><label style="font-size:0.8em; display:block; color:#555;">リロード時間(秒)</label><input type="text" id="p-reload-time" value="${p.reloadTime||2.0}" list="variable-list-options" style="width:100%; padding:5px;"></div>
-                    </div>
-                </div>
-
-                                <div style="background:#f6ffed; padding:12px; border-radius:6px; border:1px solid #b7eb8f; margin-bottom:15px;">
-                    <div style="font-weight:bold; color:#389e0d; margin-bottom:10px;">🛡️ 装備スロット設定</div>
-                    <div style="display:flex; align-items:center; gap:10px;">
-                        <label>最大装備数</label>
-                        <input type="number" id="p-equip-slots" value="${p.maxEquipSlots||1}" min="1" max="10" style="width:60px; padding:5px;">
-                        <span style="font-size:0.8em; color:#666;">個まで同時に装備可能</span>
+                        <div style="flex:1"><label style="font-size:0.85em;">装弾数</label><input type="text" id="p-mag-size" value="${p.magazineSize||30}" list="variable-list-options" style="width:100%;"></div>
+                        <div style="flex:1"><label style="font-size:0.85em;">リロード時間(秒)</label><input type="text" id="p-reload-time" value="${p.reloadTime||2.0}" list="variable-list-options" style="width:100%;"></div>
                     </div>
                 </div>
 
                 <!-- スタミナ消費 -->
                 <div style="background:#fff; padding:12px; border:1px solid #ddd; border-radius:6px; margin-bottom:15px;">
-                    <div style="font-weight:bold; border-bottom:1px solid #eee; padding-bottom:5px; margin-bottom:10px; font-size:0.95em;">
-                        ⚡ アクション消費コスト (スタミナ等)
-                    </div>
-                    <!-- グリッドで整理し、Flexboxで中身を整列 -->
+                    <label style="font-weight:bold; border-bottom:1px solid #eee; padding-bottom:5px; display:block; margin-bottom:10px;">⚡ アクション消費コスト</label>
                     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; font-size:0.9em;">
-                        <div style="display:flex; align-items:center; justify-content:space-between; background:#f9f9f9; padding:6px 10px; border-radius:4px; border:1px solid #eee;">
-                            <label class="checkbox-label" style="margin:0; cursor:pointer;"><input type="checkbox" id="p-dash-consume" ${p.dashConsume?'checked':''}> ダッシュ</label>
-                            <input type="text" id="p-dash-cost" value="${p.dashCost||0.5}" style="width:50px; text-align:right; padding:3px; border:1px solid #ccc; border-radius:3px;">
-                        </div>
-                        <div style="display:flex; align-items:center; justify-content:space-between; background:#f9f9f9; padding:6px 10px; border-radius:4px; border:1px solid #eee;">
-                            <label class="checkbox-label" style="margin:0; cursor:pointer;"><input type="checkbox" id="p-jump-consume" ${p.jumpConsume?'checked':''}> ジャンプ</label>
-                            <input type="text" id="p-jump-cost" value="${p.jumpCost||10}" style="width:50px; text-align:right; padding:3px; border:1px solid #ccc; border-radius:3px;">
-                        </div>
-                        <div style="display:flex; align-items:center; justify-content:space-between; background:#f9f9f9; padding:6px 10px; border-radius:4px; border:1px solid #eee;">
-                            <label class="checkbox-label" style="margin:0; cursor:pointer;"><input type="checkbox" id="p-atk-consume" ${p.attackConsume?'checked':''}> 攻撃</label>
-                            <input type="text" id="p-atk-cost" value="${p.attackCost||20}" style="width:50px; text-align:right; padding:3px; border:1px solid #ccc; border-radius:3px;">
-                        </div>
-                        <div style="display:flex; align-items:center; justify-content:space-between; background:#f9f9f9; padding:6px 10px; border-radius:4px; border:1px solid #eee;">
-                            <label class="checkbox-label" style="margin:0; cursor:pointer;"><input type="checkbox" id="player-guard-consume" ${p.guardConsume?'checked':''}> ガード</label>
-                            <input type="text" id="player-guard-cost" value="${p.guardCost||0.5}" style="width:50px; text-align:right; padding:3px; border:1px solid #ccc; border-radius:3px;">
-                        </div>
-                        <div style="display:flex; align-items:center; justify-content:space-between; background:#f9f9f9; padding:6px 10px; border-radius:4px; border:1px solid #eee;">
-                            <label class="checkbox-label" style="margin:0; cursor:pointer;"><input type="checkbox" id="player-invincible-consume" ${p.invincibleConsume?'checked':''}> 無敵</label>
-                            <input type="text" id="player-invincible-cost" value="${p.invincibleCost||1.0}" style="width:50px; text-align:right; padding:3px; border:1px solid #ccc; border-radius:3px;">
-                        </div>
+                        <div style="display:flex; justify-content:space-between; background:#f9f9f9; padding:5px; border:1px solid #eee;"><label class="checkbox-label"><input type="checkbox" id="p-dash-consume" ${p.dashConsume?'checked':''}>ダッシュ(/F)</label><input type="text" id="p-dash-cost" value="${p.dashCost||0.5}" style="width:40px;"></div>
+                        <div style="display:flex; justify-content:space-between; background:#f9f9f9; padding:5px; border:1px solid #eee;"><label class="checkbox-label"><input type="checkbox" id="p-jump-consume" ${p.jumpConsume?'checked':''}>ジャンプ(回)</label><input type="text" id="p-jump-cost" value="${p.jumpCost||10}" style="width:40px;"></div>
+                        <div style="display:flex; justify-content:space-between; background:#f9f9f9; padding:5px; border:1px solid #eee;"><label class="checkbox-label"><input type="checkbox" id="p-atk-consume" ${p.attackConsume?'checked':''}>攻撃(回)</label><input type="text" id="p-atk-cost" value="${p.attackCost||20}" style="width:40px;"></div>
+                        <div style="display:flex; justify-content:space-between; background:#f9f9f9; padding:5px; border:1px solid #eee;"><label class="checkbox-label"><input type="checkbox" id="p-guard-consume" ${p.guardConsume?'checked':''}>ガード維持(/F)</label><input type="text" id="p-guard-cost" value="${p.guardCost||0.5}" style="width:40px;"></div>
+                        <div style="display:flex; justify-content:space-between; background:#e6f7ff; padding:5px; border:1px solid #91d5ff;"><label class="checkbox-label"><input type="checkbox" id="p-dodge-consume" ${p.dodgeConsume!==false?'checked':''}>回避(回)</label><input type="text" id="p-dodge-cost" value="${p.dodgeCost||15}" style="width:40px;"></div>
+                        <div style="display:flex; justify-content:space-between; background:#f9f9f9; padding:5px; border:1px solid #eee;"><label class="checkbox-label"><input type="checkbox" id="p-invincible-consume" ${p.invincibleConsume?'checked':''}>無敵(/F)</label><input type="text" id="p-invincible-cost" value="${p.invincibleCost||1.0}" style="width:40px;"></div>
                     </div>
-                    <div style="margin-top:10px; padding-top:8px; border-top:1px dashed #eee; display:flex; align-items:center; gap:10px;">
-                        <label style="font-size:0.9em;">ジャンプ力</label>
-                        <input type="text" id="p-jump-power" value="${p.jumpPower||8.0}" style="width:70px; padding:4px;">
+                    
+                    <div style="margin-top:10px; padding-top:10px; border-top:1px dashed #ccc; display:flex; gap:10px;">
+                        <div style="flex:1; background:#fffbe6; padding:8px; border:1px solid #ffe58f; border-radius:4px;">
+                            <label style="color:#d46b08; font-weight:bold; font-size:0.85em;">🛡️ ガード受け被ダメ変換倍率</label>
+                            <input type="text" id="p-guard-st-mult" value="${p.guardStaminaMult||2.0}" style="width:100%; margin-top:5px;">
+                        </div>
+                        <div style="flex:1; background:#f0f5ff; padding:8px; border:1px solid #adc6ff; border-radius:4px;">
+                            <label style="color:#0050b3; font-weight:bold; font-size:0.85em;">💫 回避 無敵(F) / 速度</label>
+                            <div style="display:flex; gap:5px; margin-top:5px;">
+                                <input type="text" id="p-dodge-inv" value="${p.dodgeInvincible||20}" style="flex:1;">
+                                <input type="text" id="p-dodge-spd" value="${p.dodgeSpeed||3.0}" style="flex:1;">
+                            </div>
+                        </div>
                     </div>
                 </div>
 
                 <!-- 疲労設定 -->
                 <div style="background:#fff1f0; padding:12px; border:1px solid #ffa39e; border-radius:6px;">
-                    <div style="font-weight:bold; color:#cf1322; font-size:0.95em; margin-bottom:8px;">😫 疲労ペナルティ (スタミナ切れ時)</div>
-                    <div style="display:flex; gap:15px; margin-bottom:10px; font-size:0.9em;">
+                    <label style="font-weight:bold; color:#cf1322; display:block; margin-bottom:10px;">😫 疲労ペナルティ (スタミナ切れ時)</label>
+                    <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:10px; font-size:0.85em;">
                         <label class="checkbox-label"><input type="checkbox" id="p-ex-no-action" ${p.exhaustionNoAction?'checked':''}> アクション不可</label>
                         <label class="checkbox-label"><input type="checkbox" id="p-ex-no-item" ${p.exhaustionNoItem?'checked':''}> アイテム不可</label>
                         <label class="checkbox-label"><input type="checkbox" id="p-ex-dmg-double" ${p.exhaustionDmgDouble?'checked':''}> 被ダメージ2倍</label>
-                           <label class="checkbox-label"><input type="checkbox" id="p-ex-crit" ${p.exhaustionCrit?'checked':''}> 被弾時確定クリティカル</label>
+                        <label class="checkbox-label"><input type="checkbox" id="p-ex-crit" ${p.exhaustionCrit?'checked':''}> 被弾時確定クリティカル</label>
                     </div>
-                    <div style="display:flex; gap:10px; align-items:center; font-size:0.9em;">
-                        <label>継続時間(秒)</label>
-                        <input type="number" id="p-ex-duration" value="${p.exhaustionDuration||3.0}" step="0.1" style="width:60px; padding:4px;">
-                        <label style="margin-left:10px;">移動制限</label>
-                        <select id="p-ex-move" style="padding:4px;">
-                            <option value="normal" ${p.exhaustionMove==='normal'?'selected':''}>通常通り</option>
-                            <option value="slow" ${p.exhaustionMove==='slow'?'selected':''}>歩行のみ</option>
-                            <option value="stop" ${p.exhaustionMove==='stop'?'selected':''}>移動不可</option>
-                        </select>
+                    <div style="display:flex; gap:10px; align-items:center;">
+                        <div style="flex:1"><label style="font-size:0.85em;">継続時間(秒)</label><input type="number" id="p-ex-duration" value="${p.exhaustionDuration||3.0}" step="0.1" style="width:100%;"></div>
+                        <div style="flex:1"><label style="font-size:0.85em;">移動制限</label>
+                            <select id="p-ex-move" style="width:100%;">
+                                <option value="normal" ${p.exhaustionMove==='normal'?'selected':''}>通常</option>
+                                <option value="slow" ${p.exhaustionMove==='slow'?'selected':''}>歩行のみ</option>
+                                <option value="stop" ${p.exhaustionMove==='stop'?'selected':''}>移動不可</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -3146,13 +3177,13 @@ function initPlayerSettings() {
                     <label style="font-weight:bold; display:block; margin-bottom:5px;">頭上のステータスバー表示</label>
                     <select id="p-overhead-type" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
                         <option value="none" ${p.overheadType==='none'?'selected':''}>なし (非表示)</option>
-                        <option value="hp" ${p.overheadType==='hp'?'selected':''}>HPのみ表示</option>
-                        <option value="stamina" ${p.overheadType==='stamina'?'selected':''}>スタミナのみ表示</option>
+                        <option value="hp" ${p.overheadType==='hp'?'selected':''}>HPのみ</option>
+                        <option value="stamina" ${p.overheadType==='stamina'?'selected':''}>スタミナのみ</option>
                         <option value="both" ${p.overheadType==='both'?'selected':''}>HPとスタミナ両方</option>
                     </select>
                 </div>
                 
-                <hr style="margin:20px 0; border:0; border-top:1px dashed #ccc;">
+                <hr style="margin:15px 0; border:0; border-top:1px dashed #ccc;">
                 
                 <div class="form-group" style="margin-bottom:15px;">
                     <label style="font-weight:bold; display:block; margin-bottom:5px;">使用する3Dモデル</label>
@@ -3162,31 +3193,40 @@ function initPlayerSettings() {
 
                 <div id="p-settings-2d-group" style="background:#f9f9f9; padding:15px; border-radius:6px; border:1px solid #ddd;">
                     <div style="font-weight:bold; margin-bottom:10px; color:#555;">2D画像設定</div>
-                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px;">
-                        <div><label style="font-size:0.85em; display:block; margin-bottom:3px;">待機 (Idle)</label><select id="p-img-idle" style="width:100%; padding:5px;"></select></div>
-                        <div><label style="font-size:0.85em; display:block; margin-bottom:3px;">移動 (Move)</label><select id="p-img-move" style="width:100%; padding:5px;"></select></div>
-                        <div><label style="font-size:0.85em; display:block; margin-bottom:3px;">攻撃 (Attack)</label><select id="p-img-attack" style="width:100%; padding:5px;"></select></div>
-                        <div><label style="font-size:0.85em; display:block; margin-bottom:3px;">被弾 (Damage)</label><select id="p-img-damage" style="width:100%; padding:5px;"></select></div>
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                        <div><label style="font-size:0.85em;">待機</label><select id="p-img-idle" style="width:100%;"></select></div>
+                        <div><label style="font-size:0.85em;">移動</label><select id="p-img-move" style="width:100%;"></select></div>
+                        <div><label style="font-size:0.85em;">攻撃</label><select id="p-img-attack" style="width:100%;"></select></div>
+                        <div><label style="font-size:0.85em;">被弾</label><select id="p-img-damage" style="width:100%;"></select></div>
                     </div>
                 </div>
 
                 <div id="p-settings-3d-group" style="display:none; background:#e6f7ff; padding:15px; border-radius:6px; border:1px solid #91d5ff;">
-                    <div style="font-weight:bold; margin-bottom:10px; color:#0050b3;">3Dアニメーション割り当て</div>
-                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px;">
-                        <div><label style="font-size:0.85em; display:block; margin-bottom:3px;">待機</label><select id="p-anim-idle" style="width:100%; padding:5px;"></select></div>
-                        <div><label style="font-size:0.85em; display:block; margin-bottom:3px;">移動</label><select id="p-anim-move" style="width:100%; padding:5px;"></select></div>
-                        <div><label style="font-size:0.85em; display:block; margin-bottom:3px;">攻撃</label><select id="p-anim-attack" style="width:100%; padding:5px;"></select></div>
-                        <div><label style="font-size:0.85em; display:block; margin-bottom:3px;">被弾</label><select id="p-anim-damage" style="width:100%; padding:5px;"></select></div>
-                        <div style="grid-column: span 2;"><label style="font-size:0.85em; display:block; margin-bottom:3px;">ジャンプ</label><select id="p-anim-jump" style="width:100%; padding:5px;"></select></div>
+                    <div style="font-weight:bold; margin-bottom:10px; color:#0050b3;">3Dアニメーション</div>
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                        <div><label style="font-size:0.85em;">待機</label><select id="p-anim-idle" style="width:100%;"></select></div>
+                        <div><label style="font-size:0.85em;">移動</label><select id="p-anim-move" style="width:100%;"></select></div>
+                        <div><label style="font-size:0.85em;">攻撃</label><select id="p-anim-attack" style="width:100%;"></select></div>
+                        <div><label style="font-size:0.85em;">被弾</label><select id="p-anim-damage" style="width:100%;"></select></div>
+                        <div style="grid-column: span 2;"><label style="font-size:0.85em;">ジャンプ</label><select id="p-anim-jump" style="width:100%;"></select></div>
                     </div>
                 </div>
             </div>
-        `;
+        `; // ← innerHTML の代入ここまで
+
+        // --- セレクトボックスの設定 (HTML生成後に実行) ---
+        const setupSel = (id, type, val) => { 
+            const el = document.getElementById(id); 
+            if(el){ 
+                // exportされている populateAssetSelect を使用
+                populateAssetSelect(el, type, 'なし'); 
+                el.value = val||''; 
+            }
+        };
 
         const modelSel = document.getElementById('p-model-id');
         if (modelSel) {
-            populateAssetSelect(modelSel, 'models', '(なし: 2Dモード)');
-            modelSel.value = p.modelId || '';
+            setupSel('p-model-id', 'models', p.modelId);
             const toggleGroups = () => {
                 const is3D = !!modelSel.value;
                 document.getElementById('p-settings-2d-group').style.display = is3D ? 'none' : 'block';
@@ -3196,7 +3236,6 @@ function initPlayerSettings() {
             toggleGroups();
         }
 
-        const setupSel = (id, type, val) => { const el = document.getElementById(id); if(el){ populateAssetSelect(el, type, 'なし'); el.value = val||''; }};
         setupSel('p-img-idle', 'characters', p.imageId); setupSel('p-img-move', 'characters', p.imageIdMove);
         setupSel('p-img-attack', 'characters', p.imageIdAttack); setupSel('p-img-damage', 'characters', p.imageIdDamage);
         setupSel('p-anim-idle', 'animations', p.animIdIdle); setupSel('p-anim-move', 'animations', p.animIdMove);
@@ -3206,118 +3245,103 @@ function initPlayerSettings() {
         modal.classList.remove('hidden');
     });
 
+    // --- 保存ボタンの処理 ---
     saveBtn.addEventListener('click', () => {
         const p = state.getProjectData().player;
 
         const getRaw = (id, def='') => { const el=document.getElementById(id); return el ? el.value : def; };
-        p.$name = getRaw('p-name', '主人公');
-        const getStr = (id, def='') => { const el=document.getElementById(id); return el ? el.value : def; };
         const getChk = (id) => { const el=document.getElementById(id); return el ? el.checked : false; };
 
-        // --- 1. 基本設定・サイズ ---
+        // 1. 基本・成長
+        p.$name = getRaw('p-name', '主人公');
         p.width = getRaw('p-width', '32');
         p.height = getRaw('p-height', '32');
 
-        // レベル設定
         p.initialLevel = getRaw('p-init-level', '1');
         p.maxLevel = getRaw('p-max-level', '50');
-        p.growthType = getStr('p-growth-type', 'normal');
+        p.growthType = getRaw('p-growth-type', 'normal');
 
-        // --- 2. ステータス ---
         p.maxHp = getRaw('p-init-hp', '10');
-        p.atk = getRaw('p-init-atk', '1');
-        p.def = getRaw('p-init-def', '0');
-        p.spd = getRaw('p-init-spd', '1.0'); // デフォルトは1.0が安全
-        p.maxStamina = getRaw('p-init-stamina', '100'); 
-
-        // ★修正: HTML側のID名（p-init-stamina-regen）に合わせてタイポを修正
-        p.staminaRegen = getRaw('p-init-stamina-regen', '20');
-
-        // テストプレイ(プレビュー)を開始する時のために現在値にも反映しておく
-        p.$maxHp = p.maxHp; 
-        p.$hp = p.maxHp; 
-        p.$atk = p.atk; 
-        p.$def = p.def; 
-        p.$spd = p.spd;
-        p.$maxStamina = p.maxStamina; 
-        p.$stamina = p.maxStamina;
-
         p.limitHp = getRaw('p-limit-hp', '100');
-        p.limitAtk = getRaw('p-limit-atk', '10');
-        p.limitDef = getRaw('p-limit-def', '10');
-        p.limitSpd = getRaw('p-limit-spd', '6');
+        p.maxStamina = getRaw('p-init-stamina', '100'); 
         p.limitStamina = getRaw('p-limit-stamina', '150');
+        p.staminaRegen = getRaw('p-init-stamina-regen', '20');
+        p.limitStaminaRegen = getRaw('p-limit-stamina-regen', '50');
+        p.atk = getRaw('p-init-atk', '1');
+        p.limitAtk = getRaw('p-limit-atk', '10');
+        p.def = getRaw('p-init-def', '0');
+        p.limitDef = getRaw('p-limit-def', '10');
+        p.penetration = getRaw('p-init-pen', '1');
+        p.limitPenetration = getRaw('p-limit-pen', '10');
+        p.spd = getRaw('p-init-spd', '1.0');
+        p.limitSpd = getRaw('p-limit-spd', '6');
 
-        // --- 3. アクション設定 ---
+        p.$maxHp = p.maxHp; p.$hp = p.maxHp; 
+        p.$atk = p.atk; p.$def = p.def; p.$spd = p.spd;
+        p.$maxStamina = p.maxStamina; p.$stamina = p.maxStamina;
+
+        // 2. アクション
+        p.jumpPower = getRaw('p-jump-power', '8.0');
+        p.extraJumps = parseInt(getRaw('p-extra-jumps', '0')) || 0;
+        p.wallJump = getChk('p-wall-jump');
+
         p.attackRange = getRaw('p-range', '32');
         p.attackSize = getRaw('p-size', '32');
         p.attackCooldown = getRaw('p-cooldown', '20');
         p.projectileSpeed = getRaw('p-proj-speed', '0');
-        
         p.criticalRate = getRaw('p-crit-rate', '5');
         p.criticalMultiplier = getRaw('p-crit-mult', '2.0');
-        
-        p.blastRadius = getRaw('player-init-blast-radius', '0');
-        p.blastDamageRate = getRaw('player-init-blast-rate', '50');
+        p.blastRadius = getRaw('p-blast-radius', '0');
+        p.blastDamageRate = getRaw('p-blast-rate', '50');
 
-        // 弾薬・リロード
         p.useMagazine = getChk('p-use-magazine');
         p.magazineSize = getRaw('p-mag-size', '30');
         p.$maxMagazine = p.magazineSize;
         p.reloadTime = getRaw('p-reload-time', '2.0');
-        p.maxEquipSlots = parseInt(document.getElementById('p-equip-slots').value) || 1;
-        // スタミナ消費
+
         p.dashConsume = getChk('p-dash-consume'); 
         p.dashCost = getRaw('p-dash-cost', '0.5');
-        
         p.jumpConsume = getChk('p-jump-consume'); 
         p.jumpCost = getRaw('p-jump-cost', '10');
-        
         p.attackConsume = getChk('p-atk-consume'); 
         p.attackCost = getRaw('p-atk-cost', '20');
-        
-        p.guardConsume = getChk('player-guard-consume'); 
-        p.guardCost = getRaw('player-guard-cost', '0.5');
-        
-        p.invincibleConsume = getChk('player-invincible-consume'); 
-        p.invincibleCost = getRaw('player-invincible-cost', '1.0');
-        
-        p.jumpPower = getRaw('p-jump-power', '8.0');
+        p.guardConsume = getChk('p-guard-consume'); 
+        p.guardCost = getRaw('p-guard-cost', '0.5');
+        p.dodgeConsume = getChk('p-dodge-consume');
+        p.dodgeCost = getRaw('p-dodge-cost', '15');
+        p.invincibleConsume = getChk('p-invincible-consume'); 
+        p.invincibleCost = getRaw('p-invincible-cost', '1.0');
 
-        // 疲労設定
+        p.guardStaminaMult = getRaw('p-guard-st-mult', '2.0');
+        p.dodgeInvincible = getRaw('p-dodge-inv', '20');
+        p.dodgeSpeed = getRaw('p-dodge-spd', '3.0');
+
         p.exhaustionDuration = getRaw('p-ex-duration', '3.0');
-        p.exhaustionRecover = getStr('p-ex-recover', 'gradual');
-        p.exhaustionMove = getStr('p-ex-move', 'normal');
+        p.exhaustionMove = getRaw('p-ex-move', 'normal');
         p.exhaustionNoAction = getChk('p-ex-no-action');
         p.exhaustionNoItem = getChk('p-ex-no-item');
         p.exhaustionDmgDouble = getChk('p-ex-dmg-double');
         p.exhaustionCrit = getChk('p-ex-crit');
 
-        // --- 4. ビジュアル設定 ---
-        p.overheadType = getStr('p-overhead-type', 'none');
-        p.modelId = getStr('p-model-id', '');
+        // 3. 見た目
+        p.overheadType = getRaw('p-overhead-type', 'none');
+        p.modelId = getRaw('p-model-id', '');
         
-        p.imageId = getStr('p-img-idle');
-        p.imageIdMove = getStr('p-img-move');
-        p.imageIdAttack = getStr('p-img-attack');
-        p.imageIdDamage = getStr('p-img-damage');
+        p.imageId = getRaw('p-img-idle');
+        p.imageIdMove = getRaw('p-img-move');
+        p.imageIdAttack = getRaw('p-img-attack');
+        p.imageIdDamage = getRaw('p-img-damage');
         
-        p.animIdIdle = getStr('p-anim-idle');
-        p.animIdMove = getStr('p-anim-move');
-        p.animIdAttack = getStr('p-anim-attack');
-        p.animIdDamage = getStr('p-anim-damage');
-        p.animIdJump = getStr('p-anim-jump');
-
-p.limitStaminaRegen = getRaw('p-limit-stamina-regen', '50');
-        
-        p.penetration = getRaw('p-init-pen', '1');
-        p.limitPenetration = getRaw('p-limit-pen', '10');
+        p.animIdIdle = getRaw('p-anim-idle');
+        p.animIdMove = getRaw('p-anim-move');
+        p.animIdAttack = getRaw('p-anim-attack');
+        p.animIdDamage = getRaw('p-anim-damage');
+        p.animIdJump = getRaw('p-anim-jump');
 
         modal.classList.add('hidden');
         alert('プレイヤー設定を保存しました。');
     });
 }
-
 function updateUIIdDatalist() {
     const projectData = state.getProjectData();
     const ids = new Set(); // 重複排除のためSetを使用
@@ -3352,13 +3376,24 @@ function updateUIIdDatalist() {
 
 export function highlightActiveNode() {
     const activeId = state.getActiveNodeId();
+    const activeSecId = state.getActiveSectionId(); // ★追加: 現在の章を取得
+
+    // ノードのハイライト
     document.querySelectorAll('.tree-node').forEach(el => {
         if (el.dataset.id === activeId) el.classList.add('active');
         else el.classList.remove('active');
     });
-}
 
-// ui.js の末尾などに追加
+    // ★追加: 章(セクション)のハイライト
+    document.querySelectorAll('.tree-section').forEach(el => {
+        const header = el.querySelector('.tree-section-header');
+        if (header && header.dataset.id === activeSecId) {
+            el.classList.add('active');
+        } else {
+            el.classList.remove('active');
+        }
+    });
+}
 
 function updateGlobalGameoverSelect() {
     const s = state.getProjectData().settings;
