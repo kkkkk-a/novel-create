@@ -1,0 +1,20 @@
+[package]
+name = "game_core"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+wasm-bindgen = "0.2"
+
+# ▼ 単一HTML埋め込み用：WASMサイズを極限まで削る設定
+[profile.release]
+opt-level = "z"     # サイズ最小化（容量削減）
+lto = true          # リンク時最適化（不要コードの徹底削除）
+codegen-units = 1   # 最適化効率を最大化
+panic = "abort"     # パニック時の不要な巻き戻しコードを削除
+strip = true        # デバッグ用の不要な文字情報を削る
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = false
