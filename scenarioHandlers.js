@@ -338,6 +338,7 @@ if (newType && newType !== "" && node.type !== newType) {
                 if (oldType === 'map') { delete node.mapId; delete node.spawnId; }
                 if (oldType === 'shop') { delete node.shopItems; delete node.currencyVar; }
                 if (oldType === 'battle') { delete node.enemyIds; delete node.nextWinNodeId; delete node.nextRunNodeId; delete node.nextLoseNodeId; }
+                if (oldType === 'input') delete node.inputConfig;
                 
                 // 新しいタイプの必須プロパティを初期化
                 if (newType === 'text') {
@@ -357,6 +358,12 @@ if (newType && newType !== "" && node.type !== newType) {
                     node.currencyVar = 'money';
                 } else if (newType === 'battle') {
                     node.enemyIds = [];
+                } else if (newType === 'input') {
+                    node.inputConfig = {
+                        targetVar: '$name', typeLimit: 'text', maxLength: 10, btnText: '決定',
+                        allowEmpty: false, initialValue: '', cancelText: '', correctAnswer: '',
+                        retryLimit: 0, nextSuccessId: '', nextFailId: '', nextCancelId: ''
+                    };
                 }
             }
 

@@ -264,14 +264,14 @@ function selectEnemy(id) {
     document.getElementById('enemy-opacity').value = enemy.opacity || 100;
     document.getElementById('enemy-color').value = enemy.color || '#ffffff';
 
-    document.getElementById('enemy-hp').value = enemy.hp || 10;
+    document.getElementById('enemy-hp').value = (enemy.hp !== undefined) ? enemy.hp : 10;
     document.getElementById('enemy-stamina').value = (enemy.stamina !== undefined) ? enemy.stamina : 100;
     document.getElementById('enemy-stamina-regen').value = (enemy.staminaRegen !== undefined) ? enemy.staminaRegen : 10;
-    document.getElementById('enemy-atk').value = enemy.atk || 1;
-    document.getElementById('enemy-def').value = enemy.def || 0;
+    document.getElementById('enemy-atk').value = (enemy.atk !== undefined) ? enemy.atk : 1;
+    document.getElementById('enemy-def').value = (enemy.def !== undefined) ? enemy.def : 0;
     document.getElementById('enemy-spd').value = (enemy.spd !== undefined) ? enemy.spd : 2;
-    document.getElementById('enemy-exp').value = enemy.exp || 10;
-    document.getElementById('enemy-pen').value = enemy.pen || 1;
+    document.getElementById('enemy-exp').value = (enemy.exp !== undefined) ? enemy.exp : 10;
+    document.getElementById('enemy-pen').value = (enemy.pen !== undefined) ? enemy.pen : 1;
     document.getElementById('enemy-crit-rate').value = (enemy.critRate !== undefined) ? enemy.critRate : 5;
     document.getElementById('enemy-crit-mult').value = (enemy.critMult !== undefined) ? enemy.critMult : 1.5;
 

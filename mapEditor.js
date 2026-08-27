@@ -915,9 +915,9 @@ function syncDataFromForm() {
         t.roleType = role;
 
         // サイズ設定 (マス数 × 32 = ピクセルサイズ)
-        // 幅・高さは最小 1 マス
-        const sizeW = safeGetNum('obj-size-w', 1, false, 1);
-        const sizeH = safeGetNum('obj-size-h', 1, false, 1);
+        // 幅・高さは最小 0.1 マス (小数を許可)
+        const sizeW = safeGetNum('obj-size-w', 1, true, 0.1);
+        const sizeH = safeGetNum('obj-size-h', 1, true, 0.1);
         
         t.w = sizeW * 32;
         t.h = sizeH * 32;
@@ -1274,6 +1274,10 @@ function drawMap() {
                     if (cols > 1 || rows > 1) {
                         hasAnimatedAssets = true; // ★追加: アニメーション背景あり
                         const frame = Math.floor(performance.now() / (1000 / fps)) % (cols * rows);
+                        srcW /= cols;
+                        srcH /= rows;
+                        srcX = (frame % cols) * srcW;
+                        srcY = Math.floor(frame / cols) * srcH;
                     }
                     
                     if (map.type === 'shooter') {

@@ -1,28 +1,28 @@
 // export.js
 
 import { getProjectData } from './state.js';
-
+import { RUST_WASM_BASE64 } from './wasmCore.js';
 export function generateGameHtml(data, startNodeOverride = null) {
     // スクリプトタグの閉じ括弧をエスケープしてHTML破損を防止
-const dataString = JSON.stringify(data)
-    .replace(/<\/script>/g, '<\\/script>')
-    .replace(/\u2028/g, '\\u2028') // 行区切り文字対策
-    .replace(/\u2029/g, '\\u2029') // 段落区切り文字対策
-            .replace(/`/g, '\\`')      // 追加: バッククォートをエスケープ
+    const dataString = JSON.stringify(data)
+        .replace(/<\/script>/g, '<\\/script>')
+        .replace(/\u2028/g, '\\u2028') // 行区切り文字対策
+        .replace(/\u2029/g, '\\u2029') // 段落区切り文字対策
+        .replace(/`/g, '\\`')      // 追加: バッククォートをエスケープ
         .replace(/\$\{/g, '\\${'); // 追加: テンプレート変数をエスケープ
     const initialNodeId = startNodeOverride || data.scenario.startNodeId;
-    
-// --- Settings ---
+
+    // --- Settings ---
     const s = data.settings || {};
-    const titleBgStyle = s.titleImage 
-        ? `background: url('${s.titleImage}') center/cover no-repeat;` 
+    const titleBgStyle = s.titleImage
+        ? `background: url('${s.titleImage}') center/cover no-repeat;`
         : `background: #000;`;
     s.windowColor = s.windowColor || '#000000';
     s.windowOpacity = s.windowOpacity !== undefined ? s.windowOpacity : 75;
     s.buttonColor = s.buttonColor || '#1990ff';
     s.buttonOpacity = s.buttonOpacity !== undefined ? s.buttonOpacity : 80;
     s.buttonTextColor = s.buttonTextColor || '#FFFFFF';
-    
+
     // 背景表示モードのCSS値を決定
     const bgFitSetting = s.backgroundFit || 'cover';
     let cssBgSize = 'cover';      // 画像用 (background-size)
@@ -35,16 +35,16 @@ const dataString = JSON.stringify(data)
         cssBgSize = '100% 100%';
         cssObjFit = 'fill'; // ★ 動画の場合は 'fill' を使って画面に合わせる
     }
-    
+
     s.borderRadius = s.borderRadius !== undefined ? s.borderRadius : 10;
     s.borderWidth = s.borderWidth !== undefined ? s.borderWidth : 2;
     s.borderColor = s.borderColor || '#FFFFFF';
-    
+
     // Portrait UI
     const m = s.portraitUI || {};
     m.windowVertical = m.windowVertical || 'bottom';
     m.windowHeight = m.windowHeight !== undefined ? m.windowHeight : 35;
-        const choiceLayout = m.choiceLayout || 'center-v';
+    const choiceLayout = m.choiceLayout || 'center-v';
     // ベースCSSに overflow-x: hidden を追加（デフォルトではスクロールバーを出さない）
     let choiceBoxCss = `position: absolute; z-index: 30; pointer-events: auto; transition: all 0.3s ease-out; display: flex; gap: 15px; overflow-x: hidden;`;
 
@@ -79,7 +79,7 @@ const dataString = JSON.stringify(data)
     }
     // ★修正: 入力ノードでフォームを上書きした際に、操作が効かなくなる(沈黙する)のを防ぐ
     choiceBoxCss += ` z-index: 150 !important; `;
-    
+
     m.choiceDirection = m.choiceDirection || 'vertical';
     m.choiceAlign = m.choiceAlign || 'center';
     m.characterOffsetY = m.characterOffsetY !== undefined ? m.characterOffsetY : 0;
@@ -97,18 +97,18 @@ const dataString = JSON.stringify(data)
     const windowBackdropFilter = s.windowBgTransparent ? '' : 'backdrop-filter: blur(2px);';
     const buttonBackdropFilter = s.buttonBgTransparent ? '' : 'backdrop-filter: blur(5px);';
 
-        // 設定が false (または undefined で初期値 false 扱いにならないよう注意) なら非表示
+    // 設定が false (または undefined で初期値 false 扱いにならないよう注意) なら非表示
     // ※ ui.js でデフォルト true にしていますが、ここでも念のためガードします
     const chk = (key) => (s[key] !== false) ? '' : 'style="display:none;"';
-    
+
     // セーブ機能一式用
     const saveStyle = chk('showSaveMenu');
 
     const debugStyle = s.debugMode ? '' : 'style="display:none;"';
 
-        const faviconData = s.favicon || 'data:image/x-icon;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAABzpVFh0Q29tbWVudAAAAAAAQ3JlYXRlZCB3aXRoIEdJTVBkLmUHAAAAEklEQVQ4y2NkYGD4z0AEYBXSCgG7HgMz5yUY7wAAAABJRU5ErkJggg=='; 
+    const faviconData = s.favicon || 'data:image/x-icon;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAABzpVFh0Q29tbWVudAAAAAAAQ3JlYXRlZCB3aXRoIEdJTVBkLmUHAAAAEklEQVQ4y2NkYGD4z0AEYBXSCgG7HgMz5yUY7wAAAABJRU5ErkJggg==';
 
-            let needs3D = false;
+    let needs3D = false;
 
     // 1. 3Dモデルアセットがあるか確認
     if (data.assets && data.assets.models && Object.keys(data.assets.models).length > 0) {
@@ -156,7 +156,7 @@ const dataString = JSON.stringify(data)
         const THREE = null; // ダミー定義
     `;
 
-return `
+    return `
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -758,6 +758,23 @@ return `
     <script type="module">
     
     ${jsImports}
+
+        // --- Rust (WASM) Engine Initialization ---
+        let rustCore = null;
+        let wasmMemory = null;
+        try {
+            const wasmBinary = Uint8Array.from(atob("${RUST_WASM_BASE64}"), c => c.charCodeAt(0));
+            WebAssembly.instantiate(wasmBinary, {}).then(wasmModule => {
+                rustCore = wasmModule.instance.exports;
+                wasmMemory = rustCore.memory;
+                console.log("🚀 Rust (WASM) Game Core Ready!");
+            }).catch(e => {
+                console.warn("WASM Init Failed, falling back to JS:", e);
+            });
+        } catch (e) {
+            console.warn("WASM Base64 Decode Failed:", e);
+        }
+
         window.onerror = function(message, source, lineno, colno, error) {
             const screen = document.getElementById('error-screen');
             const msg = document.getElementById('error-message');
@@ -792,9 +809,6 @@ return `
                 if(loader) loader.style.display = 'none';
             }
         });
-
-
-
 
         // --- Globals ---
 
@@ -1284,53 +1298,104 @@ function updateParticles(dt) {
     const canvas = document.getElementById('overhead-canvas');
     const screenH = canvas ? canvas.height : window.innerHeight;
 
-    for (let i = particles.length - 1; i >= 0; i--) {
-        const p = particles[i];
-        p.life -= p.decay * timeScale;
-        
-        if (p.life <= 0) {
-            particles.splice(i, 1);
-            continue;
-        }
-        
-        p.x += p.vx * timeScale;
-        p.y += p.vy * timeScale;
+    if (rustCore && wasmMemory && particles.length > 0) {
+        const count = particles.length;
+        const stride = 12;
+        const totalFloats = count * stride;
+        const byteLen = totalFloats * 4;
 
-        // ★挙動分岐
-        if (p.isScreenSpace) {
-            // [ノベルモード / 2D UI]
-            // 重力は Y軸(画面下) に直接加算
-            p.vy += p.gravity * timeScale; 
-            
-            // 床判定: 画面下端
-            // バウンド設定がある場合のみ跳ねる
-            if (p.y > screenH) {
-                if (p.bounce > 0) {
-                    p.y = screenH;
-                    p.vy *= -p.bounce;
-                    p.vx *= 0.8;
-                } else if (p.isWeather) {
-                    // 天候でバウンドなしなら画面外で消す
-                    particles.splice(i, 1);
-                    continue;
-                }
+        // WASMメモリ領域を確保（または再利用）
+        if (!window._wasmParticlePtr || window._wasmParticleCap < totalFloats) {
+            if (window._wasmParticlePtr) {
+                rustCore.dealloc(window._wasmParticlePtr, window._wasmParticleCap * 4);
             }
-        } else {
-            // [マップモード / 3D空間]
-            // 重力は Z軸(高さ) から減算
-            p.z += p.vz * timeScale;
-            p.vz -= p.gravity * timeScale; 
+            window._wasmParticleCap = Math.max(totalFloats, 1500 * stride);
+            window._wasmParticlePtr = rustCore.alloc(window._wasmParticleCap * 4);
+        }
+
+        const floatView = new Float32Array(wasmMemory.buffer, window._wasmParticlePtr, totalFloats);
+
+        // JS配列データをフラットなFloat配列としてWASMメモリへ転送
+        for (let i = 0; i < count; i++) {
+            const p = particles[i];
+            const base = i * stride;
+            floatView[base + 0] = p.x;
+            floatView[base + 1] = p.y;
+            floatView[base + 2] = p.z || 0;
+            floatView[base + 3] = p.vx;
+            floatView[base + 4] = p.vy;
+            floatView[base + 5] = p.vz || 0;
+            floatView[base + 6] = p.life;
+            floatView[base + 7] = p.decay;
+            floatView[base + 8] = p.gravity;
+            floatView[base + 9] = p.bounce;
+            floatView[base + 10] = p.isScreenSpace ? 1.0 : 0.0;
+            floatView[base + 11] = p.isWeather ? 1.0 : 0.0;
+        }
+
+        // ★ Rust側で1500個を一括で高速物理演算
+        const aliveCount = rustCore.update_particles_batch(
+            window._wasmParticlePtr,
+            count,
+            timeScale,
+            screenH
+        );
+
+        // 生存パーティクルをJSオブジェクトへ書き戻す
+        particles.length = aliveCount;
+        for (let i = 0; i < aliveCount; i++) {
+            const base = i * stride;
+            const p = particles[i];
+            p.x = floatView[base + 0];
+            p.y = floatView[base + 1];
+            p.z = floatView[base + 2];
+            p.vx = floatView[base + 3];
+            p.vy = floatView[base + 4];
+            p.vz = floatView[base + 5];
+            p.life = floatView[base + 6];
+            p.decay = floatView[base + 7];
+            p.gravity = floatView[base + 8];
+            p.bounce = floatView[base + 9];
+        }
+    } else {
+        // フォールバック (JSループ)
+        for (let i = particles.length - 1; i >= 0; i--) {
+            const p = particles[i];
+            p.life -= p.decay * timeScale;
             
-            // 床判定: Z=0
-            if (p.z < 0) {
-                if (p.isWeather && !p.bounce) {
-                    particles.splice(i, 1);
-                    continue;
-                } else {
-                    p.z = 0;
-                    p.vz *= -p.bounce;
-                    p.vx *= 0.8;
-                    p.vy *= 0.8;
+            if (p.life <= 0) {
+                particles.splice(i, 1);
+                continue;
+            }
+            
+            p.x += p.vx * timeScale;
+            p.y += p.vy * timeScale;
+
+            if (p.isScreenSpace) {
+                p.vy += p.gravity * timeScale; 
+                if (p.y > screenH) {
+                    if (p.bounce > 0) {
+                        p.y = screenH;
+                        p.vy *= -p.bounce;
+                        p.vx *= 0.8;
+                    } else if (p.isWeather) {
+                        particles.splice(i, 1);
+                        continue;
+                    }
+                }
+            } else {
+                p.z += p.vz * timeScale;
+                p.vz -= p.gravity * timeScale; 
+                if (p.z < 0) {
+                    if (p.isWeather && !p.bounce) {
+                        particles.splice(i, 1);
+                        continue;
+                    } else {
+                        p.z = 0;
+                        p.vz *= -p.bounce;
+                        p.vx *= 0.8;
+                        p.vy *= 0.8;
+                    }
                 }
             }
         }
@@ -4775,12 +4840,11 @@ function applyNodeUIStyle(node, type) {
         // 2. 背景と枠線
         const imgId = useOverride ? n.imageId : s.windowImage; 
         let bgImage = null;
-        
 
         if (useOverride && n.imageId && gameData.assets.backgrounds[n.imageId]) {
-            bgImage = \`url('\${gameData.assets.backgrounds[n.imageId].data}')\`;
+            bgImage = "url('" + gameData.assets.backgrounds[n.imageId].data + "')";
         } else if (!useOverride && s.windowImage) {
-            bgImage = \`url('\${s.windowImage}')\`;
+            bgImage = "url('" + s.windowImage + "')";
         }
 
         const isTrans = useOverride ? n.transparent : s.windowBgTransparent;
@@ -4801,18 +4865,16 @@ function applyNodeUIStyle(node, type) {
                 const g = parseInt(colorHex.slice(3,5), 16);
                 const b = parseInt(colorHex.slice(5,7), 16);
 
-                box.style.backgroundColor = \`rgba(\${r}, \${g}, \${b}, \${opacity/100})\`;
+                box.style.backgroundColor = "rgba(" + r + ", " + g + ", " + b + ", " + (opacity / 100) + ")";
                 
                 const bw = s.borderWidth || 2;
                 const bc = s.borderColor || '#fff';
 
-                box.style.border = \`\${bw}px solid \${bc}\`;
+                box.style.border = bw + "px solid " + bc;
             }
         }
     }
 }
-
-// --- 選択肢ボタンのスタイル適用関数 (エスケープ修正版) ---
 function createChoiceButtonStyle(node) {
     const s = gameData.settings || {};
     const n = node.uiStyle || {};
@@ -4820,32 +4882,29 @@ function createChoiceButtonStyle(node) {
 
     const imgId = useOverride ? n.imageId : null;
     let bgStyle = '';
-    
 
     if (useOverride && imgId && gameData.assets.backgrounds[imgId]) {
-        bgStyle = \`background-image: url('\${gameData.assets.backgrounds[imgId].data}'); background-color: transparent; border: none;\`;
+        bgStyle = "background-image: url('" + gameData.assets.backgrounds[imgId].data + "'); background-color: transparent; border: none;";
     } else if (!useOverride && s.buttonImage) {
-        bgStyle = \`background-image: url('\${s.buttonImage}'); background-color: transparent; border: none;\`;
+        bgStyle = "background-image: url('" + s.buttonImage + "'); background-color: transparent; border: none;";
     } else {
         const isTrans = useOverride ? n.transparent : s.buttonBgTransparent;
         const colorHex = useOverride ? (n.color || '#1990ff') : (s.buttonColor || '#1990ff');
         const opacity = useOverride ? (n.opacity !== undefined ? n.opacity : 80) : (s.buttonOpacity !== undefined ? s.buttonOpacity : 80);
         
         if (isTrans) {
-            bgStyle = \`background-color: transparent; border: 1px solid #fff;\`;
+            bgStyle = "background-color: transparent; border: 1px solid #fff;";
         } else {
             const r = parseInt(colorHex.slice(1,3), 16);
             const g = parseInt(colorHex.slice(3,5), 16);
             const b = parseInt(colorHex.slice(5,7), 16);
-            // ★修正箇所
-            bgStyle = \`background-color: rgba(\${r}, \${g}, \${b}, \${opacity/100}); border: \${s.borderWidth||2}px solid \${s.borderColor||'#fff'};\`;
+            bgStyle = "background-color: rgba(" + r + ", " + g + ", " + b + ", " + (opacity / 100) + "); border: " + (s.borderWidth || 2) + "px solid " + (s.borderColor || '#fff') + ";";
         }
     }
 
     const textColor = useOverride ? (n.textColor || '#ffffff') : (s.buttonTextColor || '#ffffff');
     
-    // ★修正箇所
-    return \`\${bgStyle} color: \${textColor}; border-radius: \${s.borderRadius||10}px;\`;
+    return bgStyle + " color: " + textColor + "; border-radius: " + (s.borderRadius || 10) + "px;";
 }
         const wait = function(ms) { return new Promise(function(resolve) { setTimeout(resolve, ms); }); };
 
@@ -4952,7 +5011,7 @@ function processText(node) {
                     target.appendChild(vid); target.style.backgroundImage = 'none';
                     animState.bg = { id: null, element: null, timer: 0, frame: 0 }; 
                 } else { 
-                    target.innerHTML = ''; target.style.backgroundImage = \`url('\${asset.data}')\`; 
+                    target.innerHTML = ''; target.style.backgroundImage = "url('" + asset.data + "')"; 
                     animState.bg = { id: node.backgroundId, element: target, timer: 0, frame: 0 }; 
                 }
                 
@@ -4983,7 +5042,7 @@ function processText(node) {
                 let d; const s = (c.scale||100)/100; const posX = c.x || 0; const posY = c.y || 0;
                 
                 if ((asset.cols||1) > 1 || (asset.rows||1) > 1) {
-                    d = document.createElement('div'); d.className = 'sprite-char-div pos-'+(c.position||'bottom-center'); d.style.backgroundImage = \`url('\${asset.data}')\`;
+                    d = document.createElement('div'); d.className = 'sprite-char-div pos-'+(c.position||'bottom-center'); d.style.backgroundImage = "url('" + asset.data + "')";
                     const frameW = asset.width / asset.cols; const frameH = asset.height / asset.rows; 
                     d.style.width = frameW + 'px'; 
                     d.style.height = frameH + 'px'; 
@@ -5261,7 +5320,7 @@ function processText(node) {
                     target.appendChild(vid); target.style.backgroundImage = 'none';
                     animState.bg = { id: null, element: null, timer: 0, frame: 0 }; 
                 } else { 
-                    target.innerHTML = ''; target.style.backgroundImage = \`url('\${asset.data}')\`;
+                    target.innerHTML = ''; target.style.backgroundImage = "url('" + asset.data + "')";
                     animState.bg = { id: node.backgroundId, element: target, timer: 0, frame: 0 }; 
                 }
                 old.style.opacity = 0; target.style.opacity = 1; 
@@ -5281,7 +5340,7 @@ function processText(node) {
                 const asset = gameData.assets.characters[c.characterId];
                 let d; const s = (c.scale||100)/100; const posX = c.x || 0; const posY = c.y || 0;
                 if ((asset.cols||1) > 1 || (asset.rows||1) > 1) {
-                    d = document.createElement('div'); d.className = 'sprite-char-div pos-'+(c.position||'bottom-center'); d.style.backgroundImage = \`url('\${asset.data}')\`;
+                    d = document.createElement('div'); d.className = 'sprite-char-div pos-'+(c.position||'bottom-center'); d.style.backgroundImage = "url('" + asset.data + "')";
                     const frameW = asset.width / asset.cols; const frameH = asset.height / asset.rows; 
                     d.style.width = frameW+'px'; d.style.height = frameH+'px'; 
                     d.style.backgroundSize = asset.width+'px '+asset.height+'px'; d.style.backgroundPosition = '0 0';
@@ -5641,20 +5700,18 @@ if (op.operator === '=') targetObj[targetKey] = opVal;
                                 
                                 // 5. 増減量の算出とポップアップ表示
 const diff = newQty - currentQty;
-                                if (diff > 0) {
-                                    if (typeof showDamagePopup === 'function') {
-
-                                        showDamagePopup(mapEngine.player, \`GET: \${itemDef.name} x\${diff}\`, 'item');
-                                    }
-                                    if (itemDef.effects && itemDef.effects.sound) {
-                                        AudioManager.playSe(itemDef.effects.sound, masterVolSe);
-                                    }
-                                } else if (diff < 0) {
-                                    if (typeof showDamagePopup === 'function') {
-
-                                        showDamagePopup(mapEngine.player, \`LOST: \${itemDef.name} \${diff}\`, 'system');
-                                    }
-                                }
+if (diff > 0) {
+    if (typeof showDamagePopup === 'function') {
+        showDamagePopup(mapEngine.player, "GET: " + itemDef.name + " x" + diff, 'item');
+    }
+    if (itemDef.effects && itemDef.effects.sound) {
+        AudioManager.playSe(itemDef.effects.sound, masterVolSe);
+    }
+} else if (diff < 0) {
+    if (typeof showDamagePopup === 'function') {
+        showDamagePopup(mapEngine.player, "LOST: " + itemDef.name + " " + diff, 'system');
+    }
+}
                                 // 6. インベントリに実データを反映
                                 playerState.inventory[itemId] = newQty;
                                 if (newQty === 0) delete playerState.inventory[itemId];
@@ -5748,7 +5805,7 @@ function processConditional(node) {
                 }, 0);
             } else {
                 const errNodeId = currentPlayingNodeId || "(不明)";
-                const errMsg = "⚠️【シナリオ停止】条件を満たす移動先、またはELSE(その他の場合)の行き先ノードが設定されていません。\n\n該当ノードID: " + errNodeId;
+                const errMsg = "⚠️【シナリオ停止】条件を満たす移動先、またはELSE(その他の場合)の行き先ノードが設定されていません。\\n\\n該当ノードID: " + errNodeId;
                 
                 // デバッグモードまたは通常時問わず、画面上に明確なポップアップとアラートを表示
                 if (typeof showDamagePopup === 'function' && mapEngine && mapEngine.player) {
@@ -6668,16 +6725,34 @@ function renderMapGame() {
         ctx.restore();
     }
     
-    // --- 3. オブジェクト描画 ---
-    const sortedObjects = [...mapEngine.activeObjects];
+    // --- 3. オブジェクト描画 (メモリ再利用・GCゼロ最適化) ---
+    if (!window._renderSortBuffer) {
+        window._renderSortBuffer = [];
+        window._playerDummyObj = { isPlayer: true };
+    }
+
+    const sortedObjects = window._renderSortBuffer;
+    sortedObjects.length = 0; // 配列インスタンスを捨てずに中身だけクリア
+
+    // 既存のアクティブオブジェクトをバッファに詰める
+    for (let i = 0; i < mapEngine.activeObjects.length; i++) {
+        sortedObjects.push(mapEngine.activeObjects[i]);
+    }
     
-    // プレイヤーダミー
+    // プレイヤーダミーのプロパティを更新して追加（新規オブジェクト生成を回避）
     if (!map.stageModelId && !map.playerModelId) {
-        sortedObjects.push({ 
-            isPlayer: true, 
-            x: p.x, y: p.y, z: p.z || 0, w: p.w, h: p.h,
-            invincible: p.invincible, dir: p.dir, vx: p.vx, vy: p.vy, attackCooldown: p.attackCooldown
-        });
+        const dummy = window._playerDummyObj;
+        dummy.x = p.x;
+        dummy.y = p.y;
+        dummy.z = p.z || 0;
+        dummy.w = p.w;
+        dummy.h = p.h;
+        dummy.invincible = p.invincible;
+        dummy.dir = p.dir;
+        dummy.vx = p.vx;
+        dummy.vy = p.vy;
+        dummy.attackCooldown = p.attackCooldown;
+        sortedObjects.push(dummy);
     }
 
     sortedObjects.sort((a, b) => (a.y !== b.y) ? a.y - b.y : (a.z || 0) - (b.z || 0));
@@ -6872,27 +6947,62 @@ function renderQuarterViewGame() {
                 ctx.restore();
             }
 
-            // --- 2. オブジェクト描画 ---
-            const allObjects = [...mapEngine.activeObjects, { isPlayer: true, x: p.x, y: p.y, z: p.z, w: p.w, h: p.h }];
-            const renderList = [];
-            allObjects.forEach(obj => {
+            // --- 2. オブジェクト描画 (メモリ再利用・GCゼロ最適化) ---
+            if (!window._quarterRenderList) {
+                window._quarterRenderList = [];
+                window._quarterPool = [];
+                window._quarterPlayerDummy = { isPlayer: true };
+            }
+
+            const renderList = window._quarterRenderList;
+            renderList.length = 0; // 配列の中身だけクリア
+
+            // オブジェクトプールのヘルパー
+            const getRenderItem = (obj, screenX, screenY, z) => {
+                const idx = renderList.length;
+                if (!window._quarterPool[idx]) {
+                    window._quarterPool[idx] = { obj: null, screenX: 0, screenY: 0, z: 0 };
+                }
+                const item = window._quarterPool[idx];
+                item.obj = obj;
+                item.screenX = screenX;
+                item.screenY = screenY;
+                item.z = z;
+                return item;
+            };
+
+            const processQuarterObj = (obj) => {
                 const objX = obj.isPlayer ? p.x : (obj.currentX !== undefined ? obj.currentX : obj.x * grid);
                 const objY = obj.isPlayer ? p.y : (obj.currentY !== undefined ? obj.currentY : obj.y * grid);
-                let diffX = objX - p.x; let diffY = objY - p.y;
+                let diffX = objX - p.x; 
+                let diffY = objY - p.y;
                 if (loopX) { if (diffX < -mapW / 2) diffX += mapW; else if (diffX > mapW / 2) diffX -= mapW; }
                 if (loopY) { if (diffY < -mapH / 2) diffY += mapH; else if (diffY > mapH / 2) diffY -= mapH; }
                 const screenX = (diffX - diffY) * (TILE_W_HALF / grid) + centerX;
                 const screenY = (diffX + diffY) * (TILE_H_HALF / grid) + centerY;
                 if (screenX < -200 || screenX > w + 200 || screenY < -200 || screenY > h + 200) return;
-                renderList.push({ obj, screenX, screenY, z: (obj.z || 0) });
-            });
+                
+                renderList.push(getRenderItem(obj, screenX, screenY, (obj.z || 0)));
+            };
+
+            // マップオブジェクトの処理
+            for (let i = 0; i < mapEngine.activeObjects.length; i++) {
+                processQuarterObj(mapEngine.activeObjects[i]);
+            }
+
+            // プレイヤーの処理
+            const pDummy = window._quarterPlayerDummy;
+            pDummy.x = p.x; pDummy.y = p.y; pDummy.z = p.z; pDummy.w = p.w; pDummy.h = p.h;
+            processQuarterObj(pDummy);
             
             // ★最適化: Z座標(高さ)も考慮した精密な描画ソート
             renderList.sort((a, b) => {
                 const ay = a.screenY - a.z;
                 const by = b.screenY - b.z;
                 if (ay === by) {
-                    return (a.obj.id > b.obj.id) ? 1 : -1;
+                    const idA = a.obj.id || '';
+                    const idB = b.obj.id || '';
+                    return (idA > idB) ? 1 : -1;
                 }
                 return ay - by;
             });
@@ -7376,38 +7486,63 @@ function renderMode7Game() {
                 const destImageData = ctx.createImageData(w, h/2); 
                 const destData = destImageData.data;
                 
-                // 画面下半分 (h/2 から h まで) をスキャン
-                for (let y = 0; y < h / 2; y++) {
-                    // 画面上のY座標に対応する Z深度
-                    const z = camZ / (y + 1); 
-                    
-                    // カメラ座標を基準にスキャン
-                    const basePx = camX + z * cos; 
-                    const basePy = camY + z * sin; 
-                    
-                    const perZ = z / w * 2.5; // 水平方向のスケール調整
-                    const vecX = -sin * perZ; 
-                    const vecY = cos * perZ;
-                    
-                    for (let x = 0; x < w; x++) {
-                        const offset = x - w / 2; 
-                        let mapX = basePx + offset * vecX; 
-                        let mapY = basePy + offset * vecY;
-                        
-                        let valid = true;
-                        if (loopX) mapX = mod(mapX, mapPixelW); else if (mapX < 0 || mapX >= mapPixelW) valid = false;
-                        if (loopY) mapY = mod(mapY, mapPixelH); else if (mapY < 0 || mapY >= mapPixelH) valid = false;
+                if (rustCore && wasmMemory) {
+                    const destLen = w * (h / 2) * 4;
+                    const srcLen = srcW * srcH * 4;
 
-                        if (valid) {
-                            const texX = Math.floor((mapX / mapPixelW) * srcW); 
-                            const texY = Math.floor((mapY / mapPixelH) * srcH);
-                            if (texX >= 0 && texX < srcW && texY >= 0 && texY < srcH) {
-                                const sourceIndex = (texY * srcW + texX) * 4; 
-                                const destIndex = (y * w + x) * 4;
-                                destData[destIndex] = sourceData[sourceIndex]; 
-                                destData[destIndex + 1] = sourceData[sourceIndex + 1]; 
-                                destData[destIndex + 2] = sourceData[sourceIndex + 2]; 
-                                destData[destIndex + 3] = 255;
+                    // Wasm内部メモリに必要なバッファ領域を確保（または再利用）
+                    if (!window._wasmDestPtr) {
+                        window._wasmDestPtr = rustCore.alloc(destLen);
+                        window._wasmSrcPtr = rustCore.alloc(srcLen);
+                    }
+
+                    // 入力テクスチャをWasmメモリ領域へ転送
+                    new Uint8Array(wasmMemory.buffer, window._wasmSrcPtr, srcLen).set(sourceData);
+
+                    // ★ Rustエンジンで超高速ピクセル計算
+                    rustCore.render_mode7(
+                        window._wasmDestPtr,
+                        window._wasmSrcPtr,
+                        w, h,
+                        srcW, srcH,
+                        camX, camY,
+                        p.dir,
+                        zoom,
+                        loopX, loopY
+                    );
+
+                    // 計算結果を ImageData に反映
+                    destData.set(new Uint8Array(wasmMemory.buffer, window._wasmDestPtr, destLen));
+                } else {
+                    // フォールバック (Wasm未ロード時のJSループ)
+                    for (let y = 0; y < h / 2; y++) {
+                        const z = camZ / (y + 1); 
+                        const basePx = camX + z * cos; 
+                        const basePy = camY + z * sin; 
+                        const perZ = z / w * 2.5; 
+                        const vecX = -sin * perZ; 
+                        const vecY = cos * perZ;
+                        
+                        for (let x = 0; x < w; x++) {
+                            const offset = x - w / 2; 
+                            let mapX = basePx + offset * vecX; 
+                            let mapY = basePy + offset * vecY;
+                            
+                            let valid = true;
+                            if (loopX) mapX = mod(mapX, mapPixelW); else if (mapX < 0 || mapX >= mapPixelW) valid = false;
+                            if (loopY) mapY = mod(mapY, mapPixelH); else if (mapY < 0 || mapY >= mapPixelH) valid = false;
+
+                            if (valid) {
+                                const texX = Math.floor((mapX / mapPixelW) * srcW); 
+                                const texY = Math.floor((mapY / mapPixelH) * srcH);
+                                if (texX >= 0 && texX < srcW && texY >= 0 && texY < srcH) {
+                                    const sourceIndex = (texY * srcW + texX) * 4; 
+                                    const destIndex = (y * w + x) * 4;
+                                    destData[destIndex] = sourceData[sourceIndex]; 
+                                    destData[destIndex + 1] = sourceData[sourceIndex + 1]; 
+                                    destData[destIndex + 2] = sourceData[sourceIndex + 2]; 
+                                    destData[destIndex + 3] = 255;
+                                }
                             }
                         }
                     }
@@ -7648,48 +7783,81 @@ function renderTrapezoidGame() {
                 const destImageData = ctx.createImageData(w, h - horizon);
                 const destData = destImageData.data;
 
-                for (let y = 0; y < h - horizon; y++) {
-                    const screenY = horizon + y; 
-                    const distY = (y < 1) ? 0.5 : y;
-                    const depth = (cameraHeight * fov * zoom) / distY;
-                    const mapY = pY + cameraDist - depth;
-                    const scale = fov / depth * zoom;
+                if (rustCore && wasmMemory) {
+                    const renderH = h - horizon;
+                    const destLen = w * renderH * 4;
+                    const srcLen = srcW * srcH * 4;
 
-                    let texY;
-                    if (loopY) {
-                        texY = Math.floor(((mapY % srcH) + srcH) % srcH);
-                    } else {
-                        if (mapY < 0 || mapY >= mapPixelH) continue;
-                        texY = Math.floor(((mapY % srcH) + srcH) % srcH);
+                    // WASMメモリ領域を確保（または再利用）
+                    if (!window._wasmTrapDestPtr) {
+                        window._wasmTrapDestPtr = rustCore.alloc(destLen);
+                        window._wasmTrapSrcPtr = rustCore.alloc(srcLen);
                     }
-                    if (texY < 0 || texY >= srcH) continue;
 
-                    const sourceRowBase = texY * srcW;
-                    const destRowBase = y * w;
-                    
-                    const mapStartX = pX + (0 - w / 2) / scale;
-                    const dx = 1 / scale;
-                    let currentMapX = mapStartX;
+                    // 入力テクスチャをWASMメモリへ転送
+                    new Uint8Array(wasmMemory.buffer, window._wasmTrapSrcPtr, srcLen).set(sourceData);
 
-                    for (let x = 0; x < w; x++) {
-                        let texX;
-                        let valid = true;
-                        if (loopX) {
-                            texX = Math.floor(((currentMapX % srcW) + srcW) % srcW);
+                    // ★ Rust (WASM) による高速スキャンライン描画
+                    rustCore.render_trapezoid_floor(
+                        window._wasmTrapDestPtr,
+                        window._wasmTrapSrcPtr,
+                        w, h,
+                        horizon,
+                        srcW, srcH,
+                        pX, pY,
+                        cameraHeight,
+                        cameraDist,
+                        fov,
+                        zoom,
+                        loopX, loopY
+                    );
+
+                    // 計算結果を ImageData に反映
+                    destData.set(new Uint8Array(wasmMemory.buffer, window._wasmTrapDestPtr, destLen));
+                } else {
+                    // フォールバック (WASM未ロード時のJSループ)
+                    for (let y = 0; y < h - horizon; y++) {
+                        const distY = (y < 1) ? 0.5 : y;
+                        const depth = (cameraHeight * fov * zoom) / distY;
+                        const mapY = pY + cameraDist - depth;
+                        const scale = fov / depth * zoom;
+
+                        let texY;
+                        if (loopY) {
+                            texY = Math.floor(((mapY % srcH) + srcH) % srcH);
                         } else {
-                            if (currentMapX < 0 || currentMapX >= mapPixelW) valid = false;
-                            else texX = Math.floor(((currentMapX % srcW) + srcW) % srcW);
+                            if (mapY < 0 || mapY >= mapPixelH) continue;
+                            texY = Math.floor(((mapY % srcH) + srcH) % srcH);
                         }
+                        if (texY < 0 || texY >= srcH) continue;
 
-                        if (valid) {
-                            const srcIdx = (sourceRowBase + texX) * 4;
-                            const dstIdx = (destRowBase + x) * 4;
-                            destData[dstIdx]   = sourceData[srcIdx];
-                            destData[dstIdx+1] = sourceData[srcIdx+1];
-                            destData[dstIdx+2] = sourceData[srcIdx+2];
-                            destData[dstIdx+3] = 255;
+                        const sourceRowBase = texY * srcW;
+                        const destRowBase = y * w;
+                        
+                        const mapStartX = pX + (0 - w / 2) / scale;
+                        const dx = 1 / scale;
+                        let currentMapX = mapStartX;
+
+                        for (let x = 0; x < w; x++) {
+                            let texX;
+                            let valid = true;
+                            if (loopX) {
+                                texX = Math.floor(((currentMapX % srcW) + srcW) % srcW);
+                            } else {
+                                if (currentMapX < 0 || currentMapX >= mapPixelW) valid = false;
+                                else texX = Math.floor(((currentMapX % srcW) + srcW) % srcW);
+                            }
+
+                            if (valid) {
+                                const srcIdx = (sourceRowBase + texX) * 4;
+                                const dstIdx = (destRowBase + x) * 4;
+                                destData[dstIdx]   = sourceData[srcIdx];
+                                destData[dstIdx+1] = sourceData[srcIdx+1];
+                                destData[dstIdx+2] = sourceData[srcIdx+2];
+                                destData[dstIdx+3] = 255;
+                            }
+                            currentMapX += dx;
                         }
-                        currentMapX += dx;
                     }
                 }
                 ctx.putImageData(destImageData, 0, horizon);
@@ -9838,8 +10006,9 @@ function startMapMode(node) {
         obj.w = isNaN(resolvedW) ? mapEngine.GRID : resolvedW;
         obj.h = isNaN(resolvedH) ? mapEngine.GRID : resolvedH;
     });
-mapEngine.canvas.width = container.clientWidth; 
-    mapEngine.canvas.height = container.clientHeight; 
+    const cEl = ui.container || document.getElementById('game-container');
+    mapEngine.canvas.width = cEl.clientWidth; 
+    mapEngine.canvas.height = cEl.clientHeight; 
     mapEngine.eventCooldown = 60; 
 
     // --- ★追加: マップ遷移時のオートセーブ機能 ---
@@ -12419,7 +12588,7 @@ async function initializeGame() {
                     // コンテナの「見た目上の高さ」は元のまま維持し、上にスライドさせることで
                     // 入力フォームをキーボードの上に逃がしつつ、背景や3Dのアスペクト比崩れを防ぐ
                     container.style.height = windowHeight + 'px';
-                    container.style.transform = \`translateY(-\${windowHeight - vv.height}px)\`;
+                    container.style.transform = "translateY(-" + (windowHeight - vv.height) + "px)";
                 } else {
                     // キーボードが閉じた場合、元に戻す
                     container.style.height = '100%';
@@ -12731,7 +12900,11 @@ window.addEventListener('blur', () => {
             lastTouchEnd = now;
         }, { passive: false });
 
-        window.onload = initializeGame;
+        if (document.readyState === 'complete' || document.readyState === 'interactive') {
+            initializeGame();
+        } else {
+            window.addEventListener('load', initializeGame);
+        }
     <\/script>
 </body>
 </html>`;
@@ -12745,7 +12918,7 @@ function findNodeInProject(proj, nodeId) {
 }
 export function exportGame() {
     const projectData = getProjectData();
-    
+
     // 1. STARTノードが未設定なら、一番最初の章の最初のノードを自動で見つける
     if (!projectData.scenario.startNodeId) {
         let firstAvailableNode = null;
@@ -12757,7 +12930,7 @@ export function exportGame() {
                 break;
             }
         }
-        
+
         if (firstAvailableNode) {
             // 自動的に見つけたノードを開始地点にセット
             projectData.scenario.startNodeId = firstAvailableNode;
@@ -12773,7 +12946,7 @@ export function exportGame() {
         alert('エラー: 指定された開始ノードが見つかりません。シナリオ構成を確認してください。');
         return;
     }
-const confirmMsg = 
+    const confirmMsg =
         "【書き出し前の確認】\n\n" +
         "生成されるゲームファイル(HTML)は、起動時にライブラリをダウンロードするため\n" +
         "「インターネット接続」が必須となります。\n" +
@@ -12792,17 +12965,17 @@ const confirmMsg =
     try {
         const gameHtml = generateGameHtml(projectData);
         const blob = new Blob([gameHtml], { type: 'text/html' });
-        const link = document.createElement('a'); 
-        link.href = URL.createObjectURL(blob); 
-        
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+
         // ★変更: ユーザーが決めた名前を使う
         link.download = fileName;
-        
-        document.body.appendChild(link); 
-        link.click(); 
+
+        document.body.appendChild(link);
+        link.click();
         document.body.removeChild(link);
-    } catch (e) { 
-        console.error(e); 
-        alert('書き出し中にエラーが発生しました。'); 
+    } catch (e) {
+        console.error(e);
+        alert('書き出し中にエラーが発生しました。');
     }
 }
