@@ -585,86 +585,12 @@ function renderVariableOperationsEditor(operations) {
 }
 
 function updateDynamicVariableSelects() {
-    const v = state.getProjectData().variables;
-    // プレイヤー用システム変数
-const pStats = [
-        // --- レベル・基本 ---
-        { k: '$level', n: 'Lv (レベル)' },
-        { k: '$exp', n: 'EXP (経験値)' },
-        { k: '$nextExp', n: '次のLvまで' },
-        { k: '$name', n: '名前' },
+    // 共通の変数 datalist (variable-list-options) を最新化
+    if (typeof updateVariableSelects === 'function') {
+        updateVariableSelects();
+    }
 
-        // --- HP・リソース ---
-        { k: '$hp', n: 'HP (現在)' },
-        { k: '$maxHp', n: '最大HP' },
-        { k: '$stamina', n: 'スタミナ' },
-        { k: '$maxStamina', n: '最大スタミナ' },
-        { k: '$magazine', n: '残弾数' },
-        { k: '$maxMagazine', n: '装弾数' },
-
-        // --- 戦闘ステータス ---
-        { k: '$atk', n: '攻撃力' },
-        { k: '$def', n: '防御力' },
-        { k: '$spd', n: '移動速度' },
-        { k: '$penetration', n: '貫通力' },
-        { k: '$criticalRate', n: 'クリティカル率 (%)' },
-        { k: '$criticalMultiplier', n: 'クリティカル倍率' },
-
-        // --- アクション詳細 ---
-        { k: '$jumpPower', n: 'ジャンプ力' },
-        { k: '$attackRange', n: '攻撃射程' },
-        { k: '$attackSize', n: '攻撃判定サイズ' },
-        { k: '$attackCooldown', n: '攻撃クールダウン (F)' },
-        { k: '$projectileSpeed', n: '弾速' },
-        { k: '$blastRadius', n: '爆発範囲' },
-        { k: '$blastDamageRate', n: '爆風倍率 (%)' },
-        
-        // --- 状態異常・特殊 ---
-        { k: '$isExhausted', n: '疲労状態 (1=ON)' },
-        { k: '$isLockedOn', n: 'ロックオン中 (1=ON)' },
-        
-        // --- 強制移動 ---
-        { k: '$forceOn', n: '強制移動 (1=ON)' },
-        { k: '$forceX', n: '移動先X (Grid)' },
-        { k: '$forceY', n: '移動先Y (Grid)' },
-        { k: '$forceSpd', n: '移動速度' }
-    ];
-
-    // IDが "var-op-select-" で始まる要素を全て更新
-    document.querySelectorAll('select[id^="var-op-select-"]').forEach(sel => {
-        const currentVal = sel.value;
-        sel.innerHTML = '<option value="">(選択)</option>';
-
-        // A. ゲーム変数
-        if (Object.keys(v).length > 0) {
-            const grpVar = document.createElement('optgroup');
-            grpVar.label = "--- ゲーム変数 ---";
-            Object.keys(v).forEach(n => {
-                const meta = state.getProjectData().variableMeta?.[n];
-                const label = meta && meta.comment ? `${n} (${meta.comment})` : n;
-                grpVar.appendChild(new Option(label, n));
-            });
-            sel.appendChild(grpVar);
-        }
-
-        // B. PLステータス
-        const grpPlayer = document.createElement('optgroup');
-        grpPlayer.label = "--- PLステータス ---";
-        pStats.forEach(p => {
-            grpPlayer.appendChild(new Option(`${p.k} : ${p.n}`, p.k));
-        });
-        sel.appendChild(grpPlayer);
-
-        // 値復元
-        let found = false;
-        Array.from(sel.options).forEach(opt => { if (opt.value === currentVal) found = true; });
-        if (currentVal && !found) {
-            const opt = new Option(`⚠ ${currentVal}`, currentVal);
-            opt.style.color = 'red';
-            sel.add(opt, 0);
-        }
-        sel.value = currentVal;
-    });
+    // エネミーステータス補完用 datalist の生成・更新
     let enemyDatalist = document.getElementById('enemy-status-options');
     if (!enemyDatalist) {
         enemyDatalist = document.createElement('datalist');
@@ -676,10 +602,10 @@ const pStats = [
         enemyDatalist.appendChild(new Option(st));
     });
 
-    // エネミーが選択されている Input の list 属性を切り替える
+    // 操作タイプ（ゲーム全体 / プレイヤー / エネミー）に応じて入力補完リストを動的に切り替え
     document.querySelectorAll('.variable-op-item').forEach(item => {
         const typeSel = item.querySelector('select:first-child');
-        const targetInp = item.querySelector('input[type="text"]');
+        const targetInp = item.querySelector('input[placeholder*="変数名"]');
         if (typeSel && targetInp) {
             if (typeSel.value === 'enemy') {
                 targetInp.setAttribute('list', 'enemy-status-options');

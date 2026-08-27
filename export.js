@@ -304,17 +304,22 @@ return `
         @media (max-width: 600px) { .debug-body { grid-template-columns: 1fr; } #sys-toggle-btn { display: block; } .map-act-btn { width: 60px; height: 60px; font-size: 0.8em; } #map-action-btn-container { bottom: 20px; right: 10px; gap: 8px; } .pad-btn { width: 50px; height: 50px; font-size: 1.2em; } #map-controls { bottom: 20px; left: 10px; gap: 5px; grid-template-columns: 50px 50px 50px; grid-template-rows: 50px 50px; } }
 
         /* Battle UI */
-        #battle-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 200; display: none; flex-direction: column; justify-content: space-between; padding: 20px; color: #fff; text-shadow: 1px 1px 0 #000; }
+        #battle-overlay { 
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
+            z-index: 200; display: none; flex-direction: column; justify-content: space-between; 
+            padding: 15px; box-sizing: border-box; color: #fff; text-shadow: 1px 1px 0 #000; 
+        }
         #battle-enemy-area { 
             flex: 1; 
             display: flex; 
             justify-content: center; 
-            align-items: flex-end; /* 足元を揃える */
-            gap: 20px; 
+            align-items: flex-end; 
+            gap: 10px; 
             position: relative; 
             overflow: hidden; 
             min-height: 0; 
-            padding-bottom: 40px;
+            padding-bottom: 20px;
+            flex-wrap: nowrap;
         }
 
         /* 敵ごとのコンテナ */
@@ -325,9 +330,10 @@ return `
             align-items: center;
             transition: all 0.2s;
             cursor: default;
+            max-width: 25%;
+            flex-shrink: 1;
         }
         
-        /* ターゲット選択モード時のスタイル */
         .enemy-container.target-mode {
             cursor: pointer;
         }
@@ -336,9 +342,8 @@ return `
             transform: scale(1.05);
         }
 
-        /* 死亡時のスタイル */
         .enemy-container.dead {
-            opacity: 0.0; /* 完全に消すか、0.3で薄く残すかはお好みで */
+            opacity: 0.0;
             pointer-events: none;
             filter: grayscale(100%);
             transform: scale(0.9);
@@ -347,22 +352,23 @@ return `
 
         /* 敵画像 */
         .battle-enemy-img { 
-            max-height: 40vh; /* 画面高さの40%まで */
-            max-width: 30vw;  /* 画面幅の30%まで */
+            max-height: 35vh; 
+            max-width: 100%;  
             object-fit: contain; 
             filter: drop-shadow(0 10px 20px rgba(0,0,0,0.5));
         }
 
         /* 個別HPバー */
         .enemy-hp-bar-bg {
-            width: 80px;
+            width: 90%;
+            max-width: 80px;
             height: 6px;
             background: #333;
             border: 1px solid #fff;
             margin-top: 5px;
             border-radius: 3px;
             overflow: hidden;
-            display: none; /* 初期は非表示、JSで表示 */
+            display: none;
         }
         .enemy-hp-bar-fill {
             height: 100%;
@@ -374,11 +380,11 @@ return `
         /* ターゲット選択メッセージ */
         #battle-target-msg {
             position: absolute;
-            top: 15%;
+            top: 10%;
             left: 0;
             width: 100%;
             text-align: center;
-            font-size: 1.5em;
+            font-size: 1.3em;
             font-weight: bold;
             color: #fff;
             text-shadow: 0 0 5px #f00, 0 0 10px #000;
@@ -388,20 +394,113 @@ return `
             animation: blink 1s infinite alternate;
         }
 
-        /* 演出用クラス */
         .dmg-shake { animation: shake-hard 0.4s; filter: brightness(2) !important; }
         .enemy-attack { animation: attack-lunge 0.3s; }
         @keyframes attack-lunge { 0% { transform: scale(1); } 50% { transform: scale(1.2) translateY(20px); } 100% { transform: scale(1); } }
-        #battle-ui { height: 40%; min-height: 200px; flex-shrink: 0; display: flex; gap: 10px; font-family: 'DotGothic16', monospace; font-size: 18px; }
-        .battle-window { flex: 1; padding: 15px; border-radius: 4px; box-sizing: border-box; }
-        #battle-msg-box { flex: 2; overflow-y: auto; line-height: 1.5; }
-        #battle-cmd-box { flex: 1; display: flex; flex-direction: column; gap: 5px; overflow-y: auto; padding-right: 5px; }
-        .battle-cmd-btn { padding: 10px; cursor: pointer; border-radius: 4px; text-align: left; transition: background 0.1s; }
-        .battle-cmd-btn:hover { background: rgba(255,255,255,0.2); }
+
+        /* バトルUIコンテナ (標準: PC/横画面) */
+        #battle-ui { 
+            height: 40%; 
+            min-height: 180px; 
+            max-height: 250px; 
+            flex-shrink: 0; 
+            display: grid; 
+            grid-template-columns: 1.2fr 2fr 1fr; 
+            gap: 10px; 
+            font-family: 'DotGothic16', monospace; 
+            font-size: 16px; 
+        }
+        .battle-window { padding: 12px; border-radius: 6px; box-sizing: border-box; overflow: hidden; }
+        #battle-msg-box { overflow-y: auto; line-height: 1.4; }
+        #battle-cmd-box { 
+            display: grid; 
+            grid-template-columns: 1fr; 
+            gap: 6px; 
+            overflow-y: auto; 
+            padding-right: 2px; 
+        }
+        .battle-cmd-btn { 
+            padding: 8px 10px; 
+            cursor: pointer; 
+            border-radius: 4px; 
+            text-align: left; 
+            transition: background 0.1s; 
+            font-size: 0.95em; 
+            white-space: nowrap; 
+        }
+        
         .theme-dq .battle-window { background: #000; border: 3px solid #fff; border-radius: 8px; } .theme-dq .battle-cmd-btn:hover { background: #fff; color: #000; }
         .theme-ff .battle-window { background: linear-gradient(to bottom, #000088, #000022); border: 2px solid #ccc; border-radius: 6px; box-shadow: 0 0 10px rgba(255,255,255,0.5); } .theme-ff .battle-cmd-btn { border: 1px solid transparent; } .theme-ff .battle-cmd-btn:hover { border-color: #fff; background: rgba(255,255,255,0.1); box-shadow: 0 0 5px #fff; }
         .theme-paper { color: #333; text-shadow: none; font-family: 'Klee One', cursive; font-weight: bold; } .theme-paper .battle-window { background: #fff; border: 3px solid #333; border-radius: 2px; box-shadow: 5px 5px 0 rgba(0,0,0,0.2); } .theme-paper .battle-cmd-btn:hover { background: #eee; transform: rotate(-2deg); }
         .theme-cyber .battle-window { background: rgba(0, 0, 0, 0.8); border: 1px solid #0ff; box-shadow: 0 0 10px #0ff inset; color: #0ff; text-shadow: 0 0 5px #0ff; font-family: sans-serif; clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px); } .theme-cyber .battle-cmd-btn:hover { background: #0ff; color: #000; text-shadow: none; }
+
+        /* --- モバイル・縦画面最適化 (幅768px以下) --- */
+        @media (max-width: 768px) {
+            #battle-overlay { padding: 10px; }
+            #battle-ui { 
+                height: 48%; 
+                min-height: 220px; 
+                grid-template-columns: 1.4fr 1fr; 
+                grid-template-rows: 1fr 1.2fr; 
+                gap: 6px; 
+                font-size: 14px; 
+            }
+            /* 上段いっぱいにメッセージボックスを展開 */
+            #battle-msg-box { 
+                grid-column: 1 / -1; 
+                grid-row: 1; 
+                font-size: 0.9em; 
+                padding: 8px; 
+            }
+            /* 下段左にコマンドボタン (2列グリッド化してタップしやすく) */
+            #battle-cmd-box { 
+                grid-column: 1; 
+                grid-row: 2; 
+                grid-template-columns: 1fr 1fr; 
+                gap: 4px; 
+            }
+            .battle-cmd-btn { 
+                padding: 6px 4px; 
+                font-size: 0.85em; 
+                text-align: center; 
+            }
+            /* 下段右にステータス */
+            #battle-status-box { 
+                grid-column: 2; 
+                grid-row: 2; 
+                padding: 8px; 
+                font-size: 0.85em; 
+            }
+
+            /* インベントリモーダルのスマホ縦積み対応 */
+            #inventory-window { 
+                width: 95% !important; 
+                height: 85% !important; 
+            }
+            #inventory-window > div { 
+                flex-direction: column !important; 
+            }
+            #inventory-list { 
+                border-right: none !important; 
+                border-bottom: 2px solid #555 !important; 
+                flex: 1.2 !important; 
+            }
+            #inventory-detail { 
+                flex: 1 !important; 
+                padding: 10px !important; 
+            }
+            #inv-detail-icon { 
+                font-size: 36px !important; 
+                margin-bottom: 5px !important; 
+            }
+            #inv-detail-name { 
+                font-size: 1.1em !important; 
+                margin-bottom: 4px !important; 
+            }
+            #inv-detail-desc { 
+                font-size: 0.85em !important; 
+            }
+        }
 
         .enemy-hit-flash {
             filter: brightness(5.0) sepia(1) hue-rotate(-50deg) saturate(5) !important; 
@@ -494,10 +593,9 @@ return `
                 <button class="sys-btn" onclick="openLoadMenu('load')">LOAD</button>
                 <button id="title-btn-guideline" class="sys-btn" onclick="toggleGuideline()">GUIDELINE</button>
             </div>
-            <div id="copyright"></div> <!-- ここへ移動！ -->
+            <div id="copyright"></div>
         </div>
-    </div>
-            <div id="guideline-overlay" class="modal-overlay" onclick="if(event.target === this) toggleGuideline()">
+        <div id="guideline-overlay" class="modal-overlay" onclick="if(event.target === this) toggleGuideline()">
         <div style="background:rgba(0,0,0,0.95); border:2px solid #fff; padding:30px; border-radius:10px; width:80%; max-width:600px; max-height:80%; display:flex; flex-direction:column; box-sizing:border-box;">
             <h2 style="color:#fff; text-align:center; margin-bottom:20px; border-bottom:1px solid #555; padding-bottom:10px;">配信・二次創作ガイドライン</h2>
             <div id="guideline-text" style="color:#ddd; font-size:1.1em; line-height:1.6; white-space:pre-wrap; overflow-y:auto; flex:1;"></div>
@@ -2701,7 +2799,7 @@ window.loadGameLocal = async (keyName = 'save01') => {
                     await deleteFromDB('cfg_vol_bgm');
                     await deleteFromDB('cfg_vol_se');
                     
-                    alert('ブラウザのデータを初期化しました。\\タイトルに戻ります。'); 
+                    alert('ブラウザのデータを初期化しました。\\nタイトルに戻ります。'); 
                     location.reload();
                 } catch (e) {
                     console.error("Delete Error:", e);
@@ -2937,6 +3035,10 @@ window.renderDebug = function() {
                 gameState[key] = finalVal;
             } else {
                 playerState[key] = finalVal;
+                // レベルや経験値、装備が変更された場合はステータスを即時再計算
+                if (key === '$level' || key === '$exp' || key === 'initialLevel' || key === 'maxLevel') {
+                    if (typeof recalculatePlayerStats === 'function') recalculatePlayerStats();
+                }
             }
             
             // 即座にHUDなどを更新
@@ -3050,7 +3152,7 @@ function selectInventoryItem(itemId) {
             if (placeBtn) placeBtn.style.display = 'none';
             if (discardBtn) discardBtn.style.display = 'none';
 
-            // 2. 「使う/装備」
+            // 2. 「使う / 装備 / 外す」ボタンの出し分け
             if (item.type === 'equip') {
                 useBtn.style.display = 'inline-block';
                 if (isBattle) {
@@ -3065,73 +3167,76 @@ function selectInventoryItem(itemId) {
             } else if (item.type === 'consumable' || item.type === 'ammo') {
                 useBtn.style.display = 'inline-block';
                 useBtn.textContent = '使う';
-                // ★修正: 消費アイテムは装備できないのでそのまま「使う」
                 useBtn.onclick = function() { useItem(itemId); };
+            } else {
+                // key (重要アイテム) の場合は「使う」ボタンを出さない
+                useBtn.style.display = 'none';
             }
 
-            // 3. 「置く」 (マップモードのみ)
-            if (isMapMode && placeBtn) {
+            // 3. 「置く」ボタン (マップモード中、かつ重要アイテム・装備品以外のみ表示)
+            if (isMapMode && placeBtn && item.type !== 'key' && item.type !== 'equip') {
                 placeBtn.style.display = 'inline-block';
                 placeBtn.onclick = function() { placeItem(itemId); };
+            } else if (placeBtn) {
+                placeBtn.style.display = 'none';
             }
 
-            // 4. 「捨てる」 (重要アイテム以外、かつ装備中以外)
+            // 4. 「捨てる」ボタン (重要アイテム以外のみ表示、装備中は無効化)
             if (discardBtn && item.type !== 'key') {
+                discardBtn.style.display = 'inline-block';
                 if (isEquipped) {
-                    discardBtn.style.display = 'inline-block';
                     discardBtn.disabled = true;
                     discardBtn.style.opacity = '0.4';
                     discardBtn.title = '装備を外してから捨ててください';
                     discardBtn.onclick = null;
                 } else {
-                    discardBtn.style.display = 'inline-block';
                     discardBtn.disabled = false;
                     discardBtn.style.opacity = '1.0';
                     discardBtn.title = '';
                     discardBtn.onclick = function() { discardItem(itemId); };
                 }
+            } else if (discardBtn) {
+                discardBtn.style.display = 'none';
             }
 
-            // 4. ショートカット登録ボタンの生成 (動的生成)
-            // 既存の登録ボタンがあれば削除
+            // 5. ショートカット登録ボタン (重要アイテム以外、かつ消費/弾薬/配置可能品のみ生成)
             const existingSetBtns = document.querySelectorAll('.inv-set-btn');
             existingSetBtns.forEach(function(b) { b.remove(); });
 
-            const s = gameData.settings || {};
-            const btns = s.actionButtons || [];
-            
-            btns.forEach(function(btnConf) {
-                // システム設定で「任意アイテム(assignable_item)」に設定されているボタンのみ対象
-                if (btnConf.type === 'assignable_item' && btnConf.targetVar) {
-                    const setBtn = document.createElement('button');
-                    setBtn.className = 'sys-btn inv-set-btn';
-                    setBtn.style.cssText = 'font-size:1.0em; padding:8px 20px; margin-top:10px; display:block; width:80%;';
-                    
-                    const currentSet = (playerState.shortcuts || {})[btnConf.targetVar];
-                    const isSet = (currentSet === itemId);
-                    
-                    if (isSet) {
-                        setBtn.textContent = '★ ' + btnConf.label + ' にセット中';
-                        setBtn.style.color = '#ffff00';
-                        setBtn.style.borderColor = '#ffff00';
-                    } else {
-                        setBtn.textContent = btnConf.label + ' にセット';
-                        setBtn.style.color = '';
-                        setBtn.style.borderColor = '';
-                    }
-
-                    setBtn.onclick = function() {
-                        if (typeof assignItemToSlot === 'function') {
-                            assignItemToSlot(btnConf.targetVar, itemId, btnConf.key);
-                            // 状態が変わったのでUIを更新
-                            selectInventoryItem(itemId);
+            if (item.type !== 'key') {
+                const s = gameData.settings || {};
+                const btns = s.actionButtons || [];
+                
+                btns.forEach(function(btnConf) {
+                    if ((btnConf.type === 'assignable_item' || btnConf.type === 'assignable_place') && btnConf.targetVar) {
+                        const setBtn = document.createElement('button');
+                        setBtn.className = 'sys-btn inv-set-btn';
+                        setBtn.style.cssText = 'font-size:0.95em; padding:8px 15px; margin-top:8px; display:block; width:90%;';
+                        
+                        const currentSet = (playerState.shortcuts || {})[btnConf.targetVar];
+                        const isSet = (currentSet === itemId);
+                        
+                        if (isSet) {
+                            setBtn.textContent = '★ ' + btnConf.label + ' にセット中 (解除)';
+                            setBtn.style.color = '#ffff00';
+                            setBtn.style.borderColor = '#ffff00';
+                        } else {
+                            setBtn.textContent = btnConf.label + ' にセット';
+                            setBtn.style.color = '';
+                            setBtn.style.borderColor = '';
                         }
-                    };
-                    
-                    // 詳細エリアの末尾に追加
-                    document.getElementById('inventory-detail').appendChild(setBtn);
-                }
-            });
+
+                        setBtn.onclick = function() {
+                            if (typeof assignItemToSlot === 'function') {
+                                assignItemToSlot(btnConf.targetVar, itemId, btnConf.key);
+                                selectInventoryItem(itemId);
+                            }
+                        };
+                        
+                        document.getElementById('inventory-detail').appendChild(setBtn);
+                    }
+                });
+            }
         }
  function toggleEquip(itemId) {
     const item = gameData.items[itemId];
@@ -4089,10 +4194,9 @@ function refreshMapObjects() {
         }
 
         window.battleAction = function(action) {
-            if (!battleState || battleState.isOver) return;
-            
-            if (battleState.isActing) return;
+            if (!battleState || battleState.isOver || battleState.isActing) return;
 
+            // ターゲット選択モード中の再入力キャンセル処理
             if (battleState.isTargetSelection) {
                 battleState.isTargetSelection = false;
                 const msgEl = document.getElementById('battle-target-msg');
@@ -4103,17 +4207,23 @@ function refreshMapObjects() {
                 });
             }
 
+            // 対象選択が不要な自己完結コマンド
             if (['guard', 'dash', 'jump', 'wait', 'run', 'item'].includes(action)) {
                 executePlayerAction(action, null);
                 return;
             }
 
+            // 生存している敵を取得
             const aliveEnemies = battleState.enemies.filter(e => !e.isDead);
             
+            if (aliveEnemies.length === 0) return;
+
+            // 敵が1体のみならターゲット選択をスキップして即時実行
             if (aliveEnemies.length === 1) {
                 const targetIndex = battleState.enemies.indexOf(aliveEnemies[0]);
                 executePlayerAction(action, targetIndex);
             } else {
+                // 複数いる場合のみターゲット選択モードへ
                 startTargetSelection(action);
             }
         };
@@ -4130,10 +4240,11 @@ function refreshMapObjects() {
                 return div;
             };
 
+            // 設定で許可されているコマンドのみDOM要素を追加
             if (node.canAttack !== false) cmdBox.appendChild(createBtn('⚔️ たたかう', 'attack'));
             if (node.canGuard !== false) cmdBox.appendChild(createBtn('🛡️ ぼうぎょ', 'guard'));
-            if (node.canDash) cmdBox.appendChild(createBtn('💨 ダッシュ', 'dash'));
-            if (node.canJump) cmdBox.appendChild(createBtn('🦘 ジャンプ', 'jump'));
+            if (node.canDash === true) cmdBox.appendChild(createBtn('💨 ダッシュ', 'dash'));
+            if (node.canJump === true) cmdBox.appendChild(createBtn('🦘 ジャンプ', 'jump'));
             if (node.canLockon !== false) cmdBox.appendChild(createBtn('🎯 ロックオン', 'lockon'));
             if (node.canItem !== false) cmdBox.appendChild(createBtn('💊 アイテム', 'item'));
             if (node.canWait !== false) cmdBox.appendChild(createBtn('👀 様子を見る', 'wait'));
@@ -4471,67 +4582,92 @@ async function executePlayerAction(action, targetIndex) {
 
             const enemy = battleState.enemies[index];
             const pName = battleState.node.playerNameOverride || playerState.$name || "YOU";
+            const pattern = enemy.aiPattern || 'tactical';
 
+            // スタミナ自然回復
             enemy.stamina = Math.min(enemy.maxStamina, enemy.stamina + enemy.staminaRegen);
             updateBattleStatus();
 
             const atkCost = 20;
-            if (enemy.stamina < atkCost) {
-                battleLog(enemy.name + " は 様子を見ている。");
-                
-                // ★修正: 行動パス時のボーナス回復を調整 (過剰回復を防ぐ)
-                enemy.stamina = Math.min(enemy.maxStamina, enemy.stamina + enemy.staminaRegen); 
-                
-                await wait(1000);
-                
-                battleState.isActing = false;
-                processTurnQueue();
-                return;
-            }
+            const powerCost = 35;
+            let actionType = 'attack'; // デフォルト
 
-            enemy.stamina -= atkCost;
-            updateBattleStatus();
+            // --- AI思考ルーチン ---
+            const hpRatio = enemy.hp / enemy.maxHp;
 
-            battleLog(enemy.name + " の攻撃！");
-            
-            const img = document.getElementById('enemy-img-' + index);
-            if(img) {
-                img.classList.add('enemy-attack'); 
-                setTimeout(() => img.classList.remove('enemy-attack'), 300);
-            }
-            
-            await wait(500);
-
-            let hitChance = 90;
-            if (battleState.isDash) hitChance -= 40;
-            if (battleState.isJump) hitChance -= 20;
-
-            if (Math.random() * 100 > hitChance) {
-                battleLog(pName + " は 攻撃をかわした！");
+            if (pattern === 'defensive') {
+                if (hpRatio < 0.4 && enemy.stamina >= 15) actionType = 'guard';
+                else if (enemy.stamina < atkCost) actionType = 'wait';
+            } else if (pattern === 'power') {
+                if (enemy.stamina >= powerCost) actionType = 'power';
+                else if (enemy.stamina < atkCost) actionType = 'wait';
+            } else if (pattern === 'tactical') {
+                if (playerState.isExhausted && enemy.stamina >= atkCost) actionType = 'attack'; // プレイヤー疲労時は畳み掛ける
+                else if (battleState.isGuard && Math.random() < 0.5) actionType = 'wait'; // ガード中は様子見
+                else if (enemy.stamina < atkCost) actionType = 'wait';
+            } else if (pattern === 'random') {
+                const rand = Math.random();
+                if (rand < 0.2) actionType = 'guard';
+                else if (rand < 0.4 && enemy.stamina >= powerCost) actionType = 'power';
+                else if (enemy.stamina < atkCost) actionType = 'wait';
             } else {
-                let atk = enemy.atk;
-                let def = playerState.$def || 0;
-                
-                 const pen = enemy.penetration || 1;
-                
-                // ダメージ計算: (攻撃力) - (防御力 ÷ 貫通力)
-                let dmg = Math.max(1, Math.floor(atk - (def / Math.max(1, pen)))); 
-
-                // ★修正: 防御力2倍ではなく、アクション戦闘と同様に「最終ダメージを50%カット」に変更
-                if (battleState.isGuard) {
-                    dmg = Math.max(1, Math.floor(dmg * 0.5));
-                    battleLog("ガード！ ダメージを半減！");
-                }
-
-                playerState.$hp -= dmg;
-                battleLog(pName + " は " + dmg + " のダメージを受けた！");
-                
-                if (gameData.settings.autoShakeOnDamage !== false) {
-                    ui.container.classList.add('fx-shake-small');
-                    setTimeout(() => ui.container.classList.remove('fx-shake-small'), 500);
-                }
+                // aggressive / standard
+                if (enemy.stamina < atkCost) actionType = 'wait';
             }
 
+            // --- アクション実行 ---
+            if (actionType === 'wait') {
+                battleLog(enemy.name + " は 様子を見ている。");
+                enemy.stamina = Math.min(enemy.maxStamina, enemy.stamina + enemy.staminaRegen);
+                await wait(800);
+            } else if (actionType === 'guard') {
+                enemy.stamina -= 10;
+                enemy.isGuarding = true;
+                battleLog(enemy.name + " は 身構えている！");
+                await wait(800);
+            } else {
+                // 通常攻撃 または 強攻撃
+                const isPowerAtk = (actionType === 'power');
+                enemy.stamina -= isPowerAtk ? powerCost : atkCost;
+                updateBattleStatus();
+
+                battleLog(enemy.name + (isPowerAtk ? " の強烈な一撃！" : " の攻撃！"));
+                
+                const img = document.getElementById('enemy-img-' + index);
+                if (img) {
+                    img.classList.add('enemy-attack'); 
+                    setTimeout(() => img.classList.remove('enemy-attack'), 300);
+                }
+                
+                await wait(500);
+
+                let hitChance = 90;
+                if (battleState.isDash) hitChance -= 40;
+                if (battleState.isJump) hitChance -= 20;
+
+                if (Math.random() * 100 > hitChance) {
+                    battleLog(pName + " は 攻撃をかわした！");
+                } else {
+                    let atk = enemy.atk * (isPowerAtk ? 1.5 : 1.0);
+                    let def = playerState.$def || 0;
+                    const pen = enemy.penetration || 1;
+                    
+                    let dmg = Math.max(1, Math.floor(atk - (def / Math.max(1, pen)))); 
+
+                    if (battleState.isGuard) {
+                        dmg = Math.max(1, Math.floor(dmg * 0.5));
+                        battleLog("ガード！ ダメージを半減！");
+                    }
+
+                    playerState.$hp -= dmg;
+                    battleLog(pName + " は " + dmg + " のダメージを受けた！");
+                    
+                    if (gameData.settings.autoShakeOnDamage !== false) {
+                        ui.container.classList.add('fx-shake-medium');
+                        setTimeout(() => ui.container.classList.remove('fx-shake-medium'), 500);
+                    }
+                }
+            }
 
             updateBattleStatus();
 
@@ -4547,7 +4683,6 @@ async function executePlayerAction(action, targetIndex) {
             }
 
             await wait(500);
-            
             battleState.isActing = false;
             processTurnQueue();
         }
@@ -4731,6 +4866,7 @@ function processNode(nodeId) {
             console.error("Infinite loop detected!");
             alert("エラー: シナリオの無限ループを検知しました。\\n(ノードが瞬間的に5000回以上呼び出されました)");
             executionCounter = 0;
+            isProcessingNode = false; // ★強制ロック解除
             return;
         }
         executionCounter = 0;
@@ -5591,11 +5727,13 @@ function processConditional(node) {
             let jumped = false;
             let nextId = null;
             
-            for (const cond of node.conditions) {
-                if (evaluateCondition(cond)) {
-                    nextId = cond.nextNodeId;
-                    jumped = true;
-                    break;
+            if (node.conditions && Array.isArray(node.conditions)) {
+                for (const cond of node.conditions) {
+                    if (evaluateCondition(cond)) {
+                        nextId = cond.nextNodeId;
+                        jumped = true;
+                        break;
+                    }
                 }
             }
             
@@ -5603,17 +5741,25 @@ function processConditional(node) {
                 nextId = node.elseNextNodeId;
             }
 
-            // ★修正: 非同期で次のノードへ遷移
             if (nextId) {
                 setTimeout(() => {
                     isProcessingNode = false; // 強制ロック解除
                     processNode(nextId);
                 }, 0);
             } else {
-                // 行き先がない場合はロックだけ解除しておく（詰み防止）
-                isProcessingNode = false;
+                const errNodeId = currentPlayingNodeId || "(不明)";
+                const errMsg = "⚠️【シナリオ停止】条件を満たす移動先、またはELSE(その他の場合)の行き先ノードが設定されていません。\n\n該当ノードID: " + errNodeId;
+                
+                // デバッグモードまたは通常時問わず、画面上に明確なポップアップとアラートを表示
+                if (typeof showDamagePopup === 'function' && mapEngine && mapEngine.player) {
+                    showDamagePopup(mapEngine.player, "NO NEXT NODE!", 'system');
+                }
+                alert(errMsg);
+
+                isProcessingNode = false; // 操作不能を防ぐためロック解除
             }
         }
+
 function processUIControl(node) {
     // 古いデータ互換コードは削除済み。シンプルに配列を取得。
     const operations = node.uiOperations || [];
@@ -5745,14 +5891,18 @@ function processShop(node) {
             const s = gameData.settings || {};
             const isDetailed = (s.shopDetailed !== false);
 
-            // 所持金変数の初期化
-            if (gameState[currencyVar] === undefined || gameState[currencyVar] === null) {
-                gameState[currencyVar] = 0;
+            // 所持金変数の参照先オブジェクト判定 ($で始まるならplayerState、それ以外はgameState)
+            const getTargetObj = (key) => key.startsWith('$') ? playerState : gameState;
+            const targetMoneyObj = getTargetObj(currencyVar);
+
+            if (targetMoneyObj[currencyVar] === undefined || targetMoneyObj[currencyVar] === null) {
+                targetMoneyObj[currencyVar] = 0;
             }
             
             // 所持金表示更新関数
             const updateMoney = function() {
-                moneyDisplay.textContent = Math.floor(Number(gameState[currencyVar]) || 0);
+                const curVal = getTargetObj(currencyVar)[currencyVar];
+                moneyDisplay.textContent = Math.floor(Number(curVal) || 0);
             };
             updateMoney();
 
@@ -5795,25 +5945,26 @@ function processShop(node) {
                 const info = document.createElement('div');
                 info.style.flex = '1';
                 
-                let infoHtml = '<div style="font-weight:bold; font-size:1.2em;">' + item.name + '</div>';
+                let infoHtml = '<div style="font-weight:bold; font-size:1.1em; color:#fff;">' + item.name + '</div>';
                 
-                // 詳細モードなら説明文とステータスを追加
+                // 詳細モードが有効な場合のみ、説明文とステータスバッジを展開
                 if (isDetailed) {
                     if (item.description) {
-                        infoHtml += '<div style="font-size:0.9em; color:#ccc; margin-top:2px;">' + item.description + '</div>';
+                        infoHtml += '<div style="font-size:0.85em; color:#ccc; margin-top:3px; line-height:1.3;">' + item.description + '</div>';
                     }
                     
                     let statsHtml = '';
                     const fx = item.effects || {};
-                    const styleTag = 'display:inline-block; background:#333; color:#fff; padding:2px 6px; border-radius:4px; font-size:0.8em; margin-right:4px; margin-top:4px; border:1px solid #555;';
+                    const styleTag = 'display:inline-block; background:rgba(0,0,0,0.5); color:#fff; padding:2px 6px; border-radius:3px; font-size:0.75em; margin-right:4px; margin-top:4px; border:1px solid rgba(255,255,255,0.3);';
                     
-                    if(fx.atk) statsHtml += '<span style="' + styleTag + '">⚔️ ATK ' + (fx.atk>0?'+':'') + fx.atk + '</span>';
-                    if(fx.def) statsHtml += '<span style="' + styleTag + '">🛡️ DEF ' + (fx.def>0?'+':'') + fx.def + '</span>';
-                    if(fx.hp)  statsHtml += '<span style="' + styleTag + '">❤️ HP ' + (fx.hp>0?'+':'') + fx.hp + '</span>';
-                    if(fx.ammo) statsHtml += '<span style="' + styleTag + '">🔫 弾 ' + (fx.ammo>0?'+':'') + fx.ammo + '</span>';
+                    if (fx.atk) statsHtml += '<span style="' + styleTag + '">⚔️ ATK ' + (fx.atk > 0 ? '+' : '') + fx.atk + '</span>';
+                    if (fx.def) statsHtml += '<span style="' + styleTag + '">🛡️ DEF ' + (fx.def > 0 ? '+' : '') + fx.def + '</span>';
+                    if (fx.hp) statsHtml += '<span style="' + styleTag + '">❤️ HP ' + (fx.hp > 0 ? '+' : '') + fx.hp + '</span>';
+                    if (fx.stamina) statsHtml += '<span style="' + styleTag + '">⚡ ST ' + (fx.stamina > 0 ? '+' : '') + fx.stamina + '</span>';
+                    if (fx.ammo) statsHtml += '<span style="' + styleTag + '">🔫 弾 ' + (fx.ammo > 0 ? '+' : '') + fx.ammo + '</span>';
                     
                     if (statsHtml) {
-                        infoHtml += '<div style="margin-top:5px;">' + statsHtml + '</div>';
+                        infoHtml += '<div style="margin-top:4px; display:flex; flex-wrap:wrap;">' + statsHtml + '</div>';
                     }
                 }
                 
@@ -5903,10 +6054,10 @@ function processShop(node) {
                 
                 // ★追加: BGMを元に戻す
                 if (node.bgmId) {
-                    if (isMapMode && mapEngine.data && mapEngine.data.bgmId) {
-                        AudioManager.playBgm(mapEngine.data.bgmId, masterVolBgm);
-                    } else if (prevBgm) {
+                    if (prevBgm) {
                         AudioManager.playBgm(prevBgm, masterVolBgm);
+                    } else if (isMapMode && mapEngine.data && mapEngine.data.bgmId) {
+                        AudioManager.playBgm(mapEngine.data.bgmId, masterVolBgm);
                     } else {
                         AudioManager.stopBgm();
                     }
@@ -6009,10 +6160,13 @@ function checkMapEvents(p, isActionPressed) {
                         // プレイヤーの向いている方向と逆（あるいは中心からのベクトル）へ弾く
                         const pushBack = grid / 4;
                         if (mapEngine.data.type === 'side') {
-                            p.x += (p.vx > 0) ? -pushBack : pushBack;
+                            const newX = p.x + ((p.vx > 0) ? -pushBack : pushBack);
+                            if (!getTerrainCollision(newX, p.y, p.z, p.w, p.h, null, p.y).hitWall) p.x = newX;
                         } else {
-                            p.x -= Math.cos(p.dir) * pushBack;
-                            p.y -= Math.sin(p.dir) * pushBack;
+                            const newX = p.x - Math.cos(p.dir) * pushBack;
+                            const newY = p.y - Math.sin(p.dir) * pushBack;
+                            if (!getTerrainCollision(newX, p.y, p.z, p.w, p.h, null, p.y).hitWall) p.x = newX;
+                            if (!getTerrainCollision(p.x, newY, p.z, p.w, p.h, null, p.y).hitWall) p.y = newY;
                         }
                     }
                     
@@ -6219,17 +6373,25 @@ function updateObjectMovement(obj, dt, timeScale) {
         const distToTarget = Math.sqrt(dx * dx + dy * dy);
         
         let currentSpeed = speed;
-        const atkRange = (obj.attackRange !== undefined) ? Number(resolveValue(obj.attackRange)) : 0;
-        if (obj.aiPattern === 'kiting' && atkRange > grid) {
-            if (distToTarget < atkRange * 0.7) currentSpeed = -speed * 0.7;
-            else if (distToTarget < atkRange) currentSpeed = 0;
+        const atkRange = (obj.attackRange !== undefined) ? Number(resolveValue(obj.attackRange)) : grid;
+        const pattern = obj.aiPattern || 'tactical';
+
+        // 性格ごとの距離調整
+        if (pattern === 'kiting' && atkRange > grid) {
+            if (distToTarget < atkRange * 0.7) currentSpeed = -speed * 0.8; // 近すぎたら後退
+            else if (distToTarget < atkRange) currentSpeed = 0; // 射程内なら静止して攻撃
+        } else if (pattern === 'defensive') {
+            const curHp = obj._runtimeHp !== undefined ? obj._runtimeHp : Number(resolveValue(obj.hp || 10));
+            const maxHp = Number(resolveValue(obj.hp || 10));
+            if (curHp / maxHp < 0.35) currentSpeed = -speed * 0.9; // ピンチ時は逃走
+        } else if (pattern === 'aggressive') {
+            currentSpeed = speed * 1.2; // 突撃
         }
 
         if (currentSpeed !== 0 && distToTarget > 0) {
             const nx = (dx / distToTarget) * currentSpeed;
             const ny = (dy / distToTarget) * currentSpeed;
 
-            // ★修正: X軸とY軸を独立して判定することで、壁に沿って滑るように移動させる (Wall Sliding)
             let nextX = obj.currentX + nx;
             let nextY = obj.currentY + ny;
             
@@ -8978,20 +9140,26 @@ function updateHUD() {
             });
         }
 
-// 【デバッグ用】renderOverheadBars (export.js)
-        function renderOverheadBars() {
-            // ★修正: 描画先を専用キャンバスに変更
+function renderOverheadBars() {
             const canvas = document.getElementById('overhead-canvas');
-            if (!canvas) return;
+            if (!canvas || !mapEngine.data) return;
+
+            const pOverhead = (gameData.player && gameData.player.overheadType) ? gameData.player.overheadType : 'none';
+            const hasEnemyHpBars = mapEngine.activeObjects.some(o => o.showHpBar && o.hp && !o._isDead);
+
+            // 描画対象（プレイヤー頭上バー・敵頭上バー）が一切ない場合は処理を完全スキップ
+            if (pOverhead === 'none' && !hasEnemyHpBars) {
+                return;
+            }
+
             const ctx = canvas.getContext('2d');
             
-            // キャンバスサイズを同期 (リサイズ対応)
+            // キャンバスサイズを同期
             if (canvas.width !== mapEngine.canvas.width || canvas.height !== mapEngine.canvas.height) {
                 canvas.width = mapEngine.canvas.width;
                 canvas.height = mapEngine.canvas.height;
             }
 
-            // ★重要: 毎フレームクリアする
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
             const p = mapEngine.player;
@@ -9000,8 +9168,6 @@ function updateHUD() {
             const map = mapEngine.data;
             const w = mapEngine.canvas.width;
             const h = mapEngine.canvas.height;
-            
-            const pOverhead = (gameData.player && gameData.player.overheadType) ? gameData.player.overheadType : 'none';
             
             const drawBar = (x, y, percent, color, width, height, offsetY) => {
                 if (isNaN(percent)) percent = 0;
@@ -10488,42 +10654,7 @@ if (playerState.isReloading) {
             }
         }
 
-        // --- 地形チェック関数 (全モード共通) ---
-        // 1. まずは道具（checkTerrain）を作る (ここにお引越し！)
-        var checkTerrain = function(tx, ty, currentZ) {
-            let floorZ = 0; let hitWall = false;
-            if (map.edgeType !== 'loop') {
-                const mapPixelW = map.width * grid; const mapPixelH = map.height * grid;
-                if (tx < 0 || tx + p.w > mapPixelW) hitWall = true;
-                if (map.type !== 'side' && (ty < 0 || ty + p.h > mapPixelH)) hitWall = true;
-            }
-            
-            // ★修正: プレイヤーの壁当たり判定を「足元のみ」に絞ることで、下に長く感じる現象を解消
-            // 横スクロール(side)は全身、トップダウン等は下半分だけを判定にする
-            const isSide = (map.type === 'side');
-            const margin = 2; 
-            const pl = tx + margin; 
-            const pr = tx + p.w - margin; 
-            const pt = ty + (isSide ? margin : p.h * 0.5); // 頭の判定を消して奥へ回り込めるようにする
-            const pb = ty + p.h - margin;
-
-            mapEngine.activeObjects.forEach(o => {
-                if (!o.isWall || o._isDead) return;
-                if (typeof checkCondition === 'function' && !checkCondition(o)) return;
-                const ox = (o.currentX !== undefined ? o.currentX : o.x * grid);
-                const oy = (o.currentY !== undefined ? o.currentY : o.y * grid);
-                const oz = o.z || 0; const ow = o.w || grid; const oh = o.h || grid;
-                
-                if (pl < ox + ow && pr > ox && pt < oy + oh && pb > oy) {
-                    const objTop = oz + grid; 
-                    if (currentZ + 16 >= objTop) { if (objTop > floorZ) floorZ = objTop; } 
-                    else if (currentZ < objTop && currentZ + p.h > oz) hitWall = true;
-                }
-            });
-            return { floorZ, hitWall };
-        };
-
-        // 2. その道具を使って、移動を計算する (ここから移動ループ開始)
+        // 移動を計算する (移動ループ開始)
         const totalMoveX = moveX * timeScale;
         const totalMoveY = moveY * timeScale;
         const moveDist = Math.max(Math.abs(totalMoveX), Math.abs(totalMoveY));
@@ -10631,20 +10762,48 @@ if (playerState.isReloading) {
                     if (!p.onGround) p.y = nextY;
                 }
 
-                // ジャンプ入力
+                // コヨーテタイム (床から離れて約0.1秒以内はジャンプ可能)
+                if (p.onGround) {
+                    p._coyoteTimer = 6; // 6フレーム
+                } else if (p._coyoteTimer > 0) {
+                    p._coyoteTimer -= timeScale;
+                }
+
+                // ジャンプ先行入力バッファ
                 const isUpTrigger = (mapEngine.keys['ArrowUp'] || mapEngine.keys['KeyW']) && (!mapEngine.prevKeys['ArrowUp'] && !mapEngine.prevKeys['KeyW']);
                 if (isJumpTrigger || (isUpTrigger && !pData.wallJump)) {
-                    let canJump = false; let isWallJumping = false;
-                    if (p.onGround) { canJump = true; p._jumpCount = 1; } 
-                    else if (p._isWallSliding && pData.wallJump) { canJump = true; isWallJumping = true; } 
-                    else if (p._jumpCount <= (pData.extraJumps || 0)) { canJump = true; p._jumpCount++; }
+                    p._jumpBufferTimer = 6; // 6フレーム記憶
+                } else if (p._jumpBufferTimer > 0) {
+                    p._jumpBufferTimer -= timeScale;
+                }
+
+                // ジャンプ実行判定
+                if (p._jumpBufferTimer > 0) {
+                    let canJump = false; 
+                    let isWallJumping = false;
+
+                    if (p.onGround || p._coyoteTimer > 0) { 
+                        canJump = true; 
+                        p._jumpCount = 1; 
+                        p._coyoteTimer = 0;
+                    } 
+                    else if (p._isWallSliding && pData.wallJump) { 
+                        canJump = true; 
+                        isWallJumping = true; 
+                    } 
+                    else if (p._jumpCount <= (pData.extraJumps || 0)) { 
+                        canJump = true; 
+                        p._jumpCount++; 
+                    }
 
                     if (canJump && pData.jumpConsume) {
                         const cost = getVal(pData.jumpCost, 10);
                         if (playerState.$stamina >= cost) playerState.$stamina -= cost; 
-                        else { canJump = false; /* 疲労処理は省略 */ }
+                        else { canJump = false; }
                     }
+
                     if (canJump) {
+                        p._jumpBufferTimer = 0; // バッファ消費
                         p.vy = -getVal(pData.jumpPower, 8.0) * 1.5; 
                         p.onGround = false;
                         p.y -= 2; // ジャンプの瞬間に床から離す

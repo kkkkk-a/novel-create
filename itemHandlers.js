@@ -39,6 +39,14 @@ export function initItemHandlers() {
         });
     });
 
+    // タイプ変更時の自動レイアウト調整
+    const typeSelect = document.getElementById('item-type');
+    if (typeSelect) {
+        typeSelect.addEventListener('change', (e) => {
+            updateItemEditorLayout(e.target.value);
+        });
+    }
+
     // 入力同期
     const inputs = [
         'item-name', 'item-icon-emoji', 'item-icon-image', 'item-desc', 'item-type',
@@ -56,11 +64,11 @@ export function initItemHandlers() {
         'item-place-hp', 'item-place-wall'
     ];
     
-    // ★ここを修正: テキスト入力は 'input' イベントで即時反映させる
-     inputs.forEach(id => {
+    inputs.forEach(id => {
         const el = document.getElementById(id);
-        if(el) {
-            el.addEventListener('change', syncItemData);
+        if (el) {
+            const eventType = (el.tagName === 'INPUT' && el.type === 'text') ? 'input' : 'change';
+            el.addEventListener(eventType, syncItemData);
         }
     });
 
@@ -157,6 +165,91 @@ function selectItem(id) {
     // 壁判定読み込み (未設定ならfalse)
     const wallVal = (placeParams.isWall !== undefined) ? placeParams.isWall : false;
     document.getElementById('item-place-wall').checked = wallVal;
+
+    // 現在のタイプに合わせて不要な項目を非表示化
+    updateItemEditorLayout(item.type || 'consumable');
+}
+
+// アイテムの分類に応じた入力欄の自動表示/非表示切り替え
+function updateItemEditorLayout(type) {
+    const atkRow = document.getElementById('item-effect-atk')?.closest('.form-group-row');
+    const blastRow = document.getElementById('item-effect-blast-radius')?.closest('.form-group-row');
+    const moveRow = document.getElementById('item-effect-spd')?.closest('.form-group-row');
+    const combatRow = document.getElementById('item-effect-pen')?.closest('.form-group-row');
+    const rangeRow = document.getElementById('item-effect-range')?.closest('.form-group-row');
+    const healRow = document.getElementById('item-effect-hp')?.closest('.form-group-row');
+    const permBuffRow = document.getElementById('item-effect-hp-max')?.closest('.form-group-row');
+    const ammoVarRow = document.getElementById('item-effect-ammo')?.closest('.form-group-row');
+    const cdDurationRow = document.getElementById('item-effect-cooldown')?.closest('.form-group-row');
+    const soundGroup = document.getElementById('item-effect-sound')?.closest('.form-group');
+    const placeGroup = document.getElementById('item-place-hp')?.closest('.form-group');
+    const priceGroup = document.getElementById('item-price')?.closest('.form-group-row');
+
+    // 1. 重要アイテム (key): 戦闘バフ、回復、配置、売却をすべて隠す
+    if (type === 'key') {
+        if (atkRow) atkRow.style.display = 'none';
+        if (blastRow) blastRow.style.display = 'none';
+        if (moveRow) moveRow.style.display = 'none';
+        if (combatRow) combatRow.style.display = 'none';
+        if (rangeRow) rangeRow.style.display = 'none';
+        if (healRow) healRow.style.display = 'none';
+        if (permBuffRow) permBuffRow.style.display = 'none';
+        if (ammoVarRow) {
+            ammoVarRow.style.display = 'flex';
+            document.getElementById('item-effect-ammo').closest('div').style.display = 'none'; // 弾薬のみ隠す
+        }
+        if (cdDurationRow) cdDurationRow.style.display = 'none';
+        if (placeGroup) placeGroup.style.display = 'none';
+        if (priceGroup) priceGroup.style.display = 'none';
+    }
+    // 2. 装備品 (equip): 使用時回復・一時効果・配置設定を隠す
+    else if (type === 'equip') {
+        if (atkRow) atkRow.style.display = 'flex';
+        if (blastRow) blastRow.style.display = 'none';
+        if (moveRow) moveRow.style.display = 'flex';
+        if (combatRow) combatRow.style.display = 'flex';
+        if (rangeRow) rangeRow.style.display = 'flex';
+        if (healRow) healRow.style.display = 'none';
+        if (permBuffRow) permBuffRow.style.display = 'flex'; // MaxHP/MaxST補正として使用
+        if (ammoVarRow) ammoVarRow.style.display = 'none';
+        if (cdDurationRow) cdDurationRow.style.display = 'none';
+        if (placeGroup) placeGroup.style.display = 'none';
+        if (priceGroup) priceGroup.style.display = 'flex';
+    }
+    // 3. 弾薬 (ammo): 弾薬補充と武器特性補正のみ表示
+    else if (type === 'ammo') {
+        if (atkRow) atkRow.style.display = 'flex';
+        if (blastRow) blastRow.style.display = 'flex';
+        if (moveRow) moveRow.style.display = 'flex';
+        if (combatRow) combatRow.style.display = 'flex';
+        if (rangeRow) rangeRow.style.display = 'flex';
+        if (healRow) healRow.style.display = 'none';
+        if (permBuffRow) permBuffRow.style.display = 'none';
+        if (ammoVarRow) {
+            ammoVarRow.style.display = 'flex';
+            document.getElementById('item-effect-ammo').closest('div').style.display = 'block';
+        }
+        if (cdDurationRow) cdDurationRow.style.display = 'none';
+        if (placeGroup) placeGroup.style.display = 'none';
+        if (priceGroup) priceGroup.style.display = 'flex';
+    }
+    // 4. 通常消費アイテム (consumable): 全て表示
+    else {
+        if (atkRow) atkRow.style.display = 'flex';
+        if (blastRow) blastRow.style.display = 'flex';
+        if (moveRow) moveRow.style.display = 'flex';
+        if (combatRow) combatRow.style.display = 'none';
+        if (rangeRow) rangeRow.style.display = 'none';
+        if (healRow) healRow.style.display = 'flex';
+        if (permBuffRow) permBuffRow.style.display = 'flex';
+        if (ammoVarRow) {
+            ammoVarRow.style.display = 'flex';
+            document.getElementById('item-effect-ammo').closest('div').style.display = 'block';
+        }
+        if (cdDurationRow) cdDurationRow.style.display = 'flex';
+        if (placeGroup) placeGroup.style.display = 'block';
+        if (priceGroup) priceGroup.style.display = 'flex';
+    }
 }
 
 function deselectItem() {

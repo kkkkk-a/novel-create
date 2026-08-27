@@ -1625,22 +1625,26 @@ function updateUIVisibilityByRole(role) {
     const battlePanel = document.getElementById('obj-battle-settings'); 
     const itemPanel = document.getElementById('obj-item-settings');     
     const specSettings = document.getElementById('obj-3d-specific-settings'); 
-    const enemyGroup = document.getElementById('obj-enemy-preset-group'); // エネミーID選択
+    const enemyGroup = document.getElementById('obj-enemy-preset-group');
+    const moveGroup = document.getElementById('obj-move-type')?.closest('.form-group');
+    const detectRow = document.getElementById('obj-detection-range')?.closest('.form-group-row');
+    const eventCheck = document.getElementById('obj-has-event')?.closest('.form-group');
+    const spawnCheck = document.getElementById('obj-is-spawn')?.closest('.form-group');
 
     const projectData = state.getProjectData();
     if (!currentMapId || !projectData.maps[currentMapId]) return;
     const map = projectData.maps[currentMapId]; 
 
-    // --- 1. エネミー関連の表示制御 ---
-    
-    // エネミーID選択パネル (Enemyのみ)
-    if (enemyGroup) {
-        enemyGroup.style.display = (role === 'enemy') ? 'block' : 'none';
-    }
-// バトルステータス設定 (障害物専用。Enemyはマスターデータ依存にするため非表示)
-    if (battlePanel) {
-        battlePanel.style.display = (role === 'obstacle') ? 'block' : 'none';
-    }
+    // 1. 装飾 (deco) / ハシゴ / ジャンプ台 の場合: 戦闘・移動・イベント・スポーン設定を全非表示
+    const isSimpleObject = ['deco', 'ladder', 'jump'].includes(role);
+    if (moveGroup) moveGroup.style.display = isSimpleObject ? 'none' : 'block';
+    if (detectRow) detectRow.style.display = isSimpleObject ? 'none' : 'flex';
+    if (eventCheck) eventCheck.style.display = isSimpleObject ? 'none' : 'block';
+    if (spawnCheck) spawnCheck.style.display = (role === 'deco') ? 'none' : 'block';
+
+    // 2. エネミー (enemy): プリセット選択のみ表示、障害物用の耐久設定は非表示
+    if (enemyGroup) enemyGroup.style.display = (role === 'enemy') ? 'block' : 'none';
+    if (battlePanel) battlePanel.style.display = (role === 'obstacle') ? 'block' : 'none';
     // バトルイベント(HPトリガー)設定 (Enemyのみ)
     const battleEvtCheck = document.getElementById('obj-has-battle-event');
     if (battleEvtCheck) {

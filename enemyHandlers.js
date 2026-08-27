@@ -95,7 +95,7 @@ export function initEnemyHandlers() {
         'enemy-hp', 'enemy-stamina','enemy-stamina-regen',  'enemy-atk', 'enemy-def', 'enemy-exp', 'enemy-pen',
         'enemy-crit-rate', 'enemy-crit-mult',
         'enemy-drop-item', 'enemy-drop-rate',
-        'enemy-move-type', 'enemy-move-spd', 'enemy-on-sight', 'enemy-ai-pattern',
+        'enemy-move-type', 'enemy-spd', 'enemy-on-sight', 'enemy-ai-pattern',
         'enemy-detect-range', 'enemy-territory-range',
         'enemy-atk-range', 'enemy-atk-cool', 'enemy-atk-speed',
         'enemy-blast-radius', 'enemy-blast-rate', 'enemy-homing-strength',
@@ -108,9 +108,19 @@ export function initEnemyHandlers() {
     inputs.forEach(id => {
         const el = document.getElementById(id);
         if (el) {
-            el.addEventListener('change', syncEnemyData);
+            el.addEventListener('change', () => {
+                syncEnemyData();
+                updateEnemyEditorLayout();
+            });
         }
     });
+
+    // 項目変更による表示切り替え
+    ['enemy-move-type', 'enemy-model-id', 'enemy-atk-speed', 'enemy-blast-radius', 'enemy-drop-item'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('change', updateEnemyEditorLayout);
+    });
+
    const evtCheck = document.getElementById('enemy-has-battle-event');
     if (evtCheck) {
         evtCheck.addEventListener('change', (e) => {
@@ -306,7 +316,44 @@ document.getElementById('enemy-on-sight').value = enemy.onSightBehavior || 'norm
         document.getElementById('enemy-battle-event-details').style.display = evtCheck.checked ? 'block' : 'none';
         renderEnemyBattleEventList(enemy.battleEvents || []);
     }
+    updateEnemyEditorLayout();
     renderEnemyList();
+}
+
+// エネミー設定に応じた不要項目の自動表示/非表示切り替え
+function updateEnemyEditorLayout() {
+    // 1. 移動タイプ連動 (fixed なら索敵・活動限界・視線検知を隠す)
+    const moveType = document.getElementById('enemy-move-type')?.value;
+    const isFixed = (moveType === 'fixed');
+    const onSightGroup = document.getElementById('enemy-on-sight')?.closest('.form-group');
+    const detectRow = document.getElementById('enemy-detect-range')?.closest('.form-group-row');
+    const spdInput = document.getElementById('enemy-spd')?.closest('div');
+
+    if (onSightGroup) onSightGroup.style.display = isFixed ? 'none' : 'block';
+    if (detectRow) detectRow.style.display = isFixed ? 'none' : 'flex';
+    if (spdInput) spdInput.style.display = isFixed ? 'none' : 'block';
+
+    // 2. 攻撃タイプ連動 (弾速が0なら近接なので誘導性能を隠す)
+    const atkSpeed = parseFloat(document.getElementById('enemy-atk-speed')?.value) || 0;
+    const homingInput = document.getElementById('enemy-homing-strength')?.closest('div');
+    if (homingInput) homingInput.style.display = (atkSpeed > 0) ? 'block' : 'none';
+
+    // 3. 爆発設定連動 (爆発範囲が0なら爆風倍率を隠す)
+    const blastRadius = parseFloat(document.getElementById('enemy-blast-radius')?.value) || 0;
+    const blastRateInput = document.getElementById('enemy-blast-rate')?.closest('div');
+    if (blastRateInput) blastRateInput.style.display = (blastRadius > 0) ? 'block' : 'none';
+
+    // 4. ドロップアイテム連動 (アイテム未選択なら確率を隠す)
+    const dropItem = document.getElementById('enemy-drop-item')?.value;
+    const dropRateInput = document.getElementById('enemy-drop-rate')?.closest('div');
+    if (dropRateInput) dropRateInput.style.display = dropItem ? 'block' : 'none';
+
+    // 5. 3Dモデル連動 (モデル選択時は2D画像選択を折りたたむ/半透明にする)
+    const modelId = document.getElementById('enemy-model-id')?.value;
+    const imgGrid = document.getElementById('enemy-img-idle')?.closest('.form-group');
+    if (imgGrid) {
+        imgGrid.style.opacity = modelId ? '0.4' : '1.0';
+    }
 }
 
 function deselectEnemy() {
