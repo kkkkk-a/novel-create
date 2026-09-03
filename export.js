@@ -4030,6 +4030,7 @@ function getTerrainCollision(x, y, z, w, h, excludeObj = null, prevY = null) {
                 if (!map.enableFallDeath) {
                     // 落下死無効 (デフォルト) なら、マップの底を歩ける床として扱う。
                     if (hitY_Bottom === null || mapPixelH < hitY_Bottom) hitY_Bottom = mapPixelH;
+                    hitWall = true; // ★修正: 最下部で着地できるように壁・床フラグを立てる
                 }
             }
         }
@@ -10358,6 +10359,12 @@ if (playerState.isReloading) {
     let isGuardAction = false;
     let isDodgeTrigger = false; // ★追加: 回避トリガー
     
+    // ★修正: スコープ外参照エラーを防ぐため、キー入力変数を外側で宣言・初期化する
+    let keyUp = false;
+    let keyDown = false;
+    let keyLeft = false;
+    let keyRight = false;
+
     const isForcedMove = (Number(resolveValue(playerState.$forceOn)) === 1);
 
     if (isConversing) {
@@ -10530,10 +10537,11 @@ if (playerState.isReloading) {
             mapEngine.keys['KeyA'] = false; mapEngine.keys['KeyD'] = false;
         }
         
-        const keyUp = mapEngine.keys['ArrowUp'] || mapEngine.keys['KeyW'];
-        const keyDown = mapEngine.keys['ArrowDown'] || mapEngine.keys['KeyS'];
-        const keyLeft = mapEngine.keys['ArrowLeft'] || mapEngine.keys['KeyA'];
-        const keyRight = mapEngine.keys['ArrowRight'] || mapEngine.keys['KeyD'];
+        // ★修正: 宣言(const)ではなく代入に変更
+        keyUp = !!(mapEngine.keys['ArrowUp'] || mapEngine.keys['KeyW']);
+        keyDown = !!(mapEngine.keys['ArrowDown'] || mapEngine.keys['KeyS']);
+        keyLeft = !!(mapEngine.keys['ArrowLeft'] || mapEngine.keys['KeyA']);
+        keyRight = !!(mapEngine.keys['ArrowRight'] || mapEngine.keys['KeyD']);
         
        if (p.z === undefined) p.z = 0; if (p.vz === undefined) p.vz = 0;
         let currentSpeed = (playerState.$spd !== undefined) ? Number(playerState.$spd) : 4.0;
